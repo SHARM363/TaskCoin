@@ -1,872 +1,2004 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
 
-  <title>TaskCoin</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-    }
+    <title>TaskCoin</title>
 
-    body {
-      background: #f4f6f9;
-      color: #172033;
-      padding-bottom: 82px;
-    }
+    <style>
 
-    .app {
-      max-width: 520px;
-      margin: auto;
-    }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    /* Header */
-    .header {
-      background: linear-gradient(135deg, #1667e8, #4c8df7);
-      color: white;
-      padding: 22px 18px 28px;
-      border-radius: 0 0 25px 25px;
-    }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #222;
+            padding-bottom: 75px;
+        }
 
-    .top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+        button {
+            font-family: inherit;
+        }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+        .page {
+            display: none;
+            min-height: calc(100vh - 75px);
+            padding: 16px;
+        }
 
-    .logo {
-      width: 43px;
-      height: 43px;
-      border-radius: 13px;
-      background: white;
-      color: #1667e8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      font-weight: bold;
-    }
+        .page.active {
+            display: block;
+        }
 
-    .brand h1 {
-      font-size: 21px;
-    }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
 
-    .profile {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-    }
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #1769ff;
+        }
 
-    /* Balance */
-    .balance-card {
-      margin-top: 24px;
-      background: rgba(255,255,255,.13);
-      border: 1px solid rgba(255,255,255,.18);
-      border-radius: 18px;
-      padding: 18px;
-    }
+        .profile-btn {
+            width: 42px;
+            height: 42px;
+            border: none;
+            border-radius: 50%;
+            background: #1769ff;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
 
-    .balance-label {
-      font-size: 13px;
-      opacity: .85;
-    }
+        .balance-card {
+            background: linear-gradient(135deg, #1769ff, #5c8dff);
+            color: white;
+            border-radius: 20px;
+            padding: 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(23, 105, 255, 0.2);
+        }
 
-    .balance {
-      font-size: 34px;
-      font-weight: bold;
-      margin-top: 5px;
-    }
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 7px;
+        }
 
-    .coin-text {
-      font-size: 13px;
-      margin-top: 5px;
-      opacity: .85;
-    }
+        .balance-value {
+            font-size: 32px;
+            font-weight: 800;
+        }
 
-    /* Content */
-    .content {
-      padding: 20px 15px;
-    }
+        .coin-label {
+            font-size: 13px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
 
-    .section-title {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 13px;
-    }
+        .section-title {
+            font-size: 20px;
+            font-weight: 800;
+            margin: 20px 0 12px;
+        }
 
-    .section-title h2 {
-      font-size: 18px;
-    }
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
 
-    .see-all {
-      color: #1667e8;
-      font-size: 13px;
-      cursor: pointer;
-    }
+        .action-card {
+            background: white;
+            border-radius: 16px;
+            padding: 18px 12px;
+            text-align: center;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+        }
 
-    /* Quick Actions */
-    .quick-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 24px;
-    }
+        .action-icon {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
 
-    .quick-card {
-      background: white;
-      border-radius: 16px;
-      padding: 16px;
-      border: 1px solid #e9edf3;
-      cursor: pointer;
-    }
+        .action-title {
+            font-size: 14px;
+            font-weight: 700;
+        }
 
-    .quick-icon {
-      font-size: 25px;
-      margin-bottom: 8px;
-    }
+        .task-card {
+            background: white;
+            border-radius: 18px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
 
-    .quick-card strong {
-      display: block;
-      font-size: 14px;
-    }
+        .task-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
 
-    .quick-card span {
-      display: block;
-      color: #7a8495;
-      font-size: 12px;
-      margin-top: 4px;
-    }
+        .task-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: #eef4ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 27px;
+            flex-shrink: 0;
+        }
 
-    /* Task Cards */
-    .task-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+        .task-info {
+            flex: 1;
+        }
 
-    .task {
-      background: white;
-      border-radius: 17px;
-      padding: 15px;
-      display: flex;
-      align-items: center;
-      gap: 13px;
-      border: 1px solid #e9edf3;
-    }
+        .task-title {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
 
-    .task-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 13px;
-      background: #eef5ff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      flex-shrink: 0;
-    }
+        .task-description {
+            color: #777;
+            font-size: 12px;
+            line-height: 1.4;
+        }
 
-    .task-info {
-      flex: 1;
-      min-width: 0;
-    }
+        .task-reward {
+            color: #16a05d;
+            font-weight: 800;
+            font-size: 14px;
+            margin-top: 7px;
+        }
 
-    .task-info strong {
-      font-size: 14px;
-      display: block;
-    }
+        .task-btn {
+            width: 100%;
+            margin-top: 14px;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: #1769ff;
+            color: white;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
 
-    .task-info small {
-      color: #7a8495;
-      display: block;
-      margin-top: 4px;
-      font-size: 11px;
-    }
+        .task-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
 
-    .reward {
-      color: #14a05a;
-      font-weight: bold;
-      font-size: 13px;
-      margin-top: 5px;
-    }
+        .task-btn.completed {
+            background: #20a464;
+        }
 
-    .task-btn {
-      border: none;
-      background: #1667e8;
-      color: white;
-      padding: 9px 13px;
-      border-radius: 10px;
-      font-size: 12px;
-      cursor: pointer;
-    }
+        .wallet-card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
 
-    /* Wallet */
-    .wallet-box {
-      background: white;
-      border-radius: 18px;
-      padding: 18px;
-      border: 1px solid #e9edf3;
-      margin-bottom: 15px;
-    }
+        .wallet-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
 
-    .wallet-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 11px 0;
-      border-bottom: 1px solid #edf0f4;
-      font-size: 14px;
-    }
+        .wallet-row:last-child {
+            border-bottom: none;
+        }
 
-    .wallet-row:last-child {
-      border-bottom: none;
-    }
+        .wallet-label {
+            color: #777;
+        }
 
-    .wallet-row span {
-      color: #788293;
-    }
+        .wallet-value {
+            font-weight: 800;
+        }
 
-    /* Referral */
-    .ref-card {
-      background: white;
-      border-radius: 18px;
-      padding: 20px;
-      border: 1px solid #e9edf3;
-    }
+        .form-card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
 
-    .ref-code {
-      background: #f2f5f9;
-      border-radius: 12px;
-      padding: 13px;
-      margin-top: 13px;
-      text-align: center;
-      font-weight: bold;
-      letter-spacing: 1px;
-    }
+        .form-group {
+            margin-bottom: 15px;
+        }
 
-    .copy-btn {
-      width: 100%;
-      margin-top: 12px;
-      padding: 12px;
-      border: none;
-      border-radius: 11px;
-      background: #1667e8;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 7px;
+        }
 
-    /* Withdraw */
-    .withdraw-form {
-      background: white;
-      border-radius: 18px;
-      padding: 18px;
-      border: 1px solid #e9edf3;
-    }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 11px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+        }
 
-    .withdraw-form label {
-      display: block;
-      font-size: 13px;
-      margin-bottom: 7px;
-      color: #5e6878;
-    }
+        .withdraw-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: #1769ff;
+            color: white;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
 
-    .withdraw-form input,
-    .withdraw-form select {
-      width: 100%;
-      padding: 13px;
-      border: 1px solid #dce2ea;
-      border-radius: 11px;
-      margin-bottom: 15px;
-      outline: none;
-      font-size: 14px;
-      background: white;
-    }
-
-    .withdraw-btn {
-      width: 100%;
-      padding: 13px;
-      border: none;
-      border-radius: 11px;
-      background: #1667e8;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    /* Pages */
-    .page {
-      display: none;
-    }
-
-    .page.active {
-      display: block;
-    }
-
-    /* Bottom Navigation */
-    .bottom-nav {
-      position: fixed;
-      left: 50%;
-      bottom: 0;
-      transform: translateX(-50%);
-      width: 100%;
-      max-width: 520px;
-      height: 72px;
-      background: white;
-      border-top: 1px solid #e5e9ef;
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      z-index: 100;
-    }
-
-    .nav-btn {
-      border: none;
-      background: white;
-      color: #8a93a1;
-      font-size: 10px;
-      cursor: pointer;
-    }
-
-    .nav-btn .nav-icon {
-      display: block;
-      font-size: 20px;
-      margin-bottom: 4px;
-    }
-
-    .nav-btn.active {
-      color: #1667e8;
-      font-weight: bold;
-    }
-
-    /* Empty */
-    .empty {
-      background: white;
-      border-radius: 18px;
-      padding: 35px 20px;
-      text-align: center;
-      color: #788293;
-    }
-
-    .empty-icon {
-      font-size: 35px;
-      margin-bottom: 10px;
-    }
-
-    @media (min-width: 521px) {
-      body {
-        background: #e9edf3;
-      }
-
-      .app {
-        background: #f4f6f9;
-        min-height: 100vh;
-      }
-    }
-  </style>
+    </style>
 </head>
+ <body>
 
-<body>
+    <!-- HOME PAGE -->
+    <div id="home" class="page active">
 
-<div class="app">
+        <div class="header">
+            <div class="logo">🪙 TaskCoin</div>
 
-  <!-- HOME -->
-  <section id="homePage" class="page active">
-
-    <header class="header">
-
-      <div class="top">
-
-        <div class="brand">
-          <div class="logo">₵</div>
-
-          <div>
-            <h1>TaskCoin</h1>
-            <small>Complete tasks & earn rewards</small>
-          </div>
+            <button
+                class="profile-btn"
+                onclick="showPage('wallet')"
+            >
+                👤
+            </button>
         </div>
 
-        <div class="profile">👤</div>
+        <div class="balance-card">
 
-      </div>
+            <div class="balance-label">
+                Your TaskCoin Balance
+            </div>
 
-      <div class="balance-card">
+            <div class="balance-value">
+                0.00
+            </div>
 
-        <div class="balance-label">Available Balance</div>
-
-        <div class="balance">
-          <span id="coinBalance">0</span>
-        </div>
-
-        <div class="coin-text">TaskCoin</div>
-
-      </div>
-
-    </header>
-
-    <main class="content">
-
-      <div class="section-title">
-        <h2>Quick Actions</h2>
-      </div>
-
-      <div class="quick-grid">
-
-        <div class="quick-card" onclick="showPage('tasks')">
-          <div class="quick-icon">🎯</div>
-          <strong>Tasks</strong>
-          <span>Earn coins</span>
-        </div>
-
-        <div class="quick-card" onclick="showPage('wallet')">
-          <div class="quick-icon">💰</div>
-          <strong>Wallet</strong>
-          <span>View balance</span>
-        </div>
-
-        <div class="quick-card" onclick="showPage('withdraw')">
-          <div class="quick-icon">💸</div>
-          <strong>Withdraw</strong>
-          <span>Request payment</span>
-        </div>
-
-        <div class="quick-card" onclick="showPage('referral')">
-          <div class="quick-icon">👥</div>
-          <strong>Referral</strong>
-          <span>Invite friends</span>
-        </div>
-
-      </div>
-
-      <div class="section-title">
-        <h2>Featured Tasks</h2>
-        <span class="see-all" onclick="showPage('tasks')">See All</span>
-      </div>
-
-      <div class="task-list">
-
-        <div class="task">
-
-          <div class="task-icon">📺</div>
-
-          <div class="task-info">
-            <strong>Watch Advertisement</strong>
-            <small>Watch an available advertisement</small>
-            <div class="reward">+10 Coins</div>
-          </div>
-
-          <button class="task-btn" onclick="startTask('Watch Advertisement')">
-            Start
-          </button>
+            <div class="coin-label">
+                TaskCoins
+            </div>
 
         </div>
 
-        <div class="task">
+        <div class="section-title">
+            Quick Actions
+        </div>
 
-          <div class="task-icon">📢</div>
+        <div class="quick-actions">
 
-          <div class="task-info">
-            <strong>Social Task</strong>
-            <small>Complete an available promotional task</small>
-            <div class="reward">+20 Coins</div>
-          </div>
+            <div
+                class="action-card"
+                onclick="showPage('tasks')"
+            >
+                <div class="action-icon">🎯</div>
 
-          <button class="task-btn" onclick="startTask('Social Task')">
-            Start
-          </button>
+                <div class="action-title">
+                    Earn Tasks
+                </div>
+            </div>
+
+
+            <div
+                class="action-card"
+                onclick="showPage('wallet')"
+            >
+                <div class="action-icon">💰</div>
+
+                <div class="action-title">
+                    Wallet
+                </div>
+            </div>
+
+
+            <div
+                class="action-card"
+                onclick="showPage('withdraw')"
+            >
+                <div class="action-icon">💸</div>
+
+                <div class="action-title">
+                    Withdraw
+                </div>
+            </div>
+
+
+            <div
+                class="action-card"
+                onclick="showPage('referral')"
+            >
+                <div class="action-icon">👥</div>
+
+                <div class="action-title">
+                    Referral
+                </div>
+            </div>
 
         </div>
 
-      </div>
 
-    </main>
+        <div class="section-title">
+            Featured Tasks
+        </div>
 
-  </section>
 
+        <div class="task-card">
 
-  <!-- TASKS -->
-  <section id="tasksPage" class="page">
+            <div class="task-top">
 
-    <main class="content">
+                <div class="task-icon">
+                    📺
+                </div>
 
-      <div class="section-title">
-        <h2>🎯 Available Tasks</h2>
-      </div>
+                <div class="task-info">
 
-      <div class="task-list">
+                    <div class="task-title">
+                        Watch Advertisement
+                    </div>
 
-        <div class="task">
+                    <div class="task-description">
+                        Watch an advertisement and
+                        complete the task.
+                    </div>
 
-          <div class="task-icon">📺</div>
+                    <div class="task-reward">
+                        +10 TaskCoins
+                    </div>
 
-          <div class="task-info">
-            <strong>Watch Advertisement</strong>
-            <small>Complete the available ad task</small>
-            <div class="reward">+10 Coins</div>
-          </div>
+                </div>
 
-          <button class="task-btn" onclick="startTask('Advertisement')">
-            Start
-          </button>
+            </div>
+
+            <button
+                class="task-btn"
+                data-task="ad"
+            >
+                Start Task
+            </button>
 
         </div>
 
-        <div class="task">
 
-          <div class="task-icon">📱</div>
+        <div class="task-card">
 
-          <div class="task-info">
-            <strong>Social Media Task</strong>
-            <small>Complete an approved promotional task</small>
-            <div class="reward">+20 Coins</div>
-          </div>
+            <div class="task-top">
 
-          <button class="task-btn" onclick="startTask('Social Media Task')">
-            Start
-          </button>
+                <div class="task-icon">
+                    📱
+                </div>
+
+                <div class="task-info">
+
+                    <div class="task-title">
+                        Social Media Task
+                    </div>
+
+                    <div class="task-description">
+                        Complete a simple social media task.
+                    </div>
+
+                    <div class="task-reward">
+                        +20 TaskCoins
+                    </div>
+
+                </div>
+
+            </div>
+
+            <button
+                class="task-btn"
+                data-task="social"
+            >
+                Start Task
+            </button>
 
         </div>
 
-        <div class="task">
+    </div>
 
-          <div class="task-icon">📢</div>
 
-          <div class="task-info">
-            <strong>Channel Promotion</strong>
-            <small>Complete an available channel task</small>
-            <div class="reward">+25 Coins</div>
-          </div>
+    <!-- TASKS PAGE -->
+    <div id="tasks" class="page">
 
-          <button class="task-btn" onclick="startTask('Channel Promotion')">
-            Start
-          </button>
+        <div class="header">
+
+            <div class="logo">
+                🎯 Tasks
+            </div>
+
+            <button
+                class="profile-btn"
+                onclick="showPage('wallet')"
+            >
+                👤
+            </button>
 
         </div>
 
-      </div>
 
-    </main>
-
-  </section>
-
-
-  <!-- WALLET -->
-  <section id="walletPage" class="page">
-
-    <main class="content">
-
-      <div class="section-title">
-        <h2>💰 Wallet</h2>
-      </div>
-
-      <div class="wallet-box">
-
-        <div class="wallet-row">
-          <span>Coin Balance</span>
-          <strong><span id="walletBalance">0</span> Coins</strong>
+        <div class="section-title">
+            Available Tasks
         </div>
 
-        <div class="wallet-row">
-          <span>Pending Withdrawal</span>
-          <strong>0 Coins</strong>
+
+        <div class="task-card">
+
+            <div class="task-top">
+
+                <div class="task-icon">
+                    📺
+                </div>
+
+                <div class="task-info">
+
+                    <div class="task-title">
+                        Watch Advertisement
+                    </div>
+
+                    <div class="task-description">
+                        Watch an advertisement and earn
+                        TaskCoins.
+                    </div>
+
+                    <div class="task-reward">
+                        +10 TaskCoins
+                    </div>
+
+                </div>
+
+            </div>
+
+            <button
+                class="task-btn"
+                data-task="ad"
+            >
+                Start Task
+            </button>
+
         </div>
 
-        <div class="wallet-row">
-          <span>Total Earned</span>
-          <strong>0 Coins</strong>
+
+        <div class="task-card">
+
+            <div class="task-top">
+
+                <div class="task-icon">
+                    📱
+                </div>
+
+                <div class="task-info">
+
+                    <div class="task-title">
+                        Social Media Task
+                    </div>
+
+                    <div class="task-description">
+                        Complete a simple social media task.
+                    </div>
+
+                    <div class="task-reward">
+                        +20 TaskCoins
+                    </div>
+
+                </div>
+
+            </div>
+
+            <button
+                class="task-btn"
+                data-task="social"
+            >
+                Start Task
+            </button>
+
         </div>
 
-      </div>
 
-      <div class="quick-grid">
+        <div class="task-card">
 
-        <div class="quick-card" onclick="showPage('withdraw')">
-          <div class="quick-icon">💸</div>
-          <strong>Withdraw</strong>
-          <span>Request payment</span>
+            <div class="task-top">
+
+                <div class="task-icon">
+                    📢
+                </div>
+
+                <div class="task-info">
+
+                    <div class="task-title">
+                        Channel Promotion
+                    </div>
+
+                    <div class="task-description">
+                        Complete a channel promotion task.
+                    </div>
+
+                    <div class="task-reward">
+                        +25 TaskCoins
+                    </div>
+
+                </div>
+
+            </div>
+
+            <button
+                class="task-btn"
+                data-task="channel"
+            >
+                Start Task
+            </button>
+
         </div>
 
-        <div class="quick-card" onclick="showPage('tasks')">
-          <div class="quick-icon">🎯</div>
-          <strong>Earn More</strong>
-          <span>View tasks</span>
+
+        <div class="task-card">
+
+            <div class="task-top">
+
+                <div class="task-icon">
+                    🌐
+                </div>
+
+                <div class="task-info">
+
+                    <div class="task-title">
+                        Visit Website
+                    </div>
+
+                    <div class="task-description">
+                        Visit the website and complete
+                        the required task.
+                    </div>
+
+                    <div class="task-reward">
+                        +15 TaskCoins
+                    </div>
+
+                </div>
+
+            </div>
+
+            <button
+                class="task-btn"
+                data-task="website"
+            >
+                Start Task
+            </button>
+
         </div>
 
-      </div>
+    </div> 
+       <!-- WALLET PAGE -->
+    <div id="wallet" class="page">
 
-    </main>
+        <div class="header">
 
-  </section>
+            <div class="logo">
+                💰 Wallet
+            </div>
+
+            <button
+                class="profile-btn"
+                onclick="showPage('home')"
+            >
+                🏠
+            </button>
+
+        </div>
 
 
-  <!-- WITHDRAW -->
-  <section id="withdrawPage" class="page">
+        <div class="balance-card">
 
-    <main class="content">
+            <div class="balance-label">
+                Available Balance
+            </div>
 
-      <div class="section-title">
-        <h2>💸 Withdraw</h2>
-      </div>
+            <div class="balance-value">
+                0.00
+            </div>
 
-      <div class="withdraw-form">
+            <div class="coin-label">
+                TaskCoins
+            </div>
 
-        <label>Payment Method</label>
+        </div>
 
-        <select id="paymentMethod">
-          <option value="bkash">bKash</option>
-          <option value="nagad">Nagad</option>
-          <option value="usdt">USDT</option>
-        </select>
 
-        <label>Account / Wallet Number</label>
+        <div class="wallet-card">
 
-        <input
-          type="text"
-          id="accountNumber"
-          placeholder="Enter payment account"
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    Current Balance
+                </div>
+
+                <div class="wallet-value">
+                    <span class="balance-value">
+                        0.00
+                    </span>
+                </div>
+
+            </div>
+
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    Total Earned
+                </div>
+
+                <div class="wallet-value">
+                    <span class="total-earned">
+                        0.00
+                    </span>
+                </div>
+
+            </div>
+
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    Completed Tasks
+                </div>
+
+                <div class="wallet-value">
+                    <span id="completedCount">
+                        0
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="section-title">
+            Wallet Information
+        </div>
+
+
+        <div class="wallet-card">
+
+            <div class="task-description">
+                Your TaskCoin balance is stored locally
+                for this test version.
+            </div>
+
+            <br>
+
+            <div class="task-description">
+                Real deposits, withdrawals and secure
+                account balances will be connected to
+                the backend in the next stage.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- WITHDRAW PAGE -->
+    <div id="withdraw" class="page">
+
+        <div class="header">
+
+            <div class="logo">
+                💸 Withdraw
+            </div>
+
+            <button
+                class="profile-btn"
+                onclick="showPage('home')"
+            >
+                🏠
+            </button>
+
+        </div>
+
+
+        <div class="balance-card">
+
+            <div class="balance-label">
+                Available Balance
+            </div>
+
+            <div class="balance-value">
+                0.00
+            </div>
+
+            <div class="coin-label">
+                TaskCoins
+            </div>
+
+        </div>
+
+
+        <div class="form-card">
+
+            <div class="form-group">
+
+                <label for="withdrawAmount">
+                    Withdrawal Amount
+                </label>
+
+                <input
+                    type="number"
+                    id="withdrawAmount"
+                    placeholder="Enter amount"
+                    min="100"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="withdrawMethod">
+                    Withdrawal Method
+                </label>
+
+                <select id="withdrawMethod">
+
+                    <option value="">
+                        Select Method
+                    </option>
+
+                    <option value="bKash">
+                        bKash
+                    </option>
+
+                    <option value="Nagad">
+                        Nagad
+                    </option>
+
+                    <option value="Bank">
+                        Bank
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="withdrawAccount">
+                    Account Number
+                </label>
+
+                <input
+                    type="text"
+                    id="withdrawAccount"
+                    placeholder="Enter account number"
+                >
+
+            </div>
+
+
+            <button
+                class="withdraw-btn"
+                onclick="requestWithdraw()"
+            >
+                Submit Withdrawal Request
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- REFERRAL PAGE -->
+    <div id="referral" class="page">
+
+        <div class="header">
+
+            <div class="logo">
+                👥 Referral
+            </div>
+
+            <button
+                class="profile-btn"
+                onclick="showPage('home')"
+            >
+                🏠
+            </button>
+
+        </div>
+
+
+        <div class="referral-card">
+
+            <div class="referral-icon">
+                👥
+            </div>
+
+
+            <div class="referral-title">
+                Invite Friends
+            </div>
+
+
+            <div class="referral-text">
+                Invite your friends to TaskCoin
+                and grow the TaskCoin community.
+            </div>
+
+
+            <div class="referral-code-box">
+
+                <div
+                    class="referral-code"
+                    id="referralCode"
+                >
+                    TASKCOIN-USER
+                </div>
+
+                <button
+                    class="copy-btn"
+                    id="copyReferralBtn"
+                >
+                    Copy
+                </button>
+
+            </div>
+
+
+            <div class="referral-stats">
+
+                <div class="referral-stat">
+
+                    <div
+                        class="referral-stat-value"
+                    >
+                        0
+                    </div>
+
+                    <div
+                        class="referral-stat-label"
+                    >
+                        Total Referrals
+                    </div>
+
+                </div>
+
+
+                <div class="referral-stat">
+
+                    <div
+                        class="referral-stat-value"
+                    >
+                        0
+                    </div>
+
+                    <div
+                        class="referral-stat-label"
+                    >
+                        Referral Earnings
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+       <!-- BOTTOM NAVIGATION -->
+    <div class="bottom-nav">
+
+        <div
+            class="nav-item active"
+            onclick="showPage('home')"
         >
-
-        <label>Coin Amount</label>
-
-        <input
-          type="number"
-          id="withdrawAmount"
-          min="1"
-          placeholder="Enter coins"
-        >
-
-        <button class="withdraw-btn" onclick="requestWithdraw()">
-          Submit Withdrawal Request
-        </button>
-
-      </div>
-
-    </main>
-
-  </section>
-
-
-  <!-- REFERRAL -->
-  <section id="referralPage" class="page">
-
-    <main class="content">
-
-      <div class="section-title">
-        <h2>👥 Referral</h2>
-      </div>
-
-      <div class="ref-card">
-
-        <p>
-          Invite friends and earn referral rewards when eligible conditions
-          are completed.
-        </p>
-
-        <div class="ref-code">
-          TASKCOIN-USER
+            <div class="nav-item-icon">🏠</div>
+            <div>Home</div>
         </div>
 
-        <button class="copy-btn" onclick="copyReferral()">
-          Copy Referral Code
-        </button>
 
-      </div>
+        <div
+            class="nav-item"
+            onclick="showPage('tasks')"
+        >
+            <div class="nav-item-icon">🎯</div>
+            <div>Tasks</div>
+        </div>
 
-    </main>
+
+        <div
+            class="nav-item"
+            onclick="showPage('wallet')"
+        >
+            <div class="nav-item-icon">💰</div>
+            <div>Wallet</div>
+        </div>
 
-  </section>
 
+        <div
+            class="nav-item"
+            onclick="showPage('withdraw')"
+        >
+            <div class="nav-item-icon">💸</div>
+            <div>Withdraw</div>
+        </div>
 
-  <!-- BOTTOM NAV -->
-  <nav class="bottom-nav">
 
-    <button class="nav-btn active" onclick="showPage('home')">
-      <span class="nav-icon">🏠</span>
-      Home
-    </button>
+        <div
+            class="nav-item"
+            onclick="showPage('referral')"
+        >
+            <div class="nav-item-icon">👥</div>
+            <div>Referral</div>
+        </div>
 
-    <button class="nav-btn" onclick="showPage('tasks')">
-      <span class="nav-icon">🎯</span>
-      Tasks
-    </button>
+    </div>
 
-    <button class="nav-btn" onclick="showPage('wallet')">
-      <span class="nav-icon">💰</span>
-      Wallet
-    </button>
 
-    <button class="nav-btn" onclick="showPage('withdraw')">
-      <span class="nav-icon">💸</span>
-      Withdraw
-    </button>
+    <!-- TASK MODAL -->
+    <div
+        id="taskModal"
+        class="modal"
+    >
 
-    <button class="nav-btn" onclick="showPage('referral')">
-      <span class="nav-icon">👥</span>
-      Referral
-    </button>
+        <div class="modal-content">
 
-  </nav>
+            <button
+                class="close-modal"
+                onclick="closeTaskModal()"
+            >
+                ✕
+            </button>
 
-</div>
 
+            <div
+                class="modal-task-icon"
+                id="modalTaskIcon"
+            >
+                📺
+            </div>
 
-<script>
 
-  /*
-   * Temporary local balance.
-   * Later this will be connected to the backend/database.
-   */
+            <div
+                class="modal-task-title"
+                id="modalTaskTitle"
+            >
+                Watch Advertisement
+            </div>
 
-  let balance = 0;
 
+            <div
+                class="modal-task-description"
+                id="modalTaskDescription"
+            >
+                Complete the task to earn TaskCoins.
+            </div>
 
-  function updateBalance() {
 
-    document.getElementById("coinBalance").textContent = balance;
+            <div class="timer-box">
 
-    document.getElementById("walletBalance").textContent = balance;
+                <div class="timer-label">
+                    Time Remaining
+                </div>
 
-  }
+                <div
+                    class="timer-text"
+                    id="timerText"
+                >
+                    10
+                </div>
 
+            </div>
 
-  function showPage(page) {
 
-    const pages = document.querySelectorAll(".page");
+            <div
+                class="task-reward-modal"
+                id="modalTaskReward"
+            >
+                +10 TaskCoins
+            </div>
 
-    pages.forEach(function(p) {
-      p.classList.remove("active");
-    });
 
+            <button
+                class="claim-btn"
+                id="claimBtn"
+                disabled
+            >
+                Claim Reward
+            </button>
 
-    const target = document.getElementById(page + "Page");
+        </div>
 
-    if (target) {
-      target.classList.add("active");
-    }
+    </div>
 
 
-    const buttons = document.querySelectorAll(".nav-btn");
+    <!-- TOAST -->
+    <div
+        id="toast"
+        class="toast"
+    >
+        Task completed!
+    </div>
 
-    buttons.forEach(function(btn) {
-      btn.classList.remove("active");
-    });
 
+    <style>
 
-    const pageNames = [
-      "home",
-      "tasks",
-      "wallet",
-      "withdraw",
-      "referral"
-    ];
+        .referral-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
+
+
+        .referral-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
 
-    const index = pageNames.indexOf(page);
+
+        .referral-title {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
 
-    if (index >= 0 && buttons[index]) {
-      buttons[index].classList.add("active");
-    }
 
+        .referral-text {
+            color: #777;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
 
-  }
+        .referral-code-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
 
 
-  function startTask(taskName) {
+        .referral-code {
+            flex: 1;
+            background: #f3f6fb;
+            border-radius: 10px;
+            padding: 13px 8px;
+            font-size: 13px;
+            font-weight: 700;
+            overflow: hidden;
+        }
+
+
+        .copy-btn {
+            border: none;
+            border-radius: 10px;
+            padding: 0 16px;
+            background: #1769ff;
+            color: white;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+
+        .referral-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+
+        .referral-stat {
+            background: #f7f9fc;
+            border-radius: 14px;
+            padding: 15px 8px;
+        }
+
+
+        .referral-stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+
+        .referral-stat-label {
+            color: #777;
+            font-size: 11px;
+        }
+
+
+        .bottom-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 68px;
+            background: white;
+            border-top: 1px solid #eee;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            z-index: 100;
+        }
+
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            color: #888;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+
+        .nav-item.active {
+            color: #1769ff;
+        }
 
-    alert(
-      taskName +
-      " is ready. Backend task verification will be connected later."
-    );
 
-  }
+        .nav-item-icon {
+            font-size: 21px;
+        }
+
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 200;
+        }
+
+
+        .modal.show {
+            display: flex;
+        }
+
+
+        .modal-content {
+            width: 100%;
+            max-width: 380px;
+            background: white;
+            border-radius: 22px;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+        }
+
+
+        .close-modal {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 50%;
+            background: #f1f3f7;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+
+        .modal-task-icon {
+            font-size: 52px;
+            margin-top: 8px;
+            margin-bottom: 12px;
+        }
 
 
-  function requestWithdraw() {
+        .modal-task-title {
+            font-size: 21px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
 
-    const method =
-      document.getElementById("paymentMethod").value;
+
+        .modal-task-description {
+            color: #777;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+
+        .timer-box {
+            margin: 20px 0;
+            background: #f3f6fb;
+            border-radius: 16px;
+            padding: 18px;
+        }
+
+
+        .timer-label {
+            color: #777;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+
+        .timer-text {
+            font-size: 38px;
+            font-weight: 900;
+            color: #1769ff;
+        }
+
+
+        .task-reward-modal {
+            color: #16a05d;
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 18px;
+        }
 
-    const account =
-      document.getElementById("accountNumber").value.trim();
 
-    const amount =
-      Number(document.getElementById("withdrawAmount").value);
+        .claim-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: #1769ff;
+            color: white;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
 
 
-    if (!account) {
-      alert("Please enter your payment account.");
-      return;
-    }
+        .claim-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
 
-    if (!amount || amount <= 0) {
-      alert("Please enter a valid coin amount.");
-      return;
-    }
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 85px;
+            transform: translateX(-50%);
+            background: #222;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+            z-index: 300;
+            white-space: nowrap;
+        }
 
 
-    if (amount > balance) {
-      alert("Insufficient coin balance.");
-      return;
-    }
+        .toast.show {
+            opacity: 1;
+        }
 
+    </style>
 
-    alert(
-      "Withdrawal request created.\n\n" +
-      "Method: " + method +
-      "\nCoins: " + amount +
-      "\n\nPayment processing will be connected to the backend later."
-    );
 
-  }
+    <script>
 
+        const STORAGE_BALANCE = "taskcoin_balance";
 
-  function copyReferral() {
+        const STORAGE_EARNED = "taskcoin_total_earned";
 
-    const code = "TASKCOIN-USER";
+        const STORAGE_COMPLETED = "taskcoin_completed_tasks";
 
-    /*
-     * Clipboard API will be connected/handled with
-     * the real Telegram referral link later.
-     */
 
-    if (navigator.clipboard) {
+        const TASKS = {
 
-      navigator.clipboard.writeText(code);
+            ad: {
+                title: "Watch Advertisement",
+                description: "Watch an advertisement and complete the task.",
+                icon: "📺",
+                reward: 10,
+                duration: 10
+            },
 
-      alert("Referral code copied!");
+            social: {
+                title: "Social Media Task",
+                description: "Complete a simple social media task.",
+                icon: "📱",
+                reward: 20,
+                duration: 10
+            },
 
-    } else {
+            channel: {
+                title: "Channel Promotion",
+                description: "Complete a channel promotion task.",
+                icon: "📢",
+                reward: 25,
+                duration: 10
+            },
 
-      alert("Your referral code: " + code);
+            website: {
+                title: "Visit Website",
+                description: "Visit the website and complete the required task.",
+                icon: "🌐",
+                reward: 15,
+                duration: 10
+            }
 
-    }
+        };
 
-  }
 
+        let currentTaskId = null;
 
-  updateBalance();
+        let timerInterval = null;
 
-</script>
+        let remainingTime = 0;
+
+
+        function getBalance() {
+
+            return Number(
+                localStorage.getItem(STORAGE_BALANCE) || "0"
+            );
+
+        }
+
+
+        function getTotalEarned() {
+
+            return Number(
+                localStorage.getItem(STORAGE_EARNED) || "0"
+            );
+
+        }
+
+
+        function getCompletedTasks() {
+
+            return JSON.parse(
+                localStorage.getItem(STORAGE_COMPLETED) || "[]"
+            );
+
+        }
+                function saveBalance(balance) {
+
+            localStorage.setItem(
+                STORAGE_BALANCE,
+                balance.toString()
+            );
+
+        }
+
+
+        function saveTotalEarned(amount) {
+
+            localStorage.setItem(
+                STORAGE_EARNED,
+                amount.toString()
+            );
+
+        }
+
+
+        function saveCompletedTasks(tasks) {
+
+            localStorage.setItem(
+                STORAGE_COMPLETED,
+                JSON.stringify(tasks)
+            );
+
+        }
+
+
+        function updateBalanceDisplay() {
+
+            const balance = getBalance();
+
+            const totalEarned = getTotalEarned();
+
+            const completedTasks = getCompletedTasks();
+
+
+            document
+                .querySelectorAll(".balance-value")
+                .forEach(function(element) {
+
+                    element.textContent =
+                        balance.toFixed(2);
+
+                });
+
+
+            document
+                .querySelectorAll(".total-earned")
+                .forEach(function(element) {
+
+                    element.textContent =
+                        totalEarned.toFixed(2);
+
+                });
+
+
+            const completedCount =
+                document.getElementById("completedCount");
+
+
+            if (completedCount) {
+
+                completedCount.textContent =
+                    completedTasks.length;
+
+            }
+
+        }
+
+
+        function showPage(pageId) {
+
+            document
+                .querySelectorAll(".page")
+                .forEach(function(page) {
+
+                    page.classList.remove("active");
+
+                });
+
+
+            const page =
+                document.getElementById(pageId);
+
+
+            if (page) {
+
+                page.classList.add("active");
+
+            }
+
+
+            document
+                .querySelectorAll(".nav-item")
+                .forEach(function(item) {
+
+                    item.classList.remove("active");
+
+                });
+
+
+            document
+                .querySelectorAll(".nav-item")
+                .forEach(function(item) {
+
+                    const onclickValue =
+                        item.getAttribute("onclick") || "";
+
+                    if (
+                        onclickValue.includes(
+                            "'" + pageId + "'"
+                        )
+                    ) {
+
+                        item.classList.add("active");
+
+                    }
+
+                });
+
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+        }
+
+
+        function showToast(message) {
+
+            const toast =
+                document.getElementById("toast");
+
+
+            if (!toast) {
+                return;
+            }
+
+
+            toast.textContent = message;
+
+            toast.classList.add("show");
+
+
+            setTimeout(function() {
+
+                toast.classList.remove("show");
+
+            }, 2500);
+
+        }
+
+
+        function openTask(taskId) {
+
+            const task = TASKS[taskId];
+
+
+            if (!task) {
+                return;
+            }
+
+
+            const completedTasks =
+                getCompletedTasks();
+
+
+            if (completedTasks.includes(taskId)) {
+
+                showToast(
+                    "You already completed this task."
+                );
+
+                return;
+
+            }
+
+
+            currentTaskId = taskId;
+
+            remainingTime = task.duration;
+
+
+            document.getElementById(
+                "modalTaskIcon"
+            ).textContent = task.icon;
+
+
+            document.getElementById(
+                "modalTaskTitle"
+            ).textContent = task.title;
+
+
+            document.getElementById(
+                "modalTaskDescription"
+            ).textContent = task.description;
+
+
+            document.getElementById(
+                "modalTaskReward"
+            ).textContent =
+                "+" + task.reward + " TaskCoins";
+
+
+            document.getElementById(
+                "timerText"
+            ).textContent = remainingTime;
+
+
+            const claimBtn =
+                document.getElementById("claimBtn");
+
+
+            claimBtn.disabled = true;
+
+
+            document.getElementById(
+                "taskModal"
+            ).classList.add("show");
+
+
+            clearInterval(timerInterval);
+
+
+            timerInterval = setInterval(
+                function() {
+
+                    remainingTime--;
+
+
+                    document.getElementById(
+                        "timerText"
+                    ).textContent = remainingTime;
+
+
+                    if (remainingTime <= 0) {
+
+                        clearInterval(timerInterval);
+
+                        timerInterval = null;
+
+
+                        claimBtn.disabled = false;
+
+
+                        showToast(
+                            "Task completed. Claim your reward!"
+                        );
+
+                    }
+
+                },
+                1000
+            );
+
+        }
+
+
+        function closeTaskModal() {
+
+            clearInterval(timerInterval);
+
+            timerInterval = null;
+
+            currentTaskId = null;
+
+
+            const modal =
+                document.getElementById("taskModal");
+
+
+            if (modal) {
+
+                modal.classList.remove("show");
+
+            }
+
+        }
+
+
+        function claimReward() {
+
+            if (!currentTaskId) {
+                return;
+            }
+
+
+            const task =
+                TASKS[currentTaskId];
+
+
+            if (!task) {
+                return;
+            }
+
+
+            if (remainingTime > 0) {
+
+                showToast(
+                    "Please wait until the timer finishes."
+                );
+
+                return;
+
+            }
+
+
+            const completedTasks =
+                getCompletedTasks();
+
+
+            if (completedTasks.includes(currentTaskId)) {
+
+                showToast(
+                    "You already claimed this task."
+                );
+
+                closeTaskModal();
+
+                return;
+
+            }
+
+
+            const newBalance =
+                getBalance() + task.reward;
+
+
+            const newTotalEarned =
+                getTotalEarned() + task.reward;
+
+
+            completedTasks.push(currentTaskId);
+
+
+            saveBalance(newBalance);
+
+            saveTotalEarned(newTotalEarned);
+
+            saveCompletedTasks(completedTasks);
+
+
+            updateBalanceDisplay();
+
+            updateTaskButtons();
+
+
+            closeTaskModal();
+
+
+            showToast(
+                "+" + task.reward +
+                " TaskCoins added to your balance!"
+            );
+
+        }
+
+
+        function updateTaskButtons() {
+
+            const completedTasks =
+                getCompletedTasks();
+
+
+            document
+                .querySelectorAll(".task-btn")
+                .forEach(function(button) {
+
+                    const taskId =
+                        button.getAttribute("data-task");
+
+
+                    if (
+                        completedTasks.includes(taskId)
+                    ) {
+
+                        button.textContent =
+                            "✓ Completed";
+
+                        button.classList.add(
+                            "completed"
+                        );
+
+                    } else {
+
+                        button.textContent =
+                            "Start Task";
+
+                        button.classList.remove(
+                            "completed"
+                        );
+
+                    }
+
+                });
+
+        }
+
+
+        function requestWithdraw() {
+
+            const amountInput =
+                document.getElementById(
+                    "withdrawAmount"
+                );
+
+
+            const methodInput =
+                document.getElementById(
+                    "withdrawMethod"
+                );
+
+
+            const accountInput =
+                document.getElementById(
+                    "withdrawAccount"
+                );
+
+
+            const amount =
+                Number(amountInput.value);
+
+
+            const method =
+                methodInput.value;
+
+
+            const account =
+                accountInput.value.trim();
+
+
+            const balance =
+                getBalance();
+
+
+            if (!amount || amount <= 0) {
+
+                showToast(
+                    "Please enter a valid amount."
+                );
+
+                return;
+
+            }
+
+
+            if (amount < 100) {
+
+                showToast(
+                    "Minimum withdrawal is 100 TaskCoins."
+                );
+
+                return;
+
+            }
+
+
+            if (amount > balance) {
+
+                showToast(
+                    "Insufficient TaskCoin balance."
+                );
+
+                return;
+
+            }
+
+
+            if (!method) {
+
+                showToast(
+                    "Please select a withdrawal method."
+                );
+
+                return;
+
+            }
+
+
+            if (!account) {
+
+                showToast(
+                    "Please enter your account number."
+                );
+
+                return;
+
+            }
+
+
+            showToast(
+                "Withdrawal request submitted for testing."
+            );
+
+        }
+
+
+        function copyReferralCode() {
+
+            const codeElement =
+                document.getElementById(
+                    "referralCode"
+                );
+
+
+            if (!codeElement) {
+                return;
+            }
+
+
+            const code =
+                codeElement.textContent.trim();
+
+
+            if (
+                navigator.clipboard &&
+                navigator.clipboard.writeText
+            ) {
+
+                navigator.clipboard
+                    .writeText(code)
+                    .then(function() {
+
+                        showToast(
+                            "Referral code copied!"
+                        );
+
+                    })
+                    .catch(function() {
+
+                        showToast(
+                            "Could not copy referral code."
+                        );
+
+                    });
+
+            } else {
+
+                showToast(
+                    "Copy is not supported on this device."
+                );
+
+            }
+
+        }
+
+
+        document
+            .querySelectorAll(".task-btn")
+            .forEach(function(button) {
+
+                button.addEventListener(
+                    "click",
+                    function() {
+
+                        const taskId =
+                            button.getAttribute(
+                                "data-task"
+                            );
+
+
+                        openTask(taskId);
+
+                    }
+                );
+
+            });
+
+
+        document
+            .getElementById("claimBtn")
+            .addEventListener(
+                "click",
+                claimReward
+            );
+
+
+        document
+            .getElementById("copyReferralBtn")
+            .addEventListener(
+                "click",
+                copyReferralCode
+            );
+
+
+        updateBalanceDisplay();
+
+        updateTaskButtons();
+
+
+        if (
+            window.Telegram &&
+            window.Telegram.WebApp
+        ) {
+
+            Telegram.WebApp.ready();
+
+            Telegram.WebApp.expand();
+
+        }
+
+    </script>
 
 </body>
-  </html>
+
+</html>
