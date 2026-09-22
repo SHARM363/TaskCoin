@@ -12,6 +12,8 @@ PORT = int(os.getenv("PORT", "10000"))
 
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -44,6 +46,9 @@ def main():
     if not RENDER_EXTERNAL_URL:
         raise RuntimeError("RENDER_EXTERNAL_URL environment variable is missing.")
 
+    if not WEBHOOK_SECRET:
+        raise RuntimeError("WEBHOOK_SECRET environment variable is missing.")
+
     application = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -60,7 +65,7 @@ def main():
         listen="0.0.0.0",
         port=PORT,
         webhook_url=f"{RENDER_EXTERNAL_URL}/telegram",
-        secret_token=BOT_TOKEN
+        secret_token=WEBHOOK_SECRET
     )
 
 
