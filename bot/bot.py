@@ -62,11 +62,12 @@ def main():
     print("TaskCoin Bot is starting with webhook...")
 
     application.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        webhook_url=f"{RENDER_EXTERNAL_URL}/telegram",
-        secret_token=WEBHOOK_SECRET
-    )
+    listen="0.0.0.0",
+    port=PORT,
+    url_path="telegram",
+    webhook_url=f"{RENDER_EXTERNAL_URL}/telegram",
+    secret_token=WEBHOOK_SECRET
+)
 
 
 if __name__ == "__main__":
