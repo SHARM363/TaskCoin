@@ -1,5 +1,4 @@
 import os
-import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -8,6 +7,10 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 WEB_APP_URL = "https://sharm363.github.io/TaskCoin/"
+
+PORT = int(os.getenv("PORT", "10000"))
+
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,10 +36,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def main():
+def main():
 
     if not BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN environment variable is missing.")
+
+    if not RENDER_EXTERNAL_URL:
+        raise RuntimeError("RENDER_EXTERNAL_URL environment variable is missing.")
 
     application = (
         Application.builder()
@@ -48,19 +54,15 @@ async def main():
         CommandHandler("start", start)
     )
 
-    print("TaskCoin Bot is running...")
+    print("TaskCoin Bot is starting with webhook...")
 
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
-
-    try:
-        await asyncio.Event().wait()
-    finally:
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=f"{RENDER_EXTERNAL_URL}/telegram",
+        secret_token=BOT_TOKEN
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
