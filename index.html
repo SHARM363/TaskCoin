@@ -600,88 +600,209 @@
 
     </div> 
        <!-- WALLET PAGE -->
-    <div id="wallet" class="page">
+<div id="wallet" class="page">
 
-        <div class="header">
+    <div class="header">
 
-            <div class="logo">
-                💰 Wallet
+        <div class="logo">
+            💰 Wallet
+        </div>
+
+        <button
+            class="profile-btn"
+            onclick="showPage('home')"
+        >
+            🏠
+        </button>
+
+    </div>
+
+
+    <!-- TELEGRAM PROFILE -->
+    <div class="section-title">
+        👤 Telegram Profile
+    </div>
+
+
+    <div class="wallet-card">
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Name
             </div>
 
-            <button
-                class="profile-btn"
-                onclick="showPage('home')"
+            <div
+                class="wallet-value"
+                id="telegramName"
             >
-                🏠
-            </button>
-
-        </div>
-
-
-        <div class="balance-card">
-
-            <div class="balance-label">
-                Available Balance
-            </div>
-
-            <div class="balance-value">
-                0.00
-            </div>
-
-            <div class="coin-label">
-                TaskCoins
+                Loading...
             </div>
 
         </div>
 
 
-        <div class="wallet-card">
+        <div class="wallet-row">
 
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    Current Balance
-                </div>
-
-                <div class="wallet-value">
-                    <span class="balance-value">
-                        0.00
-                    </span>
-                </div>
-
+            <div class="wallet-label">
+                Username
             </div>
 
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    Total Earned
-                </div>
-
-                <div class="wallet-value">
-                    <span class="total-earned">
-                        0.00
-                    </span>
-                </div>
-
+            <div
+                class="wallet-value"
+                id="telegramUsername"
+            >
+                Loading...
             </div>
 
+        </div>
 
-            <div class="wallet-row">
 
-                <div class="wallet-label">
-                    Completed Tasks
-                </div>
+        <div class="wallet-row">
 
-                <div class="wallet-value">
-                    <span id="completedCount">
-                        0
-                    </span>
-                </div>
+            <div class="wallet-label">
+                Telegram ID
+            </div>
+
+            <div
+                class="wallet-value"
+                id="telegramId"
+            >
+                Loading...
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- BALANCE -->
+    <div class="balance-card">
+
+        <div class="balance-label">
+            Available Balance
+        </div>
+
+        <div
+            class="balance-value"
+            id="walletBalance"
+        >
+            0.00
+        </div>
+
+        <div class="coin-label">
+            TaskCoins
+        </div>
+
+    </div>
+
+
+    <!-- WALLET DETAILS -->
+    <div class="wallet-card">
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Current Balance
+            </div>
+
+            <div class="wallet-value">
+
+                <span
+                    class="balance-value"
+                    id="currentBalance"
+                >
+                    0.00
+                </span>
 
             </div>
 
         </div>
+
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Total Earned
+            </div>
+
+            <div class="wallet-value">
+
+                <span
+                    class="total-earned"
+                    id="totalEarned"
+                >
+                    0.00
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Completed Tasks
+            </div>
+
+            <div class="wallet-value">
+
+                <span id="completedCount">
+                    0
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Referral Count
+            </div>
+
+            <div class="wallet-value">
+
+                <span id="referralCount">
+                    0
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="section-title">
+        Wallet Information
+    </div>
+
+
+    <div class="wallet-card">
+
+        <div class="task-description">
+
+            Your TaskCoin account is connected
+            with your Telegram account.
+
+        </div>
+
+        <br>
+
+        <div class="task-description">
+
+            Your balance, completed tasks and
+            other account information will be
+            synchronized with the TaskCoin backend.
+
+        </div>
+
+    </div>
+
+</div>
 
 
         <div class="section-title">
