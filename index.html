@@ -1982,7 +1982,84 @@
 
 
         updateBalanceDisplay();
+               const tg =
+            window.Telegram &&
+            window.Telegram.WebApp
+                ? window.Telegram.WebApp
+                : null;
 
+
+        let telegramUser = null;
+
+
+        if (tg) {
+
+            tg.ready();
+
+            tg.expand();
+
+
+            if (
+                tg.initDataUnsafe &&
+                tg.initDataUnsafe.user
+            ) {
+
+                telegramUser =
+                    tg.initDataUnsafe.user;
+
+            }
+
+        }
+
+
+        async function testTelegramUser() {
+
+            if (!telegramUser) {
+
+                console.log(
+                    "Telegram user information not found."
+                );
+
+                return;
+
+            }
+
+
+            const telegramId =
+                telegramUser.id;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "https://taskcoin-1.onrender.com/api/user?telegram_id="
+                        + telegramId
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                console.log(
+                    "TaskCoin User:",
+                    data
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "User API Error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        testTelegramUser();
         updateTaskButtons();
 
 
