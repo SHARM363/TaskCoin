@@ -18,7 +18,10 @@ from telegram.ext import (
 )
 
 from api import app
-from database import init_db
+from database import (
+    init_db,
+    create_or_update_user
+)
 
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -37,6 +40,30 @@ async def start(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
+    # Telegram user information
+    telegram_user = update.effective_user
+
+    if telegram_user:
+
+        try:
+
+            create_or_update_user(
+                telegram_id=telegram_user.id,
+                username=telegram_user.username,
+                first_name=telegram_user.first_name
+            )
+
+            print(
+                f"User saved: {telegram_user.id}"
+            )
+
+        except Exception as e:
+
+            print(
+                f"User save error: {e}"
+            )
+
+
     keyboard = [
         [
             InlineKeyboardButton(
@@ -52,12 +79,17 @@ async def start(
         keyboard
     )
 
+
     await update.message.reply_text(
+
         "👋 Welcome to TaskCoin!\n\n"
+
         "🎯 Complete available tasks\n"
         "🪙 Earn TaskCoins\n"
         "💰 Manage your rewards\n\n"
+
         "Tap the button below to open TaskCoin.",
+
         reply_markup=reply_markup
     )
 
@@ -73,7 +105,9 @@ async def setup_bot(application):
         secret_token=WEBHOOK_SECRET
     )
 
-    print("TaskCoin Bot webhook is ready.")
+    print(
+        "TaskCoin Bot webhook is ready."
+    )
 
     await asyncio.Event().wait()
 
@@ -94,26 +128,34 @@ def run_flask():
 
 def main():
 
+    # Initialize database
     init_db()
 
     print(
         "TaskCoin database initialized successfully."
     )
 
+
     if not BOT_TOKEN:
+
         raise RuntimeError(
             "BOT_TOKEN environment variable is missing."
         )
 
+
     if not RENDER_EXTERNAL_URL:
+
         raise RuntimeError(
             "RENDER_EXTERNAL_URL environment variable is missing."
         )
 
+
     if not WEBHOOK_SECRET:
+
         raise RuntimeError(
             "WEBHOOK_SECRET environment variable is missing."
         )
+
 
     application = (
         Application.builder()
@@ -121,16 +163,21 @@ def main():
         .build()
     )
 
+
     application.add_handler(
+
         CommandHandler(
             "start",
             start
         )
+
     )
+
 
     loop = asyncio.new_event_loop()
 
     asyncio.set_event_loop(loop)
+
 
     @app.route(
         "/telegram",
@@ -142,44 +189,69 @@ def main():
             "X-Telegram-Bot-Api-Secret-Token"
         )
 
+
         if secret != WEBHOOK_SECRET:
 
             return jsonify({
+
                 "success": False,
                 "message": "Unauthorized"
+
             }), 403
+
 
         update_data = request.get_json(
             force=True
         )
+
 
         update = Update.de_json(
             update_data,
             application.bot
         )
 
+
         asyncio.run_coroutine_threadsafe(
-            application.update_queue.put(update),
+
+            application.update_queue.put(
+                update
+            ),
+
             loop
+
         )
 
+
         return jsonify({
+
             "success": True
+
         })
 
+
     flask_thread = threading.Thread(
+
         target=run_flask,
+
         daemon=True
+
     )
 
+
     flask_thread.start()
+
 
     print(
         "TaskCoin Bot + API is starting..."
     )
 
+
     loop.run_until_complete(
-        setup_bot(application)
+
+        setup_bot(
+            application
+        )
+
     )
 
 
