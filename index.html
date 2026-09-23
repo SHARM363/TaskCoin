@@ -2163,12 +2163,7 @@
                     await response.json();
 
 
-                console.log(
-                    "TaskCoin User:",
-                    data
-                );
-
-            } catch (error) {
+                            } catch (error) {
 
                 console.error(
                     "User API Error:",
@@ -2179,288 +2174,63 @@
 
         }
 
-        // Telegram User Profile
+
+// Telegram Profile Display
 function loadTelegramProfile() {
 
-    if (
-        !window.Telegram ||
-        !window.Telegram.WebApp
-    ) {
-        console.log("Telegram WebApp not available");
+    if (!telegramUser) {
+        console.log("Telegram user not found.");
         return;
     }
 
-    const tg = window.Telegram.WebApp;
-
-    const user = tg.initDataUnsafe.user;
-
-    if (!user) {
-        console.log("Telegram user information not available");
-        return;
-    }
-
-    // Name
-    const nameElement = document.getElementById("telegramName");
+    const nameElement =
+        document.getElementById("telegramName");
 
     if (nameElement) {
+
+        const fullName =
+            [
+                telegramUser.first_name,
+                telegramUser.last_name
+            ]
+            .filter(Boolean)
+            .join(" ");
+
         nameElement.textContent =
-            user.first_name ||
-            "Telegram User";
+            fullName || "Telegram User";
     }
 
 
-    // Username
     const usernameElement =
         document.getElementById("telegramUsername");
 
     if (usernameElement) {
 
         usernameElement.textContent =
-            user.username
-                ? "@" + user.username
+            telegramUser.username
+                ? "@" + telegramUser.username
                 : "Not set";
-
     }
 
-<script>
-    
-// ========================================
-// Telegram WebApp Initialization
-// ========================================
-
-function initTelegramApp() {
-
-    if (
-        !window.Telegram ||
-        !window.Telegram.WebApp
-    ) {
-        console.log("Telegram WebApp is not available.");
-
-        setTimeout(
-            initTelegramApp,
-            500
-        );
-
-        return;
-    }
-
-    const tg = window.Telegram.WebApp;
-
-    // Tell Telegram the app is ready
-    tg.ready();
-
-    // Expand Mini App
-    tg.expand();
-
-    console.log(
-        "Telegram WebApp initialized."
-    );
-
-    loadTelegramProfile();
-
-}
-
-
-// ========================================
-// Load Telegram User Profile
-// ========================================
-
-function loadTelegramProfile() {
-
-    const tg = window.Telegram.WebApp;
-
-    if (!tg) {
-        console.log(
-            "Telegram WebApp not available."
-        );
-        return;
-    }
-
-    const user =
-        tg.initDataUnsafe &&
-        tg.initDataUnsafe.user;
-
-
-    // ------------------------------------
-    // If Telegram user is unavailable
-    // ------------------------------------
-
-    if (!user) {
-
-        console.log(
-            "Telegram user information not available."
-        );
-
-        const nameElement =
-            document.getElementById(
-                "telegramName"
-            );
-
-        const usernameElement =
-            document.getElementById(
-                "telegramUsername"
-            );
-
-        const idElement =
-            document.getElementById(
-                "telegramId"
-            );
-
-
-        if (nameElement) {
-            nameElement.textContent =
-                "Telegram User";
-        }
-
-        if (usernameElement) {
-            usernameElement.textContent =
-                "Not available";
-        }
-
-        if (idElement) {
-            idElement.textContent =
-                "Not available";
-        }
-
-        return;
-    }
-
-
-    // ------------------------------------
-    // Telegram Name
-    // ------------------------------------
-
-    const nameElement =
-        document.getElementById(
-            "telegramName"
-        );
-
-    if (nameElement) {
-
-        const fullName =
-            [
-                user.first_name,
-                user.last_name
-            ]
-            .filter(Boolean)
-            .join(" ");
-
-
-        nameElement.textContent =
-            fullName ||
-            "Telegram User";
-    }
-
-
-    // ------------------------------------
-    // Telegram Username
-    // ------------------------------------
-
-    const usernameElement =
-        document.getElementById(
-            "telegramUsername"
-        );
-
-    if (usernameElement) {
-
-        usernameElement.textContent =
-            user.username
-                ? "@" + user.username
-                : "Username not set";
-    }
-
-
-    // ------------------------------------
-    // Telegram ID
-    // ------------------------------------
 
     const idElement =
-        document.getElementById(
-            "telegramId"
-        );
+        document.getElementById("telegramId");
 
     if (idElement) {
 
         idElement.textContent =
-            user.id
-                ? String(user.id)
+            telegramUser.id
+                ? String(telegramUser.id)
                 : "Not available";
     }
 
-
-    // ------------------------------------
-    // Console Debug
-    // ------------------------------------
-
-    console.log(
-        "Telegram User:",
-        user
-    );
-
-    console.log(
-        "Telegram User ID:",
-        user.id
-    );
-
-    console.log(
-        "Telegram Username:",
-        user.username
-    );
-
-    console.log(
-        "Telegram Name:",
-        user.first_name
-    );
-
 }
 
 
-// ========================================
-// Task Buttons
-// ========================================
+loadTelegramProfile();
+testTelegramUser();
 
-if (
-    typeof testTelegramUser === "function"
-) {
-    testTelegramUser();
-}
-
-
-if (
-    typeof updateTaskButtons === "function"
-) {
-    updateTaskButtons();
-}
-
-
-// ========================================
-// Start Telegram App
-// ========================================
-
-initTelegramApp();
-
-
-// ========================================
-// Extra Safety Check
-// ========================================
-
-setTimeout(
-    function () {
-
-        if (
-            window.Telegram &&
-            window.Telegram.WebApp
-        ) {
-
-            loadTelegramProfile();
-
-        }
-
-    },
-    1000
-);
-
-</script>>
+</script>
 
 </body>
 
