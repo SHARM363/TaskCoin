@@ -20,6 +20,7 @@ from telegram.ext import (
 from api import app
 from database import init_db
 
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 WEB_APP_URL = "https://sharm363.github.io/TaskCoin/"
@@ -92,8 +93,13 @@ def run_flask():
 
 
 def main():
-        init_db() 
-        print("TaskCoin database initialized successfully.")
+
+    init_db()
+
+    print(
+        "TaskCoin database initialized successfully."
+    )
+
     if not BOT_TOKEN:
         raise RuntimeError(
             "BOT_TOKEN environment variable is missing."
@@ -109,13 +115,11 @@ def main():
             "WEBHOOK_SECRET environment variable is missing."
         )
 
-
     application = (
         Application.builder()
         .token(BOT_TOKEN)
         .build()
     )
-
 
     application.add_handler(
         CommandHandler(
@@ -124,27 +128,9 @@ def main():
         )
     )
 
-
     loop = asyncio.new_event_loop()
 
     asyncio.set_event_loop(loop)
-
-
-    async def telegram_webhook():
-
-        update_data = request.get_json(
-            force=True
-        )
-
-        update = Update.de_json(
-            update_data,
-            application.bot
-        )
-
-        await application.update_queue.put(
-            update
-        )
-
 
     @app.route(
         "/telegram",
@@ -156,7 +142,6 @@ def main():
             "X-Telegram-Bot-Api-Secret-Token"
         )
 
-
         if secret != WEBHOOK_SECRET:
 
             return jsonify({
@@ -164,28 +149,23 @@ def main():
                 "message": "Unauthorized"
             }), 403
 
-
         update_data = request.get_json(
             force=True
         )
-
 
         update = Update.de_json(
             update_data,
             application.bot
         )
 
-
         asyncio.run_coroutine_threadsafe(
             application.update_queue.put(update),
             loop
         )
 
-
         return jsonify({
             "success": True
         })
-
 
     flask_thread = threading.Thread(
         target=run_flask,
@@ -194,11 +174,9 @@ def main():
 
     flask_thread.start()
 
-
     print(
         "TaskCoin Bot + API is starting..."
     )
-
 
     loop.run_until_complete(
         setup_bot(application)
