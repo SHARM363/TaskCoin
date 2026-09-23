@@ -2246,23 +2246,25 @@ function loadTelegramProfile() {
 
 }
         
-loadTelegramProfile();
+if (
+    window.Telegram &&
+    window.Telegram.WebApp
+) {
+
+    const tg = window.Telegram.WebApp;
+
+    tg.ready();
+
+    tg.expand();
+
+    loadTelegramProfile();
+
+}
 
 testTelegramUser();
+
 updateTaskButtons();
-
-
-        if (
-            window.Telegram &&
-            window.Telegram.WebApp
-        ) {
-
-            Telegram.WebApp.ready();
-
-            Telegram.WebApp.expand();
-
-        }
-
+   
     </script>
 
 </body>
