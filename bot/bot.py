@@ -18,7 +18,7 @@ from telegram.ext import (
 )
 
 from api import app
-
+from database import init_db
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -92,7 +92,8 @@ def run_flask():
 
 
 def main():
-
+        init_db() 
+        print("TaskCoin database initialized successfully.")
     if not BOT_TOKEN:
         raise RuntimeError(
             "BOT_TOKEN environment variable is missing."
