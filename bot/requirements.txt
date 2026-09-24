@@ -1,3 +1,4 @@
 python-telegram-bot[webhooks]==22.5
 Flask==3.1.2
 psycopg2-binary==2.9.10
+flask-cors==6.0.1
