@@ -6,7 +6,6 @@ import hmac
 from datetime import datetime, timedelta
 
 import psycopg2
-
 from psycopg2.extras import RealDictCursor
 
 
@@ -20,7 +19,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def get_connection():
 
     if not DATABASE_URL:
-
         raise RuntimeError(
             "DATABASE_URL environment variable is missing."
         )
@@ -31,7 +29,7 @@ def get_connection():
 
 
 # ============================================================
-# ADMIN PASSWORD HASH
+# ADMIN PASSWORD FUNCTIONS
 # ============================================================
 
 def hash_admin_password(password):
@@ -53,32 +51,22 @@ def hash_admin_password(password):
     )
 
 
-def verify_admin_password(
-    password,
-    stored_hash
-):
+def verify_admin_password(password, stored_hash):
 
     try:
 
         parts = stored_hash.split("$")
 
         if len(parts) != 3:
-
             return False
 
         algorithm = parts[0]
 
-        salt = bytes.fromhex(
-            parts[1]
-        )
-
-        original_hash = bytes.fromhex(
-            parts[2]
-        )
-
         if algorithm != "pbkdf2_sha256":
-
             return False
+
+        salt = bytes.fromhex(parts[1])
+        original_hash = bytes.fromhex(parts[2])
 
         new_hash = hashlib.pbkdf2_hmac(
             "sha256",
@@ -104,375 +92,399 @@ def verify_admin_password(
 def init_db():
 
     conn = get_connection()
-
     cur = conn.cursor()
 
-    # --------------------------------------------------------
-    # USERS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-
-            id SERIAL PRIMARY KEY,
-
-            telegram_id BIGINT UNIQUE NOT NULL,
-
-            username TEXT,
-
-            first_name TEXT,
-
-            balance NUMERIC(20, 2) DEFAULT 0,
-
-            total_earned NUMERIC(20, 2) DEFAULT 0,
-
-            total_withdrawn NUMERIC(20, 2) DEFAULT 0,
-
-            referral_code TEXT UNIQUE,
-
-            referred_by BIGINT,
-
-            referral_count INTEGER DEFAULT 0,
-
-            completed_tasks INTEGER DEFAULT 0,
-
-            status TEXT DEFAULT 'active',
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            last_active TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-
-    # --------------------------------------------------------
-    # TASKS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-
-            id SERIAL PRIMARY KEY,
-
-            title TEXT NOT NULL,
-
-            description TEXT DEFAULT '',
-
-            icon TEXT DEFAULT '🎯',
-
-            platform TEXT DEFAULT 'Other',
-
-            task_url TEXT DEFAULT '',
-
-            reward NUMERIC(20, 2) DEFAULT 0,
-
-            duration INTEGER DEFAULT 20,
-
-            is_active BOOLEAN DEFAULT TRUE,
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            updated_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-
-    # --------------------------------------------------------
-    # TASK COMPLETIONS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS task_completions (
-
-            id SERIAL PRIMARY KEY,
-
-            telegram_id BIGINT NOT NULL,
-
-            task_id INTEGER NOT NULL,
-
-            reward NUMERIC(20, 2) DEFAULT 0,
-
-            completed_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            completed_date DATE
-                DEFAULT CURRENT_DATE,
-
-            UNIQUE (
-                telegram_id,
-                task_id,
-                completed_date
-            )
-        );
-    """)
-
-    # --------------------------------------------------------
-    # WITHDRAWALS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS withdrawals (
-
-            id SERIAL PRIMARY KEY,
-
-            telegram_id BIGINT NOT NULL,
-
-            method TEXT NOT NULL,
-
-            account_number TEXT NOT NULL,
-
-            amount NUMERIC(20, 2) NOT NULL,
-
-            status TEXT DEFAULT 'pending',
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            processed_at TIMESTAMP
-        );
-    """)
-
-    # --------------------------------------------------------
-    # REFERRALS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS referrals (
-
-            id SERIAL PRIMARY KEY,
-
-            referrer_id BIGINT NOT NULL,
-
-            referred_id BIGINT NOT NULL,
-
-            reward NUMERIC(20, 2) DEFAULT 0,
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            UNIQUE (
-                referrer_id,
-                referred_id
-            )
-        );
-    """)
-
-    # --------------------------------------------------------
-    # ADMINS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS admins (
-
-            id SERIAL PRIMARY KEY,
-
-            username TEXT UNIQUE NOT NULL,
-
-            password_hash TEXT NOT NULL,
-
-            is_active BOOLEAN DEFAULT TRUE,
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            last_login TIMESTAMP
-        );
-    """)
-
-    # --------------------------------------------------------
-    # ADMIN SESSIONS
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS admin_sessions (
-
-            id SERIAL PRIMARY KEY,
-
-            admin_id INTEGER NOT NULL,
-
-            token_hash TEXT UNIQUE NOT NULL,
-
-            expires_at TIMESTAMP NOT NULL,
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-
-    # --------------------------------------------------------
-    # EXTRA COLUMNS FOR OLD DATABASE
-    # --------------------------------------------------------
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        total_earned NUMERIC(20, 2)
-        DEFAULT 0;
-    """)
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        total_withdrawn NUMERIC(20, 2)
-        DEFAULT 0;
-    """)
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        referral_code TEXT;
-    """)
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        referred_by BIGINT;
-    """)
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        referral_count INTEGER
-        DEFAULT 0;
-    """)
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        completed_tasks INTEGER
-        DEFAULT 0;
-    """)
-
-    cur.execute("""
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS
-        status TEXT
-        DEFAULT 'active';
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        description TEXT
-        DEFAULT '';
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        icon TEXT
-        DEFAULT '🎯';
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        platform TEXT
-        DEFAULT 'Other';
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        task_url TEXT
-        DEFAULT '';
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        reward NUMERIC(20, 2)
-        DEFAULT 0;
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        duration INTEGER
-        DEFAULT 20;
-    """)
-
-    cur.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN IF NOT EXISTS
-        is_active BOOLEAN
-        DEFAULT TRUE;
-    """)
-
-    # --------------------------------------------------------
-    # INDEXES
-    # --------------------------------------------------------
-
-    cur.execute("""
-        CREATE INDEX IF NOT EXISTS
-        idx_users_telegram_id
-        ON users(telegram_id);
-    """)
-
-    cur.execute("""
-        CREATE INDEX IF NOT EXISTS
-        idx_tasks_active
-        ON tasks(is_active);
-    """)
-
-    cur.execute("""
-        CREATE INDEX IF NOT EXISTS
-        idx_task_completions_user
-        ON task_completions(telegram_id);
-    """)
-
-    cur.execute("""
-        CREATE INDEX IF NOT EXISTS
-        idx_withdrawals_user
-        ON withdrawals(telegram_id);
-    """)
-
-    cur.execute("""
-        CREATE INDEX IF NOT EXISTS
-        idx_withdrawals_status
-        ON withdrawals(status);
-    """)
-
-    # --------------------------------------------------------
-    # AUTO CREATE ADMIN FROM RENDER ENVIRONMENT
-    # --------------------------------------------------------
-
-    admin_username = os.getenv(
-        "ADMIN_USERNAME"
-    )
-
-    admin_password = os.getenv(
-        "ADMIN_PASSWORD"
-    )
-
-    if admin_username and admin_password:
-
-        password_hash = hash_admin_password(
-            admin_password
-        )
+    try:
+
+        # ----------------------------------------------------
+        # USERS
+        # ----------------------------------------------------
 
         cur.execute("""
-            INSERT INTO admins (
-                username,
-                password_hash
+            CREATE TABLE IF NOT EXISTS users (
+
+                id SERIAL PRIMARY KEY,
+
+                telegram_id BIGINT UNIQUE NOT NULL,
+
+                username TEXT,
+
+                first_name TEXT,
+
+                balance NUMERIC(20, 2)
+                    DEFAULT 0,
+
+                total_earned NUMERIC(20, 2)
+                    DEFAULT 0,
+
+                total_withdrawn NUMERIC(20, 2)
+                    DEFAULT 0,
+
+                referral_code TEXT UNIQUE,
+
+                referred_by BIGINT,
+
+                referral_count INTEGER
+                    DEFAULT 0,
+
+                completed_tasks INTEGER
+                    DEFAULT 0,
+
+                status TEXT
+                    DEFAULT 'active',
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                last_active TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # ----------------------------------------------------
+        # TASKS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+
+                id SERIAL PRIMARY KEY,
+
+                title TEXT NOT NULL,
+
+                description TEXT
+                    DEFAULT '',
+
+                icon TEXT
+                    DEFAULT '🎯',
+
+                platform TEXT
+                    DEFAULT 'Other',
+
+                task_url TEXT
+                    DEFAULT '',
+
+                reward NUMERIC(20, 2)
+                    DEFAULT 0,
+
+                duration INTEGER
+                    DEFAULT 20,
+
+                is_active BOOLEAN
+                    DEFAULT TRUE,
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                updated_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # ----------------------------------------------------
+        # TASK COMPLETIONS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS task_completions (
+
+                id SERIAL PRIMARY KEY,
+
+                telegram_id BIGINT NOT NULL,
+
+                task_id INTEGER NOT NULL,
+
+                reward NUMERIC(20, 2)
+                    DEFAULT 0,
+
+                completed_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                completed_date DATE
+                    DEFAULT CURRENT_DATE,
+
+                UNIQUE (
+                    telegram_id,
+                    task_id,
+                    completed_date
+                )
+            );
+        """)
+
+        # ----------------------------------------------------
+        # WITHDRAWALS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS withdrawals (
+
+                id SERIAL PRIMARY KEY,
+
+                telegram_id BIGINT NOT NULL,
+
+                method TEXT NOT NULL,
+
+                account_number TEXT NOT NULL,
+
+                amount NUMERIC(20, 2) NOT NULL,
+
+                status TEXT
+                    DEFAULT 'pending',
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                processed_at TIMESTAMP
+            );
+        """)
+
+        # ----------------------------------------------------
+        # REFERRALS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS referrals (
+
+                id SERIAL PRIMARY KEY,
+
+                referrer_id BIGINT NOT NULL,
+
+                referred_id BIGINT NOT NULL,
+
+                reward NUMERIC(20, 2)
+                    DEFAULT 0,
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                UNIQUE (
+                    referrer_id,
+                    referred_id
+                )
+            );
+        """)
+
+        # ----------------------------------------------------
+        # ADMINS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS admins (
+
+                id SERIAL PRIMARY KEY,
+
+                username TEXT UNIQUE NOT NULL,
+
+                password_hash TEXT NOT NULL,
+
+                is_active BOOLEAN
+                    DEFAULT TRUE,
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                last_login TIMESTAMP
+            );
+        """)
+
+        # ----------------------------------------------------
+        # ADMIN SESSIONS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS admin_sessions (
+
+                id SERIAL PRIMARY KEY,
+
+                admin_id INTEGER NOT NULL,
+
+                token_hash TEXT UNIQUE NOT NULL,
+
+                expires_at TIMESTAMP NOT NULL,
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+                # ----------------------------------------------------
+        # OLD DATABASE COMPATIBILITY
+        # ----------------------------------------------------
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            total_earned NUMERIC(20, 2)
+            DEFAULT 0;
+        """)
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            total_withdrawn NUMERIC(20, 2)
+            DEFAULT 0;
+        """)
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            referral_code TEXT;
+        """)
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            referred_by BIGINT;
+        """)
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            referral_count INTEGER
+            DEFAULT 0;
+        """)
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            completed_tasks INTEGER
+            DEFAULT 0;
+        """)
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            status TEXT
+            DEFAULT 'active';
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            description TEXT
+            DEFAULT '';
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            icon TEXT
+            DEFAULT '🎯';
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            platform TEXT
+            DEFAULT 'Other';
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            task_url TEXT
+            DEFAULT '';
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            reward NUMERIC(20, 2)
+            DEFAULT 0;
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            duration INTEGER
+            DEFAULT 20;
+        """)
+
+        cur.execute("""
+            ALTER TABLE tasks
+            ADD COLUMN IF NOT EXISTS
+            is_active BOOLEAN
+            DEFAULT TRUE;
+        """)
+
+        # ----------------------------------------------------
+        # INDEXES
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS
+            idx_users_telegram_id
+            ON users(telegram_id);
+        """)
+
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS
+            idx_tasks_active
+            ON tasks(is_active);
+        """)
+
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS
+            idx_task_completions_user
+            ON task_completions(telegram_id);
+        """)
+
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS
+            idx_withdrawals_user
+            ON withdrawals(telegram_id);
+        """)
+
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS
+            idx_withdrawals_status
+            ON withdrawals(status);
+        """)
+
+        # ----------------------------------------------------
+        # AUTO CREATE ADMIN
+        # ----------------------------------------------------
+
+        admin_username = os.getenv(
+            "ADMIN_USERNAME"
+        )
+
+        admin_password = os.getenv(
+            "ADMIN_PASSWORD"
+        )
+
+        if admin_username and admin_password:
+
+            password_hash = hash_admin_password(
+                admin_password
             )
 
-            VALUES (%s, %s)
+            cur.execute("""
+                INSERT INTO admins (
+                    username,
+                    password_hash
+                )
+                VALUES (
+                    %s,
+                    %s
+                )
+                ON CONFLICT (username)
+                DO NOTHING;
+            """, (
+                admin_username,
+                password_hash
+            ))
 
-            ON CONFLICT (username)
-            DO NOTHING;
-        """, (
-            admin_username,
-            password_hash
-        ))
+        conn.commit()
 
-    conn.commit()
+    except Exception:
 
-    cur.close()
+        conn.rollback()
+        raise
 
-    conn.close()
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 # ============================================================
@@ -491,53 +503,60 @@ def create_or_update_user(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        INSERT INTO users (
+    try:
+
+        referral_code = "TC" + str(telegram_id)
+
+        cur.execute("""
+            INSERT INTO users (
+                telegram_id,
+                username,
+                first_name,
+                referral_code,
+                last_active
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (telegram_id)
+            DO UPDATE SET
+
+                username =
+                    EXCLUDED.username,
+
+                first_name =
+                    EXCLUDED.first_name,
+
+                last_active =
+                    CURRENT_TIMESTAMP
+
+            RETURNING *;
+        """, (
             telegram_id,
             username,
             first_name,
-            referral_code,
-            last_active
-        )
+            referral_code
+        ))
 
-        VALUES (
-            %s,
-            %s,
-            %s,
-            %s,
-            CURRENT_TIMESTAMP
-        )
+        user = cur.fetchone()
 
-        ON CONFLICT (telegram_id)
+        conn.commit()
 
-        DO UPDATE SET
+        return user
 
-            username =
-                EXCLUDED.username,
+    except Exception:
 
-            first_name =
-                EXCLUDED.first_name,
+        conn.rollback()
+        raise
 
-            last_active =
-                CURRENT_TIMESTAMP
+    finally:
 
-        RETURNING *;
-    """, (
-        telegram_id,
-        username,
-        first_name,
-        "TC" + str(telegram_id)
-    ))
-
-    user = cur.fetchone()
-
-    conn.commit()
-
-    cur.close()
-
-    conn.close()
-
-    return user
+        cur.close()
+        conn.close()
 
 
 def get_user(telegram_id):
@@ -548,21 +567,22 @@ def get_user(telegram_id):
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM users
-        WHERE telegram_id = %s;
-    """, (
-        telegram_id,
-    ))
+    try:
 
-    user = cur.fetchone()
+        cur.execute("""
+            SELECT *
+            FROM users
+            WHERE telegram_id = %s;
+        """, (
+            telegram_id,
+        ))
 
-    cur.close()
+        return cur.fetchone()
 
-    conn.close()
+    finally:
 
-    return user
+        cur.close()
+        conn.close()
 
 
 def get_all_users():
@@ -573,22 +593,21 @@ def get_all_users():
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM users
-        ORDER BY id DESC;
-    """)
+    try:
 
-    users = cur.fetchall()
+        cur.execute("""
+            SELECT *
+            FROM users
+            ORDER BY id DESC;
+        """)
 
-    cur.close()
+        return cur.fetchall()
 
-    conn.close()
+    finally:
 
-    return users
-
-
-# ============================================================
+        cur.close()
+        conn.close()
+   # ============================================================
 # TASK FUNCTIONS
 # ============================================================
 
@@ -600,20 +619,21 @@ def get_active_tasks():
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM tasks
-        WHERE is_active = TRUE
-        ORDER BY id DESC;
-    """)
+    try:
 
-    tasks = cur.fetchall()
+        cur.execute("""
+            SELECT *
+            FROM tasks
+            WHERE is_active = TRUE
+            ORDER BY id DESC;
+        """)
 
-    cur.close()
+        return cur.fetchall()
 
-    conn.close()
+    finally:
 
-    return tasks
+        cur.close()
+        conn.close()
 
 
 def get_all_tasks():
@@ -624,19 +644,20 @@ def get_all_tasks():
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM tasks
-        ORDER BY id DESC;
-    """)
+    try:
 
-    tasks = cur.fetchall()
+        cur.execute("""
+            SELECT *
+            FROM tasks
+            ORDER BY id DESC;
+        """)
 
-    cur.close()
+        return cur.fetchall()
 
-    conn.close()
+    finally:
 
-    return tasks
+        cur.close()
+        conn.close()
 
 
 def create_task(
@@ -656,9 +677,31 @@ def create_task(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        INSERT INTO tasks (
+    try:
 
+        cur.execute("""
+            INSERT INTO tasks (
+                title,
+                description,
+                icon,
+                platform,
+                task_url,
+                reward,
+                duration,
+                is_active
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+            )
+            RETURNING *;
+        """, (
             title,
             description,
             icon,
@@ -667,41 +710,23 @@ def create_task(
             reward,
             duration,
             is_active
+        ))
 
-        )
+        task = cur.fetchone()
 
-        VALUES (
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s
-        )
+        conn.commit()
 
-        RETURNING *;
-    """, (
-        title,
-        description,
-        icon,
-        platform,
-        task_url,
-        reward,
-        duration,
-        is_active
-    ))
+        return task
 
-    task = cur.fetchone()
+    except Exception:
 
-    conn.commit()
+        conn.rollback()
+        raise
 
-    cur.close()
+    finally:
 
-    conn.close()
-
-    return task
+        cur.close()
+        conn.close()
 
 
 def update_task(
@@ -722,62 +747,69 @@ def update_task(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        UPDATE tasks
+    try:
 
-        SET
+        cur.execute("""
+            UPDATE tasks
+            SET
 
-            title =
-                COALESCE(%s, title),
+                title =
+                    COALESCE(%s, title),
 
-            description =
-                COALESCE(%s, description),
+                description =
+                    COALESCE(%s, description),
 
-            icon =
-                COALESCE(%s, icon),
+                icon =
+                    COALESCE(%s, icon),
 
-            platform =
-                COALESCE(%s, platform),
+                platform =
+                    COALESCE(%s, platform),
 
-            task_url =
-                COALESCE(%s, task_url),
+                task_url =
+                    COALESCE(%s, task_url),
 
-            reward =
-                COALESCE(%s, reward),
+                reward =
+                    COALESCE(%s, reward),
 
-            duration =
-                COALESCE(%s, duration),
+                duration =
+                    COALESCE(%s, duration),
 
-            is_active =
-                COALESCE(%s, is_active),
+                is_active =
+                    COALESCE(%s, is_active),
 
-            updated_at =
-                CURRENT_TIMESTAMP
+                updated_at =
+                    CURRENT_TIMESTAMP
 
-        WHERE id = %s
+            WHERE id = %s
 
-        RETURNING *;
-    """, (
-        title,
-        description,
-        icon,
-        platform,
-        task_url,
-        reward,
-        duration,
-        is_active,
-        task_id
-    ))
+            RETURNING *;
+        """, (
+            title,
+            description,
+            icon,
+            platform,
+            task_url,
+            reward,
+            duration,
+            is_active,
+            task_id
+        ))
 
-    task = cur.fetchone()
+        task = cur.fetchone()
 
-    conn.commit()
+        conn.commit()
 
-    cur.close()
+        return task
 
-    conn.close()
+    except Exception:
 
-    return task
+        conn.rollback()
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def delete_task(task_id):
@@ -786,26 +818,30 @@ def delete_task(task_id):
 
     cur = conn.cursor()
 
-    cur.execute("""
-        DELETE FROM tasks
-        WHERE id = %s;
-    """, (
-        task_id,
-    ))
+    try:
 
-    deleted = (
-        cur.rowcount > 0
-    )
+        cur.execute("""
+            DELETE FROM tasks
+            WHERE id = %s;
+        """, (
+            task_id,
+        ))
 
-    conn.commit()
+        deleted = cur.rowcount > 0
 
-    cur.close()
+        conn.commit()
 
-    conn.close()
+        return deleted
 
-    return deleted
+    except Exception:
 
+        conn.rollback()
+        raise
 
+    finally:
+
+        cur.close()
+        conn.close()
 # ============================================================
 # TASK LIMIT / COMPLETION
 # ============================================================
@@ -816,26 +852,23 @@ def count_today_tasks(telegram_id):
 
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT COUNT(*)
+    try:
 
-        FROM task_completions
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM task_completions
+            WHERE telegram_id = %s
+            AND completed_date = CURRENT_DATE;
+        """, (
+            telegram_id,
+        ))
 
-        WHERE telegram_id = %s
+        return cur.fetchone()[0]
 
-        AND completed_date =
-            CURRENT_DATE;
-    """, (
-        telegram_id,
-    ))
+    finally:
 
-    count = cur.fetchone()[0]
-
-    cur.close()
-
-    conn.close()
-
-    return count
+        cur.close()
+        conn.close()
 
 
 def task_completed_today(
@@ -847,31 +880,26 @@ def task_completed_today(
 
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT id
+    try:
 
-        FROM task_completions
+        cur.execute("""
+            SELECT id
+            FROM task_completions
+            WHERE telegram_id = %s
+            AND task_id = %s
+            AND completed_date = CURRENT_DATE
+            LIMIT 1;
+        """, (
+            telegram_id,
+            task_id
+        ))
 
-        WHERE telegram_id = %s
+        return cur.fetchone() is not None
 
-        AND task_id = %s
+    finally:
 
-        AND completed_date =
-            CURRENT_DATE
-
-        LIMIT 1;
-    """, (
-        telegram_id,
-        task_id
-    ))
-
-    result = cur.fetchone()
-
-    cur.close()
-
-    conn.close()
-
-    return result is not None
+        cur.close()
+        conn.close()
 
 
 def claim_task_reward(
@@ -888,20 +916,38 @@ def claim_task_reward(
     try:
 
         # ----------------------------------------------------
+        # LOCK USER
+        # ----------------------------------------------------
+
+        cur.execute("""
+            SELECT *
+            FROM users
+            WHERE telegram_id = %s
+            FOR UPDATE;
+        """, (
+            telegram_id,
+        ))
+
+        user = cur.fetchone()
+
+        if not user:
+
+            conn.rollback()
+
+            return {
+                "success": False,
+                "message": "User not found."
+            }
+
+        # ----------------------------------------------------
         # DAILY LIMIT
         # ----------------------------------------------------
 
         cur.execute("""
             SELECT COUNT(*) AS total
-
             FROM task_completions
-
             WHERE telegram_id = %s
-
-            AND completed_date =
-                CURRENT_DATE
-
-            FOR UPDATE;
+            AND completed_date = CURRENT_DATE;
         """, (
             telegram_id,
         ))
@@ -919,7 +965,7 @@ def claim_task_reward(
             }
 
         # ----------------------------------------------------
-        # TASK
+        # GET TASK
         # ----------------------------------------------------
 
         cur.execute("""
@@ -940,178 +986,7 @@ def claim_task_reward(
 
             return {
                 "success": False,
-                "message":
-                    "Task not found."
-            }
-
-        # ----------------------------------------------------
-        # SAME TASK CHECK
-        # ----------------------------------------------------
-
-        cur.execute("""
-            SELECT id
-
-            FROM task_completions
-
-            WHERE telegram_id = %s
-
-            AND task_id = %s
-
-            AND completed_date =
-                CURRENT_DATE
-
-            LIMIT 1;
-        """, (
-            telegram_id,
-            task_id
-        ))
-
-        already_done = cur.fetchone()
-
-        if already_done:
-
-            conn.rollback()
-
-            return {
-                "success": False,
-                "message":
-                    "Task already completed today."
-            }
-
-        reward = task["reward"]
-
-        # ----------------------------------------------------
-        # RECORD COMPLETION
-        # ----------------------------------------------------
-
-        cur.execute("""
-            INSERT INTO task_completions (
-
-                telegram_id,
-                task_id,
-                reward
-
-            )
-
-            VALUES (
-                %s,
-                %s,
-                %s
-            );
-        """, (
-            telegram_id,
-            task_id,
-            reward
-        ))
-
-        # ----------------------------------------------------
-        # UPDATE USER BALANCE
-        # ----------------------------------------------------
-
-        cur.execute("""
-            UPDATE users
-
-            SET
-
-                balance =
-                    balance + %s,
-
-                total_earned =
-                    total_earned + %s,
-
-                completed_tasks =
-                    completed_tasks + 1,
-
-                last_active =
-                    CURRENT_TIMESTAMP
-
-            WHERE telegram_id = %s
-
-            RETURNING *;
-        """, (
-            reward,
-            reward,
-            telegram_id
-        ))
-
-        user = cur.fetchone()
-
-        if not user:
-
-            conn.rollback()
-
-            return {
-                "success": False,
-                "message":
-                    "User not found."
-            }
-
-        conn.commit()
-
-        return {
-            "success": True,
-            "reward": reward,
-            "user": user
-        }
-
-    except Exception:
-
-        conn.rollback()
-
-        raise
-
-    finally:
-
-        cur.close()
-
-        conn.close()
-
-
-# ============================================================
-# WITHDRAWAL
-# ============================================================
-
-def create_withdrawal(
-    telegram_id,
-    method,
-    account_number,
-    amount
-):
-
-    amount = float(amount)
-
-    if amount < 100:
-
-        return {
-            "success": False,
-                      "message":
-                "Daily task limit reached."
-        }
-
-        # ----------------------------------------------------
-        # TASK
-        # ----------------------------------------------------
-
-        cur.execute("""
-            SELECT *
-            FROM tasks
-            WHERE id = %s
-            AND is_active = TRUE
-            FOR UPDATE;
-        """, (
-            task_id,
-        ))
-
-        task = cur.fetchone()
-
-        if not task:
-
-            conn.rollback()
-
-            return {
-                "success": False,
-                "message":
-                    "Task not found."
+                "message": "Task not found."
             }
 
         # ----------------------------------------------------
@@ -1145,7 +1020,7 @@ def create_withdrawal(
         reward = task["reward"]
 
         # ----------------------------------------------------
-        # RECORD COMPLETION
+        # INSERT COMPLETION
         # ----------------------------------------------------
 
         cur.execute("""
@@ -1166,17 +1041,27 @@ def create_withdrawal(
         ))
 
         # ----------------------------------------------------
-        # UPDATE USER BALANCE
+        # UPDATE BALANCE
         # ----------------------------------------------------
 
         cur.execute("""
             UPDATE users
             SET
-                balance = balance + %s,
-                total_earned = total_earned + %s,
-                completed_tasks = completed_tasks + 1,
-                last_active = CURRENT_TIMESTAMP
+
+                balance =
+                    balance + %s,
+
+                total_earned =
+                    total_earned + %s,
+
+                completed_tasks =
+                    completed_tasks + 1,
+
+                last_active =
+                    CURRENT_TIMESTAMP
+
             WHERE telegram_id = %s
+
             RETURNING *;
         """, (
             reward,
@@ -1184,39 +1069,26 @@ def create_withdrawal(
             telegram_id
         ))
 
-        user = cur.fetchone()
-
-        if not user:
-
-            conn.rollback()
-
-            return {
-                "success": False,
-                               "message":
-                    "User not found."
-            }
+        updated_user = cur.fetchone()
 
         conn.commit()
 
         return {
             "success": True,
             "reward": reward,
-            "user": user
+            "user": updated_user
         }
 
     except Exception:
 
         conn.rollback()
-
         raise
 
     finally:
 
         cur.close()
         conn.close()
-
-
-# ============================================================
+    # ============================================================
 # WITHDRAWAL FUNCTIONS
 # ============================================================
 
@@ -1227,7 +1099,16 @@ def create_withdrawal(
     amount
 ):
 
-    amount = float(amount)
+    try:
+
+        amount = float(amount)
+
+    except (ValueError, TypeError):
+
+        return {
+            "success": False,
+            "message": "Invalid withdrawal amount."
+        }
 
     if amount < 100:
 
@@ -1235,6 +1116,30 @@ def create_withdrawal(
             "success": False,
             "message":
                 "Minimum withdrawal is 100 TaskCoins."
+        }
+
+    allowed_methods = (
+        "bKash",
+        "Nagad",
+        "USDT",
+        "usdt",
+        "bkash",
+        "nagad"
+    )
+
+    if method not in allowed_methods:
+
+        return {
+            "success": False,
+            "message": "Invalid withdrawal method."
+        }
+
+    if not account_number:
+
+        return {
+            "success": False,
+            "message":
+                "Account number or wallet address is required."
         }
 
     conn = get_connection()
@@ -1262,8 +1167,7 @@ def create_withdrawal(
 
             return {
                 "success": False,
-                "message":
-                    "User not found."
+                "message": "User not found."
             }
 
         current_balance = float(
@@ -1276,16 +1180,19 @@ def create_withdrawal(
 
             return {
                 "success": False,
-                "message":
-                    "Insufficient balance."
+                "message": "Insufficient balance."
             }
 
         cur.execute("""
             UPDATE users
             SET
-                balance = balance - %s,
+
+                balance =
+                    balance - %s,
+
                 total_withdrawn =
                     total_withdrawn + %s
+
             WHERE telegram_id = %s;
         """, (
             amount,
@@ -1328,7 +1235,6 @@ def create_withdrawal(
     except Exception:
 
         conn.rollback()
-
         raise
 
     finally:
@@ -1347,21 +1253,23 @@ def get_user_withdrawals(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM withdrawals
-        WHERE telegram_id = %s
-        ORDER BY id DESC;
-    """, (
-        telegram_id,
-    ))
+    try:
 
-    withdrawals = cur.fetchall()
+        cur.execute("""
+            SELECT *
+            FROM withdrawals
+            WHERE telegram_id = %s
+            ORDER BY id DESC;
+        """, (
+            telegram_id,
+        ))
 
-    cur.close()
-    conn.close()
+        return cur.fetchall()
 
-    return withdrawals
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def get_all_withdrawals():
@@ -1372,24 +1280,38 @@ def get_all_withdrawals():
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM withdrawals
-        ORDER BY id DESC;
-    """)
+    try:
 
-    withdrawals = cur.fetchall()
+        cur.execute("""
+            SELECT *
+            FROM withdrawals
+            ORDER BY id DESC;
+        """)
 
-    cur.close()
-    conn.close()
+        return cur.fetchall()
 
-    return withdrawals
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def update_withdrawal_status(
     withdrawal_id,
     status
 ):
+
+    if status not in (
+        "pending",
+        "approved",
+        "rejected"
+    ):
+
+        return {
+            "success": False,
+            "message":
+                "Invalid withdrawal status."
+        }
 
     conn = get_connection()
 
@@ -1414,51 +1336,33 @@ def update_withdrawal_status(
 
             conn.rollback()
 
-            return None
+            return {
+                "success": False,
+                "message":
+                    "Withdrawal not found."
+            }
 
-        if withdrawal["status"] != "pending":
+        old_status = withdrawal["status"]
+
+        if old_status in (
+            "approved",
+            "rejected"
+        ):
 
             conn.rollback()
 
-            return withdrawal
+            return {
+                "success": False,
+                "message":
+                    "Withdrawal already processed."
+            }
 
-        if status == "approved":
-
-            cur.execute("""
-                UPDATE withdrawals
-                SET
-                    status = 'approved',
-                    processed_at =
-                        CURRENT_TIMESTAMP
-                WHERE id = %s
-                RETURNING *;
-            """, (
-                withdrawal_id,
-            ))
-
-            updated = cur.fetchone()
-
-        elif status == "rejected":
-
-            cur.execute("""
-                UPDATE withdrawals
-                SET
-                    status = 'rejected',
-                    processed_at =
-                        CURRENT_TIMESTAMP
-                WHERE id = %s
-                RETURNING *;
-            """, (
-                withdrawal_id,
-            ))
-
-            updated = cur.fetchone()
-
-            # Refund rejected withdrawal
+        if status == "rejected":
 
             cur.execute("""
                 UPDATE users
                 SET
+
                     balance =
                         balance + %s,
 
@@ -1475,20 +1379,35 @@ def update_withdrawal_status(
                 withdrawal["telegram_id"]
             ))
 
-        else:
+        cur.execute("""
+            UPDATE withdrawals
+            SET
 
-            conn.rollback()
+                status = %s,
 
-            return None
+                processed_at =
+                    CURRENT_TIMESTAMP
+
+            WHERE id = %s
+
+            RETURNING *;
+        """, (
+            status,
+            withdrawal_id
+        ))
+
+        updated = cur.fetchone()
 
         conn.commit()
 
-        return updated
+        return {
+            "success": True,
+            "withdrawal": updated
+        }
 
     except Exception:
 
         conn.rollback()
-
         raise
 
     finally:
@@ -1497,6 +1416,165 @@ def update_withdrawal_status(
         conn.close()
 
 
+# ============================================================
+# REFERRAL FUNCTIONS
+# ============================================================
+
+def create_referral(
+    referrer_id,
+    referred_id,
+    reward=0
+):
+
+    if referrer_id == referred_id:
+
+        return {
+            "success": False,
+            "message":
+                "Self referral is not allowed."
+        }
+
+    conn = get_connection()
+
+    cur = conn.cursor(
+        cursor_factory=RealDictCursor
+    )
+
+    try:
+
+        cur.execute("""
+            SELECT id
+            FROM referrals
+            WHERE referrer_id = %s
+            AND referred_id = %s
+            LIMIT 1;
+        """, (
+            referrer_id,
+            referred_id
+        ))
+
+        existing = cur.fetchone()
+
+        if existing:
+
+            conn.rollback()
+
+            return {
+                "success": False,
+                "message":
+                    "Referral already exists."
+            }
+
+        cur.execute("""
+            INSERT INTO referrals (
+                referrer_id,
+                referred_id,
+                reward
+            )
+            VALUES (
+                %s,
+                %s,
+                %s
+            )
+            RETURNING *;
+        """, (
+            referrer_id,
+            referred_id,
+            reward
+        ))
+
+        referral = cur.fetchone()
+
+        cur.execute("""
+            UPDATE users
+            SET
+                referral_count =
+                    referral_count + 1
+            WHERE telegram_id = %s;
+        """, (
+            referrer_id,
+        ))
+
+        if reward and float(reward) > 0:
+
+            cur.execute("""
+                UPDATE users
+                SET
+
+                    balance =
+                        balance + %s,
+
+                    total_earned =
+                        total_earned + %s
+
+                WHERE telegram_id = %s;
+            """, (
+                reward,
+                reward,
+                referrer_id
+            ))
+
+        cur.execute("""
+            UPDATE users
+            SET
+                referred_by = %s
+            WHERE telegram_id = %s;
+        """, (
+            referrer_id,
+            referred_id
+        ))
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "referral": referral
+        }
+
+    except Exception:
+
+        conn.rollback()
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
+
+
+def get_user_referrals(
+    telegram_id
+):
+
+    conn = get_connection()
+
+    cur = conn.cursor(
+        cursor_factory=RealDictCursor
+    )
+
+    try:
+
+        cur.execute("""
+            SELECT
+                r.*,
+                u.username,
+                u.first_name
+            FROM referrals r
+            LEFT JOIN users u
+                ON u.telegram_id =
+                   r.referred_id
+            WHERE r.referrer_id = %s
+            ORDER BY r.id DESC;
+        """, (
+            telegram_id,
+        ))
+
+        return cur.fetchall()
+
+    finally:
+
+        cur.close()
+        conn.close()
 # ============================================================
 # ADMIN FUNCTIONS
 # ============================================================
@@ -1511,21 +1589,24 @@ def get_admin_by_username(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT *
-        FROM admins
-        WHERE username = %s
-        AND is_active = TRUE;
-    """, (
-        username,
-    ))
+    try:
 
-    admin = cur.fetchone()
+        cur.execute("""
+            SELECT *
+            FROM admins
+            WHERE username = %s
+            AND is_active = TRUE
+            LIMIT 1;
+        """, (
+            username,
+        ))
 
-    cur.close()
-    conn.close()
+        return cur.fetchone()
 
-    return admin
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def create_admin(
@@ -1539,37 +1620,46 @@ def create_admin(
         cursor_factory=RealDictCursor
     )
 
-    password_hash = hash_admin_password(
-        password
-    )
+    try:
 
-    cur.execute("""
-        INSERT INTO admins (
+        password_hash = hash_admin_password(
+            password
+        )
+
+        cur.execute("""
+            INSERT INTO admins (
+                username,
+                password_hash
+            )
+            VALUES (
+                %s,
+                %s
+            )
+            ON CONFLICT (username)
+            DO UPDATE SET
+                password_hash =
+                    EXCLUDED.password_hash
+            RETURNING *;
+        """, (
             username,
             password_hash
-        )
-        VALUES (
-            %s,
-            %s
-        )
-        ON CONFLICT (username)
-        DO UPDATE SET
-            password_hash =
-                EXCLUDED.password_hash
-        RETURNING *;
-    """, (
-        username,
-        password_hash
-    ))
+        ))
 
-    admin = cur.fetchone()
+        admin = cur.fetchone()
 
-    conn.commit()
+        conn.commit()
 
-    cur.close()
-    conn.close()
+        return admin
 
-    return admin
+    except Exception:
+
+        conn.rollback()
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def create_admin_session(
@@ -1594,32 +1684,41 @@ def create_admin_session(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        INSERT INTO admin_sessions (
+    try:
+
+        cur.execute("""
+            INSERT INTO admin_sessions (
+                admin_id,
+                token_hash,
+                expires_at
+            )
+            VALUES (
+                %s,
+                %s,
+                %s
+            )
+            RETURNING *;
+        """, (
             admin_id,
             token_hash,
             expires_at
-        )
-        VALUES (
-            %s,
-            %s,
-            %s
-        )
-        RETURNING *;
-    """, (
-        admin_id,
-        token_hash,
-        expires_at
-    ))
+        ))
 
-    session = cur.fetchone()
+        session = cur.fetchone()
 
-    conn.commit()
+        conn.commit()
 
-    cur.close()
-    conn.close()
+        return token, session
 
-    return token, session
+    except Exception:
+
+        conn.rollback()
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def get_admin_by_token(
@@ -1627,7 +1726,6 @@ def get_admin_by_token(
 ):
 
     if not token:
-
         return None
 
     token_hash = hashlib.sha256(
@@ -1640,36 +1738,43 @@ def get_admin_by_token(
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT
-            admins.id,
-            admins.username,
-            admins.is_active,
-            admins.created_at,
-            admin_sessions.expires_at
+    try:
 
-        FROM admin_sessions
+        cur.execute("""
+            SELECT
 
-        JOIN admins
-        ON admins.id =
-           admin_sessions.admin_id
+                admins.id,
+                admins.username,
+                admins.is_active,
+                admins.created_at,
+                admins.last_login,
 
-        WHERE admin_sessions.token_hash = %s
+                admin_sessions.expires_at
 
-        AND admin_sessions.expires_at >
-            CURRENT_TIMESTAMP
+            FROM admin_sessions
 
-        AND admins.is_active = TRUE;
-    """, (
-        token_hash,
-    ))
+            INNER JOIN admins
+                ON admins.id =
+                   admin_sessions.admin_id
 
-    admin = cur.fetchone()
+            WHERE admin_sessions.token_hash = %s
 
-    cur.close()
-    conn.close()
+            AND admin_sessions.expires_at >
+                CURRENT_TIMESTAMP
 
-    return admin
+            AND admins.is_active = TRUE
+
+            LIMIT 1;
+        """, (
+            token_hash,
+        ))
+
+        return cur.fetchone()
+
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 def delete_admin_session(
@@ -1677,7 +1782,6 @@ def delete_admin_session(
 ):
 
     if not token:
-
         return False
 
     token_hash = hashlib.sha256(
@@ -1688,23 +1792,63 @@ def delete_admin_session(
 
     cur = conn.cursor()
 
-    cur.execute("""
-        DELETE FROM admin_sessions
-        WHERE token_hash = %s;
-    """, (
-        token_hash,
-    ))
+    try:
 
-    deleted = (
-        cur.rowcount > 0
-    )
+        cur.execute("""
+            DELETE FROM admin_sessions
+                       WHERE token_hash = %s;
+        """, (
+            token_hash,
+        ))
 
-    conn.commit()
+        deleted = cur.rowcount > 0
 
-    cur.close()
-    conn.close()
+        conn.commit()
 
-    return deleted
+        return deleted
+
+    except Exception:
+
+        conn.rollback()
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
+
+
+def update_admin_last_login(
+    admin_id
+):
+
+    conn = get_connection()
+
+    cur = conn.cursor()
+
+    try:
+
+        cur.execute("""
+            UPDATE admins
+            SET
+                last_login =
+                    CURRENT_TIMESTAMP
+            WHERE id = %s;
+        """, (
+            admin_id,
+        ))
+
+        conn.commit()
+
+    except Exception:
+
+        conn.rollback()
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
 
 
 # ============================================================
@@ -1719,69 +1863,75 @@ def get_dashboard_stats():
         cursor_factory=RealDictCursor
     )
 
-    cur.execute("""
-        SELECT COUNT(*) AS total_users
-        FROM users;
-    """)
+    try:
 
-    total_users = (
-        cur.fetchone()["total_users"]
-    )
+        cur.execute("""
+            SELECT
 
-    cur.execute("""
-        SELECT COUNT(*) AS active_tasks
-        FROM tasks
-        WHERE is_active = TRUE;
-    """)
+                COUNT(*) AS total_users,
 
-    active_tasks = (
-        cur.fetchone()["active_tasks"]
-    )
+                COALESCE(
+                    SUM(total_earned),
+                    0
+                ) AS total_earned,
 
-    cur.execute("""
-        SELECT COUNT(*) AS pending_withdrawals
-        FROM withdrawals
-        WHERE status = 'pending';
-    """)
+                COALESCE(
+                    SUM(total_withdrawn),
+                    0
+                ) AS total_withdrawn,
 
-    pending_withdrawals = (
-        cur.fetchone()["pending_withdrawals"]
-    )
+                COALESCE(
+                    SUM(balance),
+                    0
+                ) AS total_balance
 
-    cur.execute("""
-        SELECT
-            COALESCE(
-                SUM(total_earned),
-                0
-            ) AS total_earned,
+            FROM users;
+        """)
 
-            COALESCE(
-                SUM(balance),
-                0
-            ) AS total_balance
+        money = cur.fetchone()
 
-        FROM users;
-    """)
+        cur.execute("""
+            SELECT COUNT(*) AS active_tasks
+            FROM tasks
+            WHERE is_active = TRUE;
+        """)
 
-    money = cur.fetchone()
+        active_tasks = (
+            cur.fetchone()["active_tasks"]
+        )
 
-    cur.close()
-    conn.close()
+        cur.execute("""
+            SELECT COUNT(*) AS pending_withdrawals
+            FROM withdrawals
+            WHERE status = 'pending';
+        """)
 
-    return {
-        "total_users":
-            total_users,
+        pending_withdrawals = (
+            cur.fetchone()["pending_withdrawals"]
+        )
 
-        "active_tasks":
-            active_tasks,
+        return {
 
-        "pending_withdrawals":
-            pending_withdrawals,
+            "total_users":
+                money["total_users"],
 
-        "total_earned":
-            money["total_earned"],
+            "active_tasks":
+                active_tasks,
 
-        "total_balance":
-            money["total_balance"]
-    }
- 
+            "pending_withdrawals":
+                pending_withdrawals,
+
+            "total_earned":
+                money["total_earned"],
+
+            "total_withdrawn":
+                money["total_withdrawn"],
+
+            "total_balance":
+                money["total_balance"]
+        }
+
+    finally:
+
+        cur.close()
+        conn.close()
