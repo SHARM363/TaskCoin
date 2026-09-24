@@ -1784,3 +1784,4 @@ def get_dashboard_stats():
         "total_balance":
             money["total_balance"]
     }
+ 
