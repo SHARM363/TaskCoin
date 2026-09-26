@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -10,6 +12,7 @@
 
     <title>TaskCoin</title>
 
+    <!-- Telegram Mini App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
@@ -19,10 +22,16 @@
             padding: 0;
         }
 
+        html,
         body {
+            width: 100%;
+            min-height: 100%;
             font-family: Arial, sans-serif;
-            background: #f4f7fb;
+            background: #f5f7fb;
             color: #172033;
+        }
+
+        body {
             padding-bottom: 80px;
         }
 
@@ -33,140 +42,274 @@
         }
 
         button {
+            border: none;
             cursor: pointer;
         }
 
-        /* HEADER */
+        /* Loading */
 
-        .header {
-            background: linear-gradient(
-                135deg,
-                #1769ff,
-                #4936ff
-            );
-
-            color: white;
-            padding: 20px 16px 28px;
-            border-radius: 0 0 24px 24px;
-        }
-
-        .profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(255,255,255,.2);
+        #appLoading {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
-            font-weight: bold;
-            overflow: hidden;
+            flex-direction: column;
         }
 
-        .avatar img {
+        .loading-logo {
+            width: 70px;
+            height: 70px;
+            border-radius: 20px;
+            background: #1877f2;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 18px;
+        }
+
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 4px solid #e5e9f2;
+            border-top-color: #1877f2;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            margin-top: 12px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        /* Header */
+
+        .top-header {
+            background: #1877f2;
+            color: #ffffff;
+            padding: 18px 16px 24px;
+            border-radius: 0 0 24px 24px;
+        }
+
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 13px;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .brand-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .brand-subtitle {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 2px;
+        }
+
+        .profile-button {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .profile-button img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
-        .profile-name {
-            font-size: 17px;
-            font-weight: 700;
-        }
-
-        .profile-username {
-            margin-top: 4px;
-            font-size: 13px;
-            opacity: .8;
-        }
-
-        /* BALANCE */
-
-        .balance-card {
-            margin-top: 22px;
-            background: rgba(255,255,255,.13);
-            border: 1px solid rgba(255,255,255,.18);
-            border-radius: 18px;
-            padding: 18px;
-        }
-
-        .balance-label {
-            font-size: 13px;
-            opacity: .8;
-        }
-
-        .balance {
-            margin-top: 5px;
-            font-size: 32px;
-            font-weight: 800;
-        }
-
-        .coin-name {
-            font-size: 13px;
-            opacity: .8;
-        }
-
-        /* CONTENT */
-
-        .container {
-            padding: 18px 15px;
-        }
+        /* Pages */
 
         .page {
             display: none;
+            padding: 16px;
         }
 
         .page.active {
             display: block;
         }
+                /* Balance Card */
+
+        .balance-card {
+            margin-top: -8px;
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        }
+
+        .balance-label {
+            font-size: 13px;
+            color: #7a8496;
+        }
+
+        .balance-value {
+            font-size: 32px;
+            font-weight: 800;
+            margin-top: 5px;
+            color: #152238;
+        }
+
+        .coin-name {
+            font-size: 13px;
+            color: #1877f2;
+            margin-top: 2px;
+        }
+
+        .balance-bottom {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 18px;
+            padding-top: 15px;
+            border-top: 1px solid #edf0f5;
+        }
+
+        .balance-stat span {
+            display: block;
+            font-size: 12px;
+            color: #8a93a3;
+        }
+
+        .balance-stat strong {
+            display: block;
+            margin-top: 4px;
+            font-size: 15px;
+        }
+
+        /* Section */
+
+        .section {
+            margin-top: 18px;
+        }
 
         .section-title {
-            font-size: 20px;
-            font-weight: 800;
-            margin-bottom: 14px;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
         }
 
-        /* QUICK STATS */
+        /* Quick Actions */
 
-        .stats {
+        .quick-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 22px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
         }
 
-        .stat-card {
-            background: white;
+        .quick-card {
+            background: #ffffff;
             border-radius: 16px;
-            padding: 15px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.05);
+            padding: 15px 8px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
 
-        .stat-value {
-            font-size: 20px;
-            font-weight: 800;
+        .quick-icon {
+            font-size: 24px;
+            margin-bottom: 7px;
         }
 
-        .stat-label {
-            margin-top: 5px;
-            color: #778096;
+        .quick-name {
             font-size: 12px;
+            font-weight: 600;
         }
 
-        /* TASK CARD */
+        /* User Card */
+
+        .user-card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .user-avatar {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #e8f1ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #1877f2;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-name {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .user-username {
+            font-size: 12px;
+            color: #7d8797;
+            margin-top: 3px;
+        }
+
+        .user-id {
+            font-size: 11px;
+            color: #a0a7b4;
+            margin-top: 3px;
+            }
+                /* Tasks */
 
         .task-card {
-            background: white;
-            border-radius: 17px;
+            background: #ffffff;
+            border-radius: 18px;
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
 
         .task-top {
@@ -175,75 +318,123 @@
             gap: 10px;
         }
 
+        .task-info {
+            flex: 1;
+        }
+
         .task-title {
             font-size: 16px;
             font-weight: 700;
         }
 
         .task-description {
+            font-size: 12px;
+            color: #7d8797;
             margin-top: 6px;
-            color: #778096;
-            font-size: 13px;
             line-height: 1.5;
         }
 
-        .reward {
-            color: #1769ff;
-            font-weight: 800;
+        .task-reward {
             white-space: nowrap;
+            background: #eaf4ff;
+            color: #1877f2;
+            padding: 7px 9px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .task-button {
             width: 100%;
-            border: 0;
-            border-radius: 11px;
+            margin-top: 14px;
+            background: #1877f2;
+            color: #ffffff;
             padding: 12px;
-            margin-top: 13px;
-            background: #1769ff;
-            color: white;
+            border-radius: 12px;
             font-weight: 700;
         }
 
         .task-button:disabled {
-            background: #b9c0cc;
+            background: #cbd2dc;
             cursor: not-allowed;
         }
 
-        /* WALLET */
+        /* Empty State */
 
-        .info-card {
-            background: white;
-            border-radius: 17px;
-            padding: 17px;
-            margin-bottom: 13px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.05);
+        .empty-box {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 35px 20px;
+            text-align: center;
+            color: #7c8797;
         }
 
-        .info-row {
+        .empty-icon {
+            font-size: 35px;
+            margin-bottom: 10px;
+        }
+
+        .empty-title {
+            font-weight: 700;
+            color: #354052;
+            margin-bottom: 5px;
+        }
+
+        .empty-text {
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Error */
+
+        .error-box {
+            background: #fff0f0;
+            border: 1px solid #ffd0d0;
+            color: #9b3030;
+            border-radius: 14px;
+            padding: 14px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+                /* Wallet */
+
+        .wallet-card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .wallet-row {
             display: flex;
             justify-content: space-between;
-            gap: 15px;
-            padding: 10px 0;
-            border-bottom: 1px solid #edf0f5;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eef1f5;
         }
 
-        .info-row:last-child {
-            border-bottom: 0;
+        .wallet-row:last-child {
+            border-bottom: none;
         }
 
-        .info-label {
-            color: #778096;
+        .wallet-label {
+            color: #778294;
             font-size: 13px;
         }
 
-        .info-value {
-            font-size: 13px;
+        .wallet-value {
             font-weight: 700;
-            text-align: right;
-            word-break: break-word;
         }
 
-        /* FORM */
+        /* Withdraw */
+
+        .form-card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
 
         .form-group {
             margin-bottom: 14px;
@@ -251,9 +442,9 @@
 
         .form-label {
             display: block;
-            margin-bottom: 7px;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 600;
+            margin-bottom: 7px;
         }
 
         .form-input,
@@ -261,183 +452,257 @@
             width: 100%;
             padding: 13px;
             border: 1px solid #dfe4ec;
-            border-radius: 11px;
+            border-radius: 12px;
             outline: none;
-            background: white;
+            background: #ffffff;
         }
 
         .form-input:focus,
         .form-select:focus {
-            border-color: #1769ff;
+            border-color: #1877f2;
         }
 
         .primary-button {
             width: 100%;
+            background: #1877f2;
+            color: #ffffff;
             padding: 13px;
-            border: 0;
-            border-radius: 11px;
-            background: #1769ff;
-            color: white;
+            border-radius: 12px;
             font-weight: 700;
         }
 
-        /* REFERRAL */
+        .primary-button:disabled {
+            background: #bfc7d3;
+        }
 
-        .referral-box {
-            background: linear-gradient(
-                135deg,
-                #1769ff,
-                #4936ff
-            );
+        .notice {
+            background: #fff8e6;
+            border: 1px solid #f4df9d;
+            color: #765b14;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+            }
+                /* Referral */
 
-            color: white;
-            border-radius: 18px;
+        .referral-card {
+            background: #1877f2;
+            color: #ffffff;
+            border-radius: 20px;
             padding: 20px;
         }
 
-        .referral-code {
-            background: rgba(255,255,255,.15);
-            padding: 13px;
-            border-radius: 10px;
-            margin-top: 15px;
-            word-break: break-all;
+        .referral-title {
+            font-size: 19px;
             font-weight: 700;
+        }
+
+        .referral-text {
+            margin-top: 7px;
+            font-size: 12px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .referral-link-box {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 16px;
+            word-break: break-all;
+            font-size: 12px;
         }
 
         .copy-button {
             margin-top: 10px;
+            background: #ffffff;
+            color: #1264d8;
             width: 100%;
-            padding: 11px;
-            border: 0;
-            border-radius: 10px;
-            background: white;
-            color: #1769ff;
+            padding: 12px;
+            border-radius: 12px;
             font-weight: 700;
         }
 
-        /* EMPTY */
-
-        .empty {
-            background: white;
-            border-radius: 16px;
-            padding: 30px 15px;
-            text-align: center;
-            color: #7b8495;
+        .referral-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 14px;
         }
 
-        /* BOTTOM NAV */
+        .referral-stat {
+            background: #ffffff;
+            color: #172033;
+            border-radius: 14px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .referral-stat-value {
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .referral-stat-label {
+            font-size: 11px;
+            color: #7c8797;
+            margin-top: 4px;
+        }
+
+        /* Deposit */
+
+        .deposit-disabled {
+            background: #f1f3f7;
+            border-radius: 16px;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .deposit-disabled-icon {
+            font-size: 32px;
+        }
+
+        .deposit-disabled-title {
+            margin-top: 8px;
+            font-weight: 700;
+        }
+
+        .deposit-disabled-text {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #7b8595;
+            line-height: 1.5;
+        }
+                /* Bottom Navigation */
 
         .bottom-nav {
             position: fixed;
+            bottom: 0;
             left: 0;
             right: 0;
-            bottom: 0;
-            height: 68px;
-            background: white;
-            border-top: 1px solid #e9edf3;
+            z-index: 1000;
+            background: #ffffff;
+            border-top: 1px solid #e7eaf0;
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            z-index: 1000;
+            padding: 7px 4px calc(7px + env(safe-area-inset-bottom));
         }
 
         .nav-button {
-            border: 0;
             background: transparent;
-            color: #7b8495;
-            font-size: 11px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
+            color: #8a94a5;
+            padding: 5px 2px;
+            font-size: 10px;
         }
 
         .nav-icon {
-            font-size: 20px;
+            display: block;
+            font-size: 19px;
+            margin-bottom: 3px;
         }
 
         .nav-button.active {
-            color: #1769ff;
+            color: #1877f2;
             font-weight: 700;
         }
 
-        /* LOADING */
+        /* Toast */
 
-        .loading {
-            text-align: center;
-            padding: 30px;
-            color: #7b8495;
-        }
-
-        /* MESSAGE */
-
-        .message {
+        #toast {
             position: fixed;
-            left: 15px;
-            right: 15px;
-            bottom: 82px;
+            left: 50%;
+            bottom: 90px;
+            transform: translateX(-50%) translateY(20px);
             background: #172033;
-            color: white;
-            padding: 13px;
+            color: #ffffff;
+            padding: 11px 16px;
             border-radius: 10px;
+            font-size: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.25s;
+            z-index: 9998;
+            max-width: 85%;
             text-align: center;
-            display: none;
-            z-index: 2000;
-            font-size: 13px;
         }
 
-        @media (min-width: 700px) {
-            .container {
-                max-width: 650px;
-                margin: auto;
-            }
-
-            .header {
-                padding-left: calc((100% - 650px) / 2 + 15px);
-                padding-right: calc((100% - 650px) / 2 + 15px);
-            }
-
-            .bottom-nav {
-                max-width: 650px;
-                left: 50%;
-                transform: translateX(-50%);
-            }
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
+
     </style>
+
 </head>
 
 <body>
+<!-- Loading Screen -->
 
-<!-- HEADER -->
+<div id="appLoading">
 
-<header class="header">
+    <div class="loading-logo">
+        TC
+    </div>
 
-    <div class="profile">
+    <div class="loading-spinner"></div>
 
-        <div class="avatar" id="avatar">
-            TC
-        </div>
+    <div class="loading-text">
+        Loading TaskCoin...
+    </div>
 
-        <div>
+</div>
 
-            <div
-                class="profile-name"
-                id="telegramName"
-            >
-                Loading...
+
+<!-- Header -->
+
+<header class="top-header">
+
+    <div class="header-row">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                TC
             </div>
 
-            <div
-                class="profile-username"
-                id="telegramUsername"
-            >
-                Loading...
+            <div>
+
+                <div class="brand-title">
+                    TaskCoin
+                </div>
+
+                <div class="brand-subtitle">
+                    Earn by completing tasks
+                </div>
+
             </div>
 
         </div>
+
+
+        <button
+            class="profile-button"
+            onclick="openPage('wallet')"
+            id="headerAvatar"
+        >
+            U
+        </button>
 
     </div>
 
+</header>
+
+
+<!-- Home Page -->
+
+<section
+    id="page-home"
+    class="page active"
+>
+
+    <!-- Balance -->
 
     <div class="balance-card">
 
@@ -446,1022 +711,1676 @@
         </div>
 
         <div
-            class="balance"
-            id="balance"
+            class="balance-value"
+            id="homeBalance"
         >
             0
         </div>
 
         <div class="coin-name">
-            TaskCoin
+            TaskCoins
+        </div>
+
+
+        <div class="balance-bottom">
+
+            <div class="balance-stat">
+
+                <span>
+                    Total Earned
+                </span>
+
+                <strong id="homeEarned">
+                    0
+                </strong>
+
+            </div>
+
+
+            <div class="balance-stat">
+
+                <span>
+                    Referrals
+                </span>
+
+                <strong id="homeReferrals">
+                    0
+                </strong>
+
+            </div>
+
         </div>
 
     </div>
 
-</header>
 
+    <!-- Quick Actions -->
 
-<!-- CONTENT -->
-
-<main class="container">
-
-
-    <!-- HOME -->
-
-    <section
-        id="homePage"
-        class="page active"
-    >
+    <div class="section">
 
         <div class="section-title">
-            Dashboard
+            Quick Actions
         </div>
 
 
-        <div class="stats">
+        <div class="quick-grid">
 
-            <div class="stat-card">
+            <button
+                class="quick-card"
+                onclick="openPage('tasks')"
+            >
 
-                <div
-                    class="stat-value"
-                    id="totalEarned"
-                >
-                    0
+                <div class="quick-icon">
+                    🎯
                 </div>
 
-                <div class="stat-label">
-                    Total Earned
+                <div class="quick-name">
+                    Tasks
                 </div>
 
-            </div>
-
-
-            <div class="stat-card">
-
-                <div
-                    class="stat-value"
-                    id="completedTasks"
-                >
-                    0
-                </div>
-
-                <div class="stat-label">
-                    Completed Tasks
-                </div>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <div
-                    class="stat-value"
-                    id="referralCount"
-                >
-                    0
-                </div>
-
-                <div class="stat-label">
-                    Referrals
-                </div>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <div
-                    class="stat-value"
-                    id="userId"
-                >
-                    -
-                </div>
-
-                <div class="stat-label">
-                    Telegram ID
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="section-title">
-            Featured Tasks
-        </div>
-
-
-        <div id="homeTasks">
-
-            <div class="empty">
-                Tasks will appear here.
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- TASKS -->
-
-    <section
-        id="tasksPage"
-        class="page"
-    >
-
-        <div class="section-title">
-            Available Tasks
-        </div>
-
-        <div id="tasksList">
-
-            <div class="loading">
-                Loading tasks...
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- WALLET -->
-
-    <section
-        id="walletPage"
-        class="page"
-    >
-
-        <div class="section-title">
-            Wallet
-        </div>
-
-
-        <div class="info-card">
-
-            <div class="info-row">
-
-                <span class="info-label">
-                    Telegram Name
-                </span>
-
-                <span
-                    class="info-value"
-                    id="walletName"
-                >
-                    -
-                </span>
-
-            </div>
-
-
-            <div class="info-row">
-
-                <span class="info-label">
-                    Username
-                </span>
-
-                <span
-                    class="info-value"
-                    id="walletUsername"
-                >
-                    -
-                </span>
-
-            </div>
-
-
-            <div class="info-row">
-
-                <span class="info-label">
-                    Telegram ID
-                </span>
-
-                <span
-                    class="info-value"
-                    id="walletTelegramId"
-                >
-                    -
-                </span>
-
-            </div>
-
-
-            <div class="info-row">
-
-                <span class="info-label">
-                    Balance
-                </span>
-
-                <span
-                    class="info-value"
-                    id="walletBalance"
-                >
-                    0
-                </span>
-
-            </div>
-
-
-            <div class="info-row">
-
-                <span class="info-label">
-                    Total Earned
-                </span>
-
-                <span
-                    class="info-value"
-                    id="walletEarned"
-                >
-                    0
-                </span>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- WITHDRAW -->
-
-    <section
-        id="withdrawPage"
-        class="page"
-    >
-
-        <div class="section-title">
-            Withdraw
-        </div>
-
-
-        <div class="info-card">
-
-            <div class="info-row">
-
-                <span class="info-label">
-                    Available Balance
-                </span>
-
-                <span
-                    class="info-value"
-                    id="withdrawBalance"
-                >
-                    0
-                </span>
-
-            </div>
-
-        </div>
-
-
-        <div class="info-card">
-
-            <div class="form-group">
-
-                <label class="form-label">
-                    Amount
-                </label>
-
-                <input
-                    type="number"
-                    id="withdrawAmount"
-                    class="form-input"
-                    placeholder="Enter amount"
-                    min="1"
-                >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label class="form-label">
-                    Payment Method
-                </label>
-
-                <select
-                    id="withdrawMethod"
-                    class="form-select"
-                >
-
-                    <option value="bkash">
-                        bKash
-                    </option>
-
-                    <option value="nagad">
-                        Nagad
-                    </option>
-
-                    <option value="bank">
-                        Bank
-                    </option>
-
-                </select>
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label class="form-label">
-                    Account Number
-                </label>
-
-                <input
-                    type="text"
-                    id="withdrawAccount"
-                    class="form-input"
-                    placeholder="Enter account number"
-                >
-
-            </div>
+            </button>
 
 
             <button
-                class="primary-button"
-                onclick="submitWithdraw()"
+                class="quick-card"
+                onclick="openPage('wallet')"
             >
-                Submit Withdraw
+
+                <div class="quick-icon">
+                    💰
+                </div>
+
+                <div class="quick-name">
+                    Wallet
+                </div>
+
+            </button>
+
+
+            <button
+                class="quick-card"
+                onclick="openPage('withdraw')"
+            >
+
+                <div class="quick-icon">
+                    💸
+                </div>
+
+                <div class="quick-name">
+                    Withdraw
+                </div>
+
             </button>
 
         </div>
 
-    </section>
+    </div>
 
 
-    <!-- REFERRAL -->
+    <!-- Telegram Profile -->
 
-    <section
-        id="referralPage"
-        class="page"
-    >
+    <div class="section">
 
         <div class="section-title">
-            Referral
+            Telegram Profile
         </div>
 
 
-        <div class="referral-box">
-
-            <div>
-                Invite friends and earn TaskCoins.
-            </div>
-
+        <div class="user-card">
 
             <div
-                class="referral-code"
-                id="referralCode"
+                class="user-avatar"
+                id="homeAvatar"
             >
-                Loading...
+                U
             </div>
 
 
-            <button
-                class="copy-button"
-                onclick="copyReferral()"
-            >
-                Copy Referral Link
-            </button>
+            <div>
 
+                <div
+                    class="user-name"
+                    id="telegramName"
+                >
+                    Loading...
+                </div>
+
+
+                <div
+                    class="user-username"
+                    id="telegramUsername"
+                >
+                    @loading
+                </div>
+
+
+                <div
+                    class="user-id"
+                    id="telegramId"
+                >
+                    ID: Loading...
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Deposit -->
+
+    <div class="section">
+
+        <div class="section-title">
+            Deposit
+        </div>
+
+
+        <div class="deposit-disabled">
+
+            <div class="deposit-disabled-icon">
+                🔒
+            </div>
+
+
+            <div class="deposit-disabled-title">
+                Deposit Coming Soon
+            </div>
+
+
+            <div class="deposit-disabled-text">
+                Deposit and payment processing will be
+                activated in a later system update.
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+<!-- Tasks Page -->
+
+<section
+    id="page-tasks"
+    class="page"
+>
+
+    <div class="section-title">
+        Available Tasks
+    </div>
+
+
+    <div id="tasksContainer">
+
+        <div class="empty-box">
+
+            <div class="empty-icon">
+                🎯
+            </div>
+
+            <div class="empty-title">
+                No Tasks Available
+            </div>
+
+            <div class="empty-text">
+                New tasks will appear here when they are
+                added by the TaskCoin admin.
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- Wallet Page -->
+
+<section
+    id="page-wallet"
+    class="page"
+>
+
+    <div class="section-title">
+        My Wallet
+    </div>
+
+
+    <div class="wallet-card">
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Available Balance
+            </div>
+
+            <div
+                class="wallet-value"
+                id="walletBalance"
+            >
+                0
+            </div>
+
+        </div>
+
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Total Earned
+            </div>
+
+            <div
+                class="wallet-value"
+                id="walletEarned"
+            >
+                0
+            </div>
+
+        </div>
+
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Total Referrals
+            </div>
+
+            <div
+                class="wallet-value"
+                id="walletReferrals"
+            >
+                0
+            </div>
+
+        </div>
+
+
+        <div class="wallet-row">
+
+            <div class="wallet-label">
+                Pending Withdrawals
+            </div>
+
+            <div
+                class="wallet-value"
+                id="walletPendingWithdraw"
+            >
+                0
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="section">
+
+        <div class="section-title">
+            Account Information
+        </div>
+
+
+        <div class="user-card">
+
+            <div
+                class="user-avatar"
+                id="walletAvatar"
+            >
+                U
+            </div>
+
+
+            <div>
+
+                <div
+                    class="user-name"
+                    id="walletName"
+                >
+                    Loading...
+                </div>
+
+
+                <div
+                    class="user-username"
+                    id="walletUsername"
+                >
+                    @loading
+                </div>
+
+
+                <div
+                    class="user-id"
+                    id="walletTelegramId"
+                >
+                    ID: Loading...
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- Withdraw Page -->
+
+<section
+    id="page-withdraw"
+    class="page"
+>
+
+    <div class="section-title">
+        Withdraw
+    </div>
+
+
+    <div class="notice">
+
+        ⚠️ Withdraw processing is not active yet.
+        The withdrawal system will be connected in
+        Part 5 of the TaskCoin development.
+
+    </div>
+
+
+    <div class="form-card">
+
+        <div class="form-group">
+
+            <label class="form-label">
+                Payment Method
+            </label>
+
+
+            <select
+                class="form-select"
+                id="withdrawMethod"
+            >
+
+                <option value="bkash">
+                    bKash
+                </option>
+
+                <option value="nagad">
+                    Nagad
+                </option>
+
+                <option value="usdt">
+                    USDT
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="form-group">
+
+            <label class="form-label">
+                Account / Wallet Number
+            </label>
+
+
+            <input
+                type="text"
+                class="form-input"
+                id="withdrawAccount"
+                placeholder="Enter account or wallet"
+                autocomplete="off"
+            >
+
+        </div>
+
+
+        <div class="form-group">
+
+            <label class="form-label">
+                Amount
+            </label>
+
+
+            <input
+                type="number"
+                class="form-input"
+                id="withdrawAmount"
+                placeholder="Enter TaskCoin amount"
+                min="0"
+                inputmode="numeric"
+            >
+
+        </div>
+
+
+        <button
+            class="primary-button"
+            id="withdrawButton"
+            onclick="submitWithdraw()"
+        >
+            Request Withdraw
+        </button>
+
+    </div>
+
+
+    <div class="section">
+
+        <div class="section-title">
+            Withdrawal History
+        </div>
+
+
+        <div class="empty-box">
+
+            <div class="empty-icon">
+                💸
+            </div>
+
+            <div class="empty-title">
+                No Withdrawal History
+            </div>
+
+            <div class="empty-text">
+                Your withdrawal records will appear here
+                after the withdrawal system is activated.
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- Referral Page -->
+
+<section
+    id="page-referral"
+    class="page"
+>
+
+    <div class="section-title">
+        Referral Program
+    </div>
+
+
+    <div class="referral-card">
+
+        <div class="referral-title">
+            Invite Friends & Earn
+        </div>
+
+
+        <div class="referral-text">
+            Share your referral link with friends.
+            Referral rewards will be connected to the
+            TaskCoin backend later.
         </div>
 
 
         <div
-            class="info-card"
-            style="margin-top:15px;"
+            class="referral-link-box"
+            id="referralLink"
         >
+            Generating referral link...
+        </div>
 
-            <div class="info-row">
 
-                <span class="info-label">
-                    Total Referrals
-                </span>
+        <button
+            class="copy-button"
+            onclick="copyReferralLink()"
+        >
+            📋 Copy Referral Link
+        </button>
 
-                <span
-                    class="info-value"
+
+        <div class="referral-stats">
+
+            <div class="referral-stat">
+
+                <div
+                    class="referral-stat-value"
                     id="referralTotal"
                 >
                     0
-                </span>
+                </div>
+
+                <div class="referral-stat-label">
+                    Total Referrals
+                </div>
+
+            </div>
+
+
+            <div class="referral-stat">
+
+                <div
+                    class="referral-stat-value"
+                    id="referralEarned"
+                >
+                    0
+                </div>
+
+                <div class="referral-stat-label">
+                    Referral Earnings
+                </div>
 
             </div>
 
         </div>
 
-    </section>
-
-</main>
+    </div>
 
 
-<!-- MESSAGE -->
+    <div class="section">
 
-<div
-    id="message"
-    class="message"
-></div>
+        <div class="section-title">
+            How It Works
+        </div>
 
 
-<!-- BOTTOM NAV -->
+        <div class="wallet-card">
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    1. Copy your referral link
+                </div>
+
+                <div>
+                    🔗
+                </div>
+
+            </div>
+
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    2. Share it with your friends
+                </div>
+
+                <div>
+                    👥
+                </div>
+
+            </div>
+
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    3. Friends join TaskCoin
+                </div>
+
+                <div>
+                    🚀
+                </div>
+
+            </div>
+
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    4. Referral rewards are credited
+                </div>
+
+                <div>
+                    🪙
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+ </section> 
+<!-- Bottom Navigation -->
 
 <nav class="bottom-nav">
 
     <button
         class="nav-button active"
-        onclick="showPage('homePage', this)"
+        data-page="home"
+        onclick="openPage('home')"
     >
-
-        <span class="nav-icon">
-            🏠
-        </span>
-
+        <span class="nav-icon">🏠</span>
         Home
-
     </button>
 
 
     <button
         class="nav-button"
-        onclick="showPage('tasksPage', this)"
+        data-page="tasks"
+        onclick="openPage('tasks')"
     >
-
-        <span class="nav-icon">
-            📋
-        </span>
-
+        <span class="nav-icon">🎯</span>
         Tasks
-
     </button>
 
 
     <button
         class="nav-button"
-        onclick="showPage('walletPage', this)"
+        data-page="wallet"
+        onclick="openPage('wallet')"
     >
-
-        <span class="nav-icon">
-            💰
-        </span>
-
+        <span class="nav-icon">💰</span>
         Wallet
-
     </button>
 
 
     <button
         class="nav-button"
-        onclick="showPage('withdrawPage', this)"
+        data-page="withdraw"
+        onclick="openPage('withdraw')"
     >
-
-        <span class="nav-icon">
-            💸
-        </span>
-
+        <span class="nav-icon">💸</span>
         Withdraw
-
     </button>
 
 
     <button
         class="nav-button"
-        onclick="showPage('referralPage', this)"
+        data-page="referral"
+        onclick="openPage('referral')"
     >
-
-        <span class="nav-icon">
-            👥
-        </span>
-
+        <span class="nav-icon">👥</span>
         Referral
-
     </button>
 
 </nav>
 
 
+<!-- Toast -->
+
+<div id="toast"></div>
+
+
 <script>
 
-    /*
-    ============================================
-    TASKCOIN FRONTEND
-    STEP 1
-    ============================================
+/* =========================================
+   TaskCoin Configuration
+========================================= */
 
-    Backend/database will be connected
-    in the next steps.
-    */
+const API_BASE_URL =
+    "https://taskcoin-1.onrender.com";
 
 
-    const tg = window.Telegram &&
-               window.Telegram.WebApp
-        ? window.Telegram.WebApp
-        : null;
+/* =========================================
+   Telegram Mini App
+========================================= */
+
+let tg = null;
+
+let telegramUser = null;
 
 
-    /*
-    TELEGRAM INITIALIZATION
-    */
+if (
+    window.Telegram &&
+    window.Telegram.WebApp
+) {
 
-    if (tg) {
+    tg =
+        window.Telegram.WebApp;
+
+
+    try {
 
         tg.ready();
 
         tg.expand();
 
-    }
-
-
-    /*
-    TELEGRAM USER
-    */
-
-    function loadTelegramUser() {
-
-        let user = null;
-
-
-        if (
-            tg &&
-            tg.initDataUnsafe &&
-            tg.initDataUnsafe.user
-        ) {
-
-            user = tg.initDataUnsafe.user;
-
-        }
-
-
-        if (!user) {
-
-            document.getElementById(
-                "telegramName"
-            ).textContent = "Telegram User";
-
-            document.getElementById(
-                "telegramUsername"
-            ).textContent = "@username";
-
-            return;
-
-        }
-
-
-        const firstName =
-            user.first_name || "";
-
-        const lastName =
-            user.last_name || "";
-
-        const fullName =
-            `${firstName} ${lastName}`.trim()
-            || "Telegram User";
-
-
-        const username =
-            user.username
-            ? "@" + user.username
-            : "No username";
-
-
-        document.getElementById(
-            "telegramName"
-        ).textContent = fullName;
-
-
-        document.getElementById(
-            "telegramUsername"
-        ).textContent = username;
-
-
-        document.getElementById(
-            "walletName"
-        ).textContent = fullName;
-
-
-        document.getElementById(
-            "walletUsername"
-        ).textContent = username;
-
-
-        document.getElementById(
-            "userId"
-        ).textContent = user.id || "-";
-
-
-        document.getElementById(
-            "walletTelegramId"
-        ).textContent = user.id || "-";
-
-
-        /*
-        TELEGRAM PHOTO
-        */
-
-        if (user.photo_url) {
-
-            document.getElementById(
-                "avatar"
-            ).innerHTML =
-                `<img src="${user.photo_url}" alt="Profile">`;
-
-        } else {
-
-            document.getElementById(
-                "avatar"
-         /*
-        TELEGRAM PHOTO
-        */
-
-        if (user.photo_url) {
-
-            document.getElementById(
-                "avatar"
-            ).innerHTML =
-                `<img src="${user.photo_url}" alt="Profile">`;
-
-        } else {
-
-            document.getElementById(
-                "avatar"
-            ).textContent =
-                firstName
-                    ? firstName.charAt(0).toUpperCase()
-                    : "TC";
-
-        }
-
-
-        /*
-        REFERRAL CODE
-        */
-
-        const referralLink =
-            `https://t.me/TaskCoinEarnBot?start=${user.id}`;
-
-
-        document.getElementById(
-            "referralCode"
-        ).textContent = referralLink;
-
-    }
-
-
-    /*
-    PAGE NAVIGATION
-    */
-
-    function showPage(
-        pageId,
-        button
-    ) {
-
-        document
-            .querySelectorAll(".page")
-            .forEach(page => {
-
-                page.classList.remove("active");
-
-            });
-
-
-        const selectedPage =
-            document.getElementById(pageId);
-
-
-        if (selectedPage) {
-
-            selectedPage.classList.add("active");
-
-        }
-
-
-        document
-            .querySelectorAll(".nav-button")
-            .forEach(btn => {
-
-                btn.classList.remove("active");
-
-            });
-
-
-        if (button) {
-
-            button.classList.add("active");
-
-        }
-
-
-        /*
-        PAGE DATA
-        */
-
-        if (pageId === "tasksPage") {
-
-            loadTasks();
-
-        }
-
-
-        if (
-            pageId === "walletPage" ||
-            pageId === "withdrawPage"
-        ) {
-
-            updateWallet();
-
-        }
-
-    }
-
-
-    /*
-    TEMPORARY TASK LOADER
-    */
-
-    function loadTasks() {
-
-        const list =
-            document.getElementById(
-                "tasksList"
-            );
-
-
-        if (!list) return;
-
-
-        list.innerHTML = `
-
-            <div class="empty">
-
-                <div style="font-size:35px;">
-                    📋
-                </div>
-
-                <br>
-
-                No tasks available yet.
-
-                <br><br>
-
-                Admin-created tasks
-                will appear here.
-
-            </div>
-
-        `;
-
-    }
-
-
-    /*
-    HOME TASKS
-    */
-
-    function loadHomeTasks() {
-
-        const container =
-            document.getElementById(
-                "homeTasks"
-            );
-
-
-        if (!container) return;
-
-
-        container.innerHTML = `
-
-            <div class="empty">
-
-                <div style="font-size:35px;">
-                    🚀
-                </div>
-
-                <br>
-
-                Complete tasks and
-                earn TaskCoins.
-
-                <br><br>
-
-                New tasks will appear here.
-
-            </div>
-
-        `;
-
-    }
-
-
-    /*
-    WALLET
-    */
-
-    function updateWallet() {
-
-        const balanceElement =
-            document.getElementById("balance");
-
-        const earnedElement =
-            document.getElementById("totalEarned");
-
-
-        const balance =
-            balanceElement
-                ? balanceElement.textContent
-                : "0";
-
-
-        const earned =
-            earnedElement
-                ? earnedElement.textContent
-                : "0";
-
-
-        const walletBalance =
-            document.getElementById(
-                "walletBalance"
-            );
-
-
-        const walletEarned =
-            document.getElementById(
-                "walletEarned"
-            );
-
-
-        const withdrawBalance =
-            document.getElementById(
-                "withdrawBalance"
-            );
-
-
-        if (walletBalance) {
-
-            walletBalance.textContent =
-                balance;
-
-        }
-
-
-        if (walletEarned) {
-
-            walletEarned.textContent =
-                earned;
-
-        }
-
-
-        if (withdrawBalance) {
-
-            withdrawBalance.textContent =
-                balance;
-
-        }
-
-    }
-
-
-    /*
-    WITHDRAW
-    */
-
-    function submitWithdraw() {
-
-        const amount =
-            document.getElementById(
-                "withdrawAmount"
-            ).value;
-
-
-        const method =
-            document.getElementById(
-                "withdrawMethod"
-            ).value;
-
-
-        const account =
-            document.getElementById(
-                "withdrawAccount"
-            ).value.trim();
-
-
-        if (
-            !amount ||
-            Number(amount) <= 0
-        ) {
-
-            showMessage(
-                "Please enter a valid amount."
-            );
-
-            return;
-
-        }
-
-
-        if (!account) {
-
-            showMessage(
-                "Please enter your account number."
-            );
-
-            return;
-
-        }
-
-
-        showMessage(
-            "Withdraw system will be connected to the database."
+    } catch (error) {
+
+        console.log(
+            "Telegram initialization error:",
+            error
         );
 
     }
 
 
-    /*
-    REFERRAL COPY
-    */
+    telegramUser =
+        tg.initDataUnsafe &&
+        tg.initDataUnsafe.user
+            ? tg.initDataUnsafe.user
+            : null;
 
-    function copyReferral() {
+}
 
-        const codeElement =
-            document.getElementById(
-                "referralCode"
+
+/* =========================================
+   App State
+========================================= */
+
+const appState = {
+
+    balance: 0,
+
+    totalEarned: 0,
+
+    referrals: 0,
+
+    referralEarned: 0,
+
+    pendingWithdrawals: 0,
+
+    tasks: [],
+
+    currentPage: "home"
+
+};
+
+
+/* =========================================
+   Helper
+========================================= */
+
+function getElement(id) {
+
+    return document.getElementById(id);
+
+}
+
+
+function escapeHtml(value) {
+
+    return String(value || "")
+
+        .replace(/&/g, "&amp;")
+
+        .replace(/</g, "&lt;")
+
+        .replace(/>/g, "&gt;")
+
+        .replace(/"/g, "&quot;")
+
+        .replace(/'/g, "&#039;");
+
+}
+
+
+/* =========================================
+   Toast
+========================================= */
+
+let toastTimer = null;
+
+
+function showToast(message) {
+
+    const toast =
+        getElement("toast");
+
+
+    if (!toast) {
+
+        return;
+
+    }
+
+
+    toast.textContent =
+        message;
+
+
+    toast.classList.add(
+        "show"
+    );
+
+
+    clearTimeout(
+        toastTimer
+    );
+
+
+    toastTimer =
+        setTimeout(
+            function () {
+
+                toast.classList.remove(
+                    "show"
+                );
+
+            },
+            2500
+        );
+
+}
+
+
+/* =========================================
+   Page Navigation
+========================================= */
+
+function openPage(pageName) {
+
+    const pages =
+        document.querySelectorAll(
+            ".page"
+        );
+
+
+    pages.forEach(
+        function(page) {
+
+            page.classList.remove(
+                "active"
             );
-
-
-        if (!codeElement) return;
-
-
-        const code =
-            codeElement.textContent;
-
-
-        if (
-            navigator.clipboard &&
-            code &&
-            code !== "Loading..."
-        ) {
-
-            navigator.clipboard
-                .writeText(code)
-                .then(() => {
-
-                    showMessage(
-                        "Referral link copied."
-                    );
-
-                })
-                .catch(() => {
-
-                    showMessage(
-                        "Copy failed."
-                    );
-
-                });
 
         }
+    );
+
+
+    const targetPage =
+        getElement(
+            "page-" + pageName
+        );
+
+
+    if (targetPage) {
+
+        targetPage.classList.add(
+            "active"
+        );
 
     }
 
 
-    /*
-    MESSAGE
-    */
+    const navButtons =
+        document.querySelectorAll(
+            ".nav-button"
+        );
 
-    function showMessage(text) {
 
-        const box =
-            document.getElementById(
-                "message"
+    navButtons.forEach(
+        function(button) {
+
+            button.classList.remove(
+                "active"
             );
 
 
-        if (!box) return;
+            if (
+                button.dataset.page ===
+                pageName
+            ) {
+
+                button.classList.add(
+                    "active"
+                );
+
+            }
+
+        }
+    );
 
 
-        box.textContent = text;
+    appState.currentPage =
+        pageName;
 
-        box.style.display = "block";
 
+    window.scrollTo(
+        0,
+        0
+    );
 
-        setTimeout(() => {
+}    
+<script>
 
-            box.style.display = "none";
+/* =========================================
+   Telegram Profile
+========================================= */
 
-        }, 2500);
+function loadTelegramProfile() {
+
+    if (!telegramUser) {
+
+        setProfileFallback();
+
+        return;
 
     }
 
 
+    const firstName =
+        telegramUser.first_name || "";
+
+
+    const lastName =
+        telegramUser.last_name || "";
+
+
+    const fullName =
+        (
+            firstName +
+            " " +
+            lastName
+        ).trim() ||
+        "Telegram User";
+
+
+    const username =
+        telegramUser.username
+            ? "@" + telegramUser.username
+            : "@no_username";
+
+
+    const userId =
+        telegramUser.id
+            ? String(telegramUser.id)
+            : "Unknown";
+
+
+    const avatarText =
+        (
+            firstName ||
+            "U"
+        )
+        .charAt(0)
+        .toUpperCase();
+
+
+    if (getElement("telegramName")) {
+
+        getElement("telegramName")
+            .textContent =
+            fullName;
+
+    }
+
+
+    if (getElement("telegramUsername")) {
+
+        getElement("telegramUsername")
+            .textContent =
+            username;
+
+    }
+
+
+    if (getElement("telegramId")) {
+
+        getElement("telegramId")
+            .textContent =
+            "ID: " + userId;
+
+    }
+
+
+    if (getElement("walletName")) {
+
+        getElement("walletName")
+            .textContent =
+            fullName;
+
+    }
+
+
+    if (getElement("walletUsername")) {
+
+        getElement("walletUsername")
+            .textContent =
+            username;
+
+    }
+
+
+    if (getElement("walletTelegramId")) {
+
+        getElement("walletTelegramId")
+            .textContent =
+            "ID: " + userId;
+
+    }
+
+
+    if (getElement("homeAvatar")) {
+
+        getElement("homeAvatar")
+            .textContent =
+            avatarText;
+
+    }
+
+
+    if (getElement("walletAvatar")) {
+
+        getElement("walletAvatar")
+            .textContent =
+            avatarText;
+
+    }
+
+
+    if (getElement("headerAvatar")) {
+
+        getElement("headerAvatar")
+            .textContent =
+            avatarText;
+
+    }
+
+
+    if (telegramUser.photo_url) {
+
+        setAvatarImage(
+            telegramUser.photo_url
+        );
+
+    }
+
+}
+
+
+/* =========================================
+   Avatar
+========================================= */
+
+function setAvatarImage(photoUrl) {
+
+    const avatarIds = [
+
+        "homeAvatar",
+
+        "walletAvatar",
+
+        "headerAvatar"
+
+    ];
+
+
+    avatarIds.forEach(
+        function(id) {
+
+            const element =
+                getElement(id);
+
+
+            if (!element) {
+
+                return;
+
+            }
+
+
+            element.innerHTML =
+                "<img src=\"" +
+                escapeHtml(photoUrl) +
+                "\" alt=\"Profile\">";
+
+        }
+    );
+
+}
+
+
+function setProfileFallback() {
+
+    const name =
+        "Telegram User";
+
+
+    const username =
+        "@no_username";
+
+
+    const userId =
+        "Unavailable";
+
+
+    if (getElement("telegramName")) {
+
+        getElement("telegramName")
+            .textContent =
+            name;
+
+    }
+
+
+    if (getElement("telegramUsername")) {
+
+        getElement("telegramUsername")
+            .textContent =
+            username;
+
+    }
+
+
+    if (getElement("telegramId")) {
+
+        getElement("telegramId")
+            .textContent =
+            "ID: " + userId;
+
+    }
+
+
+    if (getElement("walletName")) {
+
+        getElement("walletName")
+            .textContent =
+            name;
+
+    }
+
+
+    if (getElement("walletUsername")) {
+
+        getElement("walletUsername")
+            .textContent =
+            username;
+
+    }
+
+
+    if (getElement("walletTelegramId")) {
+
+        getElement("walletTelegramId")
+            .textContent =
+            "ID: " + userId;
+
+    }
+
+}
+
+
+/* =========================================
+   Balance UI
+========================================= */
+
+function updateBalanceUI() {
+
+    const balance =
+        Number(
+            appState.balance || 0
+        );
+
+
+    const earned =
+        Number(
+            appState.totalEarned || 0
+        );
+
+
+    const referrals =
+        Number(
+            appState.referrals || 0
+        );
+
+
+    const referralEarned =
+        Number(
+            appState.referralEarned || 0
+        );
+
+
+    const pending =
+        Number(
+            appState.pendingWithdrawals || 0
+        );
+
+
+    if (getElement("homeBalance")) {
+
+        getElement("homeBalance")
+            .textContent =
+            balance;
+
+    }
+
+
+    if (getElement("homeEarned")) {
+
+        getElement("homeEarned")
+            .textContent =
+            earned;
+
+    }
+
+
+    if (getElement("homeReferrals")) {
+
+        getElement("homeReferrals")
+            .textContent =
+            referrals;
+
+    }
+
+
+    if (getElement("walletBalance")) {
+
+        getElement("walletBalance")
+            .textContent =
+            balance;
+
+    }
+
+
+    if (getElement("walletEarned")) {
+
+        getElement("walletEarned")
+            .textContent =
+            earned;
+
+    }
+
+
+    if (getElement("walletReferrals")) {
+
+        getElement("walletReferrals")
+            .textContent =
+            referrals;
+
+    }
+
+
+    if (getElement("walletPendingWithdraw")) {
+
+        getElement("walletPendingWithdraw")
+            .textContent =
+            pending;
+
+    }
+
+
+    if (getElement("referralTotal")) {
+
+        getElement("referralTotal")
+            .textContent =
+            referrals;
+
+    }
+
+
+    if (getElement("referralEarned")) {
+
+        getElement("referralEarned")
+            .textContent =
+            referralEarned;
+
+    }
+
+}
+
+
+/* =========================================
+   Referral Link
+========================================= */
+
+function setupReferralLink() {
+
+    const referralBox =
+        getElement(
+            "referralLink"
+        );
+
+
+    if (!referralBox) {
+
+        return;
+
+    }
+
+
+    if (
+        telegramUser &&
+        telegramUser.id
+    ) {
+
+        const referralLink =
+            "https://t.me/TaskCoinEarnBot?start=ref_" +
+            telegramUser.id;
+
+
+        referralBox.textContent =
+            referralLink;
+
+    } else {
+
+        referralBox.textContent =
+            "Open TaskCoin from Telegram to get your referral link.";
+
+    }
+
+}
+
+
+/* =========================================
+   Copy Referral
+========================================= */
+
+async function copyReferralLink() {
+
+    const referralBox =
+        getElement(
+            "referralLink"
+        );
+
+
+    if (!referralBox) {
+
+        return;
+
+    }
+
+
+    const link =
+        referralBox.textContent.trim();
+
+
+    if (
+        !link ||
+        link.startsWith("Open TaskCoin")
+    ) {
+
+        showToast(
+            "Referral link is not available yet."
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        await navigator.clipboard.writeText(
+            link
+        );
+
+
+        showToast(
+            "Referral link copied!"
+        );
+
+    } catch (error) {
+
+        showToast(
+            "Could not copy the link."
+        );
+
+    }
+
+}
+
+
+/* =========================================
+   Tasks
+========================================= */
+
+function renderTasks() {
+
+    const container =
+        getElement(
+            "tasksContainer"
+        );
+
+
+    if (!container) {
+
+        return;
+
+    }
+
+
+    if (
+        !Array.isArray(
+            appState.tasks
+        ) ||
+        appState.tasks.length === 0
+    ) {
+
+        container.innerHTML = `
+
+            <div class="empty-box">
+
+                <div class="empty-icon">
+                    🎯
+                </div>
+
+                <div class="empty-title">
+                    No Tasks Available
+                </div>
+
+                <div class="empty-text">
+                    New tasks will appear here when
+                    they are added by the TaskCoin admin.
+                </div>
+
+            </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    container.innerHTML =
+        appState.tasks.map(
+            function(task) {
+
+                return `
+
+                    <div class="task-card">
+
+                        <div class="task-top">
+
+                            <div class="task-info">
+
+                                <div class="task-title">
+                                    ${escapeHtml(task.title)}
+                                </div>
+
+                                <div class="task-description">
+                                    ${escapeHtml(task.description)}
+                                </div>
+
+                            </div>
+
+                            <div class="task-reward">
+                                +${Number(task.reward || 0)}
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="task-button"
+                            onclick="startTask('${escapeHtml(task.id || "")}')"
+                        >
+                            Complete Task
+                        </button>
+
+                    </div>
+
+                `;
+
+            }
+        ).join("");
+
+}
+
+
+/* =========================================
+   Start Task
+========================================= */
+
+function startTask(taskId) {
+
+    showToast(
+        "Task system will be connected in Part 3."
+    );
+
+}
+
+
+/* =========================================
+   Withdraw
+========================================= */
+
+function submitWithdraw() {
+
+    const account =
+        getElement(
+            "withdrawAccount"
+        )?.value.trim() || "";
+
+
+    const amount =
+        getElement(
+            "withdrawAmount"
+        )?.value || "";
+
+
+    if (!account) {
+
+        showToast(
+            "Please enter your account or wallet."
+        );
+
+        return;
+
+    }
+
+
+    if (
+        !amount ||
+        Number(amount) <= 0
+    ) {
+
+        showToast(
+            "Please enter a valid amount."
+        );
+
+        return;
+
+    }
+
+
+    showToast(
+        "Withdraw system will be activated in Part 5."
+    );
+
+}
+
+
+/* =========================================
+   Backend Placeholder
+========================================= */
+
+async function loadBackendData() {
+
     /*
-    INITIAL LOAD
+       Backend and PostgreSQL connection
+       will be added in Part 2.
+
+       No fake balance is created here.
     */
 
-    loadTelegramUser();
 
-    loadHomeTasks();
+    appState.balance = 0;
 
-    loadTasks();
+    appState.totalEarned = 0;
+
+    appState.referrals = 0;
+
+    appState.referralEarned = 0;
+
+    appState.pendingWithdrawals = 0;
+
+    appState.tasks = [];
+
+}
+
+
+/* =========================================
+   Initialize
+========================================= */
+
+async function initializeApp() {
+
+    try {
+
+        loadTelegramProfile();
+
+        setupReferralLink();
+
+        await loadBackendData();
+
+        updateBalanceUI();
+
+        renderTasks();
+
+    } catch (error) {
+
+        console.error(
+            "TaskCoin initialization error:",
+            error
+        );
+
+
+        showToast(
+            "TaskCoin loaded with limited data."
+        );
+
+    }
+
+
+    setTimeout(
+        function() {
+
+            const loader =
+                getElement(
+                    "appLoading"
+                );
+
+
+            if (loader) {
+
+                loader.style.display =
+                    "none";
+
+            }
+
+        },
+        500
+    );
+
+}
+
+
+/* =========================================
+   Start App
+========================================= */
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeApp
+    );
+
+} else {
+
+    initializeApp();
+
+}
 
 </script>
 
+
 </body>
-</html>
+
+</html>    
