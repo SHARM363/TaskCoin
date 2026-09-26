@@ -5,81 +5,379 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>TaskCoin Pro</title>
     
-    <!-- Telegram WebApp Script -->
+    <!-- Telegram WebApp Script Base -->
     <script src="https://telegram.org"></script>
 
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f7fb; color: #222; padding-bottom: 75px; }
-        button { font-family: inherit; }
-        .page { display: none; min-height: calc(100vh - 75px); padding: 16px; }
-        .page.active { display: block; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-        .logo { font-size: 24px; font-weight: 800; color: #1769ff; }
-        .profile-btn { width: 42px; height: 42px; border: none; border-radius: 50%; background: #1769ff; color: white; font-size: 20px; cursor: pointer; }
-        .balance-card { background: linear-gradient(135deg, #1769ff, #5c8dff); color: white; border-radius: 20px; padding: 22px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(23, 105, 255, 0.2); }
-        .balance-label { font-size: 14px; opacity: 0.9; margin-bottom: 7px; }
-        .balance-value { font-size: 32px; font-weight: 800; }
-        .coin-label { font-size: 13px; margin-top: 5px; opacity: 0.9; }
-        .section-title { font-size: 20px; font-weight: 800; margin: 20px 0 12px; }
-        .quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .action-card { background: white; border-radius: 16px; padding: 18px 12px; text-align: center; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06); cursor: pointer; }
-        .action-icon { font-size: 30px; margin-bottom: 8px; }
-        .action-title { font-size: 14px; font-weight: 700; }
-        .task-card { background: white; border-radius: 18px; padding: 16px; margin-bottom: 12px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06); }
-        .task-top { display: flex; align-items: center; gap: 12px; }
-        .task-icon { width: 52px; height: 52px; border-radius: 14px; background: #eef4ff; display: flex; align-items: center; justify-content: center; font-size: 27px; flex-shrink: 0; }
-        .task-info { flex: 1; }
-        .task-title { font-size: 16px; font-weight: 800; margin-bottom: 5px; }
-        .task-description { color: #777; font-size: 12px; line-height: 1.4; }
-        .task-reward { color: #16a05d; font-weight: 800; font-size: 14px; margin-top: 7px; }
-        .task-limit-badge { display: inline-block; padding: 3px 8px; background: #fff3cd; color: #856404; font-size: 11px; border-radius: 6px; font-weight: 700; margin-top: 5px; }
-        .task-btn { width: 100%; margin-top: 14px; padding: 12px; border: none; border-radius: 12px; background: #1769ff; color: white; font-size: 14px; font-weight: 800; cursor: pointer; }
-        .task-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .task-btn.completed { background: #20a464; }
-        .wallet-card { background: white; border-radius: 18px; padding: 20px; margin-bottom: 15px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06); }
-        .wallet-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; }
-        .wallet-row:last-child { border-bottom: none; }
-        .wallet-label { color: #777; }
-        .wallet-value { font-weight: 800; }
-        .form-card { background: white; border-radius: 18px; padding: 20px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06); }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 7px; }
-        .form-group input, .form-group select { width: 100%; padding: 13px; border: 1px solid #ddd; border-radius: 11px; font-size: 14px; outline: none; background: white; }
-        .withdraw-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #1769ff; color: white; font-size: 15px; font-weight: 800; cursor: pointer; }
-        .referral-card { background: white; border-radius: 20px; padding: 24px; text-align: center; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06); }
-        .referral-icon { font-size: 48px; margin-bottom: 12px; }
-        .referral-title { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
-        .referral-text { color: #777; font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
-        .referral-code-box { display: flex; gap: 8px; margin-bottom: 20px; }
-        .referral-code { flex: 1; background: #f3f6fb; border-radius: 10px; padding: 13px 8px; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .copy-btn { border: none; border-radius: 10px; padding: 0 16px; background: #1769ff; color: white; font-weight: 800; cursor: pointer; }
-        .referral-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .referral-stat { background: #f7f9fc; border-radius: 14px; padding: 15px 8px; }
-        .referral-stat-value { font-size: 20px; font-weight: 800; margin-bottom: 5px; }
-        .referral-stat-label { color: #777; font-size: 11px; }
-        .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; height: 68px; background: white; border-top: 1px solid #eee; display: grid; grid-template-columns: repeat(5, 1fr); z-index: 100; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #888; font-size: 10px; font-weight: 700; cursor: pointer; }
-        .nav-item.active { color: #1769ff; }
-        .nav-item-icon { font-size: 21px; }
-        .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 200; }
-        .modal.show { display: flex; }
-        .modal-content { width: 100%; max-width: 380px; background: white; border-radius: 22px; padding: 25px; text-align: center; position: relative; }
-        .close-modal { position: absolute; right: 15px; top: 15px; width: 34px; height: 34px; border: none; border-radius: 50%; background: #f1f3f7; cursor: pointer; font-size: 16px; }
-        .modal-task-icon { font-size: 52px; margin-top: 8px; margin-bottom: 12px; }
-        .modal-task-title { font-size: 21px; font-weight: 800; margin-bottom: 8px; }
-        .modal-task-description { color: #777; font-size: 13px; line-height: 1.5; }
-        .timer-box { margin: 20px 0; background: #f3f6fb; border-radius: 16px; padding: 18px; }
-        .timer-label { color: #777; font-size: 12px; margin-bottom: 5px; }
-        .timer-text { font-size: 38px; font-weight: 900; color: #1769ff; }
-        .task-reward-modal { color: #16a05d; font-size: 18px; font-weight: 800; margin-bottom: 18px; }
-        .claim-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #1769ff; color: white; font-size: 15px; font-weight: 800; cursor: pointer; }
-        .claim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .toast { position: fixed; left: 50%; bottom: 85px; transform: translateX(-50%); background: #222; color: white; padding: 12px 18px; border-radius: 12px; font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 300; white-space: nowrap; }
-        .toast.show { opacity: 1; }
-    </style>
-</head>
- <body>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #222;
+            padding-bottom: 75px;
+        }
+        button {
+            font-family: inherit;
+        }
+        .page {
+            display: none;
+            min-height: calc(100vh - 75px);
+            padding: 16px;
+        }
+        .page.active {
+            display: block;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #1769ff;
+        }
+        .profile-btn {
+            width: 42px;
+            height: 42px;
+            border: none;
+            border-radius: 50%;
+            background: #1769ff;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .balance-card {
+            background: linear-gradient(135deg, #1769ff, #5c8dff);
+            color: white;
+            border-radius: 20px;
+            padding: 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(23, 105, 255, 0.2);
+        }
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 7px;
+        }
+        .balance-value {
+            font-size: 32px;
+            font-weight: 800;
+        }
+        .coin-label {
+            font-size: 13px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 800;
+            margin: 20px 0 12px;
+        }
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .action-card {
+            background: white;
+            border-radius: 16px;
+            padding: 18px 12px;
+            text-align: center;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+        }
+        .action-icon {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+        .action-title {
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .task-card {
+            background: white;
+            border-radius: 18px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
+        .task-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .task-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: #eef4ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 27px;
+            flex-shrink: 0;
+        }
+        .task-info {
+            flex: 1;
+        }
+        .task-title {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        .task-description {
+            color: #777;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .task-reward {
+            color: #16a05d;
+            font-weight: 800;
+            font-size: 14px;
+            margin-top: 7px;
+        }
+        .task-limit-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #fff3cd;
+            color: #856404;
+            font-size: 11px;
+            border-radius: 6px;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+        .task-btn {
+            width: 100%;
+            margin-top: 14px;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: #1769ff;
+            color: white;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .task-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #ccc !important;
+            color: #666 !important;
+        }
+        .task-btn.completed {
+            background: #20a464;
+        }
+        .wallet-card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
+        .wallet-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .wallet-row:last-child {
+            border-bottom: none;
+        }
+        .wallet-label {
+            color: #777;
+        }
+        .wallet-value {
+            font-weight: 800;
+        }
+        .form-card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 7px;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 11px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+        }
+        .withdraw-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: #1769ff;
+            color: white;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .referral-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+        }
+        .referral-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .referral-title {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+        .referral-text {
+            color: #777;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        .referral-code-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .referral-code {
+            flex: 1;
+            background: #f3f6fb;
+            border-radius: 10px;
+            padding: 13px 8px;
+            font-size: 13px;
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .copy-btn {
+            border: none;
+            border-radius: 10px;
+            padding: 0 16px;
+            background: #1769ff;
+            color: white;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .referral-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .referral-stat {
+            background: #f7f9fc;
+            border-radius: 14px;
+            padding: 15px 8px;
+        }
+        .referral-stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        .referral-stat-label {
+            color: #777;
+            font-size: 11px;
+        }
+        .bottom-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 68px;
+            background: white;
+            border-top: 1px solid #eee;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            z-index: 100;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            color: #888;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .nav-item.active {
+            color: #1769ff;
+        }
+        .nav-item-icon {
+            font-size: 21px;
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 200;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            width: 100%;
+            max-width: 380px;
+            background: white;
+            border-radius: 22px;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 50%;
+            background: #f1f3f7;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .modal-task-icon {
+            font-size: 52px;
+            margin-top: 8px;
+            margin-bottom: 12px;
+        }
+        .modal-task-title {
+            font-size: 21px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .modal-task-description {
+            color: #777;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .timer-box {
+    ```html
+<body>
 
     <!-- HOME PAGE -->
     <div id="home" class="page active">
@@ -137,7 +435,7 @@
             <div class="wallet-row"><div class="wallet-label">Referral Count</div><div class="wallet-value"><span id="referralCount">0</span></div></div>
         </div>
     </div>
-        <!-- WITHDRAW PAGE -->
+       <!-- WITHDRAW PAGE -->
     <div id="withdraw" class="page">
         <div class="header">
             <div class="logo">💸 Withdraw</div>
@@ -149,10 +447,10 @@
             <div class="coin-label">TaskCoins</div>
         </div>
         <div class="form-card">
-            <p style="color: #d93025; font-size: 12px; font-weight: bold; margin-bottom: 10px; text-align: center;">⚠ Minimum Withdrawal Limit is 1000 TaskCoins</p>
+            <p style="color: #d93025; font-size: 13px; font-weight: 800; margin-bottom: 12px; text-align: center;">⚠ Minimum Withdrawal Limit is 1000 TaskCoins</p>
             <div class="form-group">
                 <label for="withdrawAmount">Withdrawal Amount</label>
-                <input type="number" id="withdrawAmount" placeholder="Min 1000 TaskCoins" min="1000">
+                <input type="number" id="withdrawAmount" placeholder="Enter amount (Min 1000)" min="1000">
             </div>
             <div class="form-group">
                 <label for="withdrawMethod">Withdrawal Method</label>
@@ -180,19 +478,25 @@
         <div class="referral-card">
             <div class="referral-icon">👥</div>
             <div class="referral-title">Invite Friends</div>
-            <div class="referral-text">Invite friends and grow your community.</div>
+            <div class="referral-text">Invite your friends to TaskCoin and grow the TaskCoin community.</div>
             <div class="referral-code-box">
                 <div class="referral-code" id="referralCode">Loading link...</div>
                 <button class="copy-btn" id="copyReferralBtn">Copy</button>
             </div>
             <div class="referral-stats">
-                <div class="referral-stat"><div class="referral-stat-value" id="totalReferralsVal">0</div><div class="referral-stat-label">Total Referrals</div></div>
-                <div class="referral-stat"><div class="referral-stat-value" id="referralEarningsVal">0.00</div><div class="referral-stat-label">Referral Earnings</div></div>
+                <div class="referral-stat">
+                    <div class="referral-stat-value" id="totalReferralsVal">0</div>
+                    <div class="referral-stat-label">Total Referrals</div>
+                </div>
+                <div class="referral-stat">
+                    <div class="referral-stat-value" id="referralEarningsVal">0.00</div>
+                    <div class="referral-stat-label">Referral Earnings</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- NAVIGATION & MODALS -->
+    <!-- BOTTOM NAVIGATION -->
     <div class="bottom-nav">
         <div class="nav-item active" onclick="showPage('home')"><div class="nav-item-icon">🏠</div><div>Home</div></div>
         <div class="nav-item" onclick="showPage('tasks')"><div class="nav-item-icon">🎯</div><div>Tasks</div></div>
@@ -201,12 +505,13 @@
         <div class="nav-item" onclick="showPage('referral')"><div class="nav-item-icon">👥</div><div>Referral</div></div>
     </div>
 
+    <!-- TASK TIEMR MODAL -->
     <div id="taskModal" class="modal">
         <div class="modal-content">
             <button class="close-modal" onclick="closeTaskModal()">✕</button>
             <div class="modal-task-icon" id="modalTaskIcon">🎯</div>
             <div class="modal-task-title" id="modalTaskTitle">Task Title</div>
-            <div class="modal-task-description" id="modalTaskDescription">Instructions...</div>
+            <div class="modal-task-description" id="modalTaskDescription">Complete task instructions...</div>
             <div class="timer-box">
                 <div class="timer-label">Time Remaining</div>
                 <div class="timer-text" id="timerText">10</div>
@@ -217,34 +522,47 @@
     </div>
 
     <div id="toast" class="toast">Task completed!</div>
-         <script>
+        <script>
         // ==========================================
-        // 1. CONFIGURATION & STATE
+        // 1. GLOBAL SETTINGS & WEBAPP STATE
         // ==========================================
-        const API_BASE_URL = "https://onrender.com"; // আপনার রেন্ডার সার্ভার URL
-        const botUsername = "YOUR_BOT_USERNAME"; // আপনার বটের ইউজারনেম দিন (@ ছাড়া)
+        const API_BASE_URL = "https://onrender.com"; // আপনার রেন্ডার API ইউআরএল
+        const botUsername = "TaskCoinEarnBot"; // আপনার বটের আসল ইউজারনেম সেট করা হয়েছে
+        const REFERRAL_RATE = 500; // প্রতি রেফারে ৫০০ পয়েন্ট
 
         const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
         let telegramUser = null;
 
+        // ইন-অ্যাপ ওয়েবভিউ মোডে রিয়েল প্রোফাইল ডাটা পার্সিং ফিক্স (বাধ্যতামূলক লজিক)
         if (tg) {
             tg.ready();
             tg.expand();
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                telegramUser = tg.initDataUnsafe.user;
+            try {
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    telegramUser = tg.initDataUnsafe.user;
+                } else if (tg.initData) {
+                    const urlParams = new URLSearchParams(tg.initData);
+                    const userRaw = urlParams.get('user');
+                    if (userRaw) {
+                        telegramUser = JSON.parse(userRaw);
+                    }
+                }
+            } catch (e) {
+                console.error("Telegram Data Extraction Crashed:", e);
             }
         }
 
         let currentBalanceValue = 0;
         let totalEarnedValue = 0;
-        let userCompletedTasks = {}; // অবজেক্ট ম্যাপ: { taskId: counts } ট্র্যাকিং এর জন্য
+        let userCompletedTasks = {}; 
+        let userReferralsCount = 0;
         let TASKS = {}; 
 
         let currentTaskId = null;
         let timerInterval = null;
         let remainingTime = 0;
 
-        // Navigation
+        // Navigation Engine
         function showPage(pageId) {
             document.querySelectorAll(".page").forEach(page => page.classList.remove("active"));
             const page = document.getElementById(pageId);
@@ -266,58 +584,131 @@
             setTimeout(() => { toast.classList.remove("show"); }, 2500);
         }
 
-        // Profile Display
+        // ==========================================
+        // 2. PROFILE & UNIQUE REFERRAL LINKS
+        // ==========================================
         function loadTelegramProfile() {
             const nameEl = document.getElementById("telegramName");
             const userEl = document.getElementById("telegramUsername");
             const idEl = document.getElementById("telegramId");
 
             if (!telegramUser) {
+                console.log("No Active Telegram Session. Loading Fallback Data.");
                 if (nameEl) nameEl.textContent = "Test Developer";
                 if (userEl) userEl.textContent = "@test_dev";
                 if (idEl) idEl.textContent = "test_12345";
+                generateReferralLink("test_12345");
                 return;
             }
-            if (nameEl) nameEl.textContent = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ") || "User";
-            if (userEl) userEl.textContent = telegramUser.username ? "@" + telegramUser.username : "Not set";
-            if (idEl) idEl.textContent = String(telegramUser.id);
+
+            if (nameEl) {
+                const fullName = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ");
+                nameEl.textContent = fullName || "Telegram User";
+            }
+            if (userEl) {
+                userEl.textContent = telegramUser.username ? "@" + telegramUser.username : "Not set";
+            }
+            if (idEl) {
+                idEl.textContent = String(telegramUser.id);
+            }
+            
+            // প্রত্যেক ইউজারের জন্য আলাদা রেফার লিংক জেনারেট করা
+            generateReferralLink(telegramUser.id);
         }
+
+        function generateReferralLink(tgId) {
+            const fullRefLink = `https://t.me{botUsername}?start=${String(tgId)}`;
+            const refCodeBox = document.getElementById("referralCode");
+            if (refCodeBox) refCodeBox.textContent = fullRefLink;
+        }
+
+        // ইউনিভার্সাল কপি ইঞ্জিন (মোবাইল ফ্রেন্ডলি)
+        function copyReferralCode() {
+            const code = document.getElementById("referralCode").textContent.trim();
+            if (code.includes("Loading link...")) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => {
+                    showToast("Referral link copied!");
+                }).catch(() => { fallbackCopyText(code); });
+            } else { fallbackCopyText(code); }
+        }
+
+        function fallbackCopyText(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; 
+            document.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast("Referral link copied!");
+            } catch (err) { showToast("Long press on link to copy."); }
+            document.body.removeChild(textArea);
+                }
         // ==========================================
-        // 2. DYNAMIC TASK LOGIC WITH ADVANCED LIMITS
+        // 3. FLASK DATABASE SYNC & DYNAMIC LIMITS
         // ==========================================
         async function syncUserData() {
-            const tId = telegramUser ? telegramUser.id : "test_12345";
-            const tName = telegramUser ? ([telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ")) : "Test Dev";
+            const tId = telegramUser ? String(telegramUser.id) : "test_12345";
+            const tName = telegramUser ? ([telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ")) : "Test Developer";
             const tUser = telegramUser ? (telegramUser.username || "test_dev") : "test_dev";
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/users/sync`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegram_id: String(tId), name: tName, username: tUser })
+                    body: JSON.stringify({ telegram_id: tId, name: tName, username: tUser })
                 });
                 const data = await response.json();
                 
-                if (data.success && data.user) {
+                if (data && data.success && data.user) {
                     currentBalanceValue = parseFloat(data.user.balance || 0);
-                    totalEarnedValue = parseFloat(data.user.totalEarned || 0);
-                    userCompletedTasks = data.user.taskLogs || {}; // সার্ভার থেকে ক্লেইম সংখ্যা আসবে
+                    totalEarnedValue = parseFloat(data.user.total_earned || data.user.totalEarned || 0);
+                    userCompletedTasks = data.user.task_logs || data.user.taskLogs || {}; 
+                    userReferralsCount = parseInt(data.user.referral_count || data.user.referralCount || 0);
 
-                    document.querySelectorAll(".balance-value").forEach(el => el.textContent = currentBalanceValue.toFixed(2));
-                    document.querySelectorAll(".total-earned").forEach(el => el.textContent = totalEarnedValue.toFixed(2));
-                    
-                    if (document.getElementById("completedCount")) {
-                        let totalClicks = Object.values(userCompletedTasks).reduce((a, b) => a + b, 0);
-                        document.getElementById("completedCount").textContent = totalClicks;
-                    }
-                    
-                    document.getElementById("referralCount").textContent = data.user.referralCount || 0;
-                    document.getElementById("totalReferralsVal").textContent = data.user.referralCount || 0;
-                    document.getElementById("referralEarningsVal").textContent = parseFloat(data.user.referralEarnings || 0).toFixed(2);
-                    
-                    updateTaskButtons();
+                    updateBalanceDisplay();
+                } else {
+                    await testTelegramUser();
                 }
-            } catch (error) { console.error("Sync Error:", error); }
+            } catch (error) {
+                console.error("API POST Failed. Running Backup GET Endpoint:", error);
+                await testTelegramUser();
+            }
+        }
+
+        async function testTelegramUser() {
+            if (!telegramUser) return;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/user?telegram_id=${telegramUser.id}`);
+                const data = await response.json();
+                if(data && data.balance !== undefined) {
+                    currentBalanceValue = parseFloat(data.balance);
+                    totalEarnedValue = parseFloat(data.total_earned || data.totalEarned || data.balance);
+                    userCompletedTasks = data.task_logs || data.taskLogs || {};
+                    userReferralsCount = parseInt(data.referral_count || data.referralCount || 0);
+                    updateBalanceDisplay();
+                }
+            } catch (error) { console.error("Server API Fallback Error:", error); }
+        }
+
+        function updateBalanceDisplay() {
+            document.querySelectorAll(".balance-value").forEach(el => el.textContent = currentBalanceValue.toFixed(2));
+            document.querySelectorAll(".total-earned").forEach(el => el.textContent = totalEarnedValue.toFixed(2));
+
+            const completedCount = document.getElementById("completedCount");
+            if (completedCount) {
+                let totalClicks = Object.values(userCompletedTasks).reduce((a, b) => a + b, 0);
+                completedCount.textContent = totalClicks;
+            }
+
+            document.getElementById("referralCount").textContent = userReferralsCount;
+            document.getElementById("totalReferralsVal").textContent = userReferralsCount;
+            
+            let calculatedRefEarnings = userReferralsCount * REFERRAL_RATE;
+            document.getElementById("referralEarningsVal").textContent = calculatedRefEarnings.toFixed(2);
+
+            updateTaskButtons();
         }
 
         async function loadActiveTasksFromServer() {
@@ -327,6 +718,7 @@
                 
                 const tasksContainer = document.getElementById('all-tasks-container');
                 const featuredContainer = document.getElementById('featured-tasks-container');
+                
                 tasksContainer.innerHTML = ''; featuredContainer.innerHTML = '';
 
                 if (!data.success || !data.tasks || data.tasks.length === 0) {
@@ -343,7 +735,7 @@
                     TASKS[taskId] = task;
 
                     const completedCount = userCompletedTasks[taskId] || 0;
-                    let maxLimit = task.category === 'Website' ? 20 : 3; // Website/WebView হলে ২০, Social হলে ৩
+                    let maxLimit = task.category === 'Website' ? 20 : 3; // থার্ডপার্টি ২০ বার, সোশ্যাল ৩ বার
                     let isLimitOver = completedCount >= maxLimit;
 
                     const taskHtml = `
@@ -354,7 +746,7 @@
                                     <div class="task-title">${task.title}</div>
                                     <div class="task-description">${task.description || 'Complete task.'}</div>
                                     <div class="task-reward">+${task.reward} TaskCoins</div>
-                                    <div class="task-limit-badge">Limit Today: ${completedCount}/${maxLimit} Used</div>
+                                    <div class="task-limit-badge">Limit: ${completedCount}/${maxLimit} Used</div>
                                 </div>
                             </div>
                             <button class="task-btn ${isLimitOver ? 'completed' : ''}" data-task="${taskId}" ${isLimitOver ? 'disabled' : ''}>
@@ -371,7 +763,7 @@
                     button.onclick = function() { openTask(button.getAttribute("data-task")); };
                 });
 
-            } catch (error) { console.error("Fetch Tasks Error:", error); }
+            } catch (error) { console.error("Error Rendering Tasks:", error); }
         }
 
         function openTask(taskId) {
@@ -382,7 +774,7 @@
             let maxLimit = task.category === 'Website' ? 20 : 3;
 
             if (completedCount >= maxLimit) {
-                showToast("You have reached today's limit for this task.");
+                showToast("Daily limit reached for this task.");
                 return;
             }
 
@@ -391,7 +783,7 @@
 
             document.getElementById("modalTaskIcon").textContent = task.icon || "🎯";
             document.getElementById("modalTaskTitle").textContent = task.title;
-            document.getElementById("modalTaskDescription").textContent = task.description || "";
+            document.getElementById("modalTaskDescription").textContent = task.description;
             document.getElementById("modalTaskReward").textContent = "+" + task.reward + " TaskCoins";
             document.getElementById("timerText").textContent = remainingTime;
 
@@ -411,7 +803,7 @@
                     clearInterval(timerInterval);
                     timerInterval = null;
                     claimBtn.disabled = false;
-                    showToast("Task completed. Claim reward!");
+                    showToast("Task completed! Claim reward.");
                 }
             }, 1000);
         }
@@ -419,7 +811,7 @@
         function closeTaskModal() {
             clearInterval(timerInterval);
             timerInterval = null; currentTaskId = null;
-            if (document.getElementById("taskModal")) document.getElementById("taskModal").classList.remove("show");
+            document.getElementById("taskModal").classList.remove("show");
         }
 
         async function claimReward() {
@@ -437,30 +829,35 @@
 
                 if (result.success) {
                     closeTaskModal();
-                    showToast("+" + task.reward + " TaskCoins Added!");
+                    showToast("+" + task.reward + " TaskCoins added!");
                     await syncUserData();
                     await loadActiveTasksFromServer();
                 } else { alert(result.message || "Failed to process reward claim."); }
-            } catch (error) { console.error("Claim error:", error); }
+            } catch (error) { console.error("Claim Transaction Error:", error); }
         }
 
         function updateTaskButtons() {
             document.querySelectorAll(".task-btn").forEach(button => {
                 const taskId = button.getAttribute("data-task");
                 const task = TASKS[taskId];
-                if(task){
+                if (task) {
                     const completedCount = userCompletedTasks[taskId] || 0;
                     let maxLimit = task.category === 'Website' ? 20 : 3;
                     if (completedCount >= maxLimit) {
                         button.textContent = "✓ Daily Limit Over";
                         button.classList.add("completed");
-                        button.disabled = true;
+                                    button.disabled = true;
+                    } else {
+                        button.textContent = "Start Task";
+                        button.classList.remove("completed");
+                        button.disabled = false;
                     }
                 }
             });
-             }
+        }
+
         // ==========================================
-       // 3. SECURE 1000 COIN WITHDRAWAL VALIDATION
+        // 4. SECURE 1000 COIN WITHDRAWAL VALIDATION
         // ==========================================
         async function requestWithdraw() {
             const amountInput = document.getElementById("withdrawAmount");
@@ -471,7 +868,6 @@
             const method = methodInput.value;
             const account = accountInput.value.trim();
 
-            // ১০০০ কয়েন ভ্যালিডেশন রুলস
             if (!amount || amount < 1000) { showToast("Minimum withdrawal is 1000 TaskCoins."); return; }
             if (amount > currentBalanceValue) { showToast("Insufficient wallet balance."); return; }
             if (!method || !account) { showToast("Please completely fill out all input fields."); return; }
@@ -489,26 +885,16 @@
                 if (result.success) {
                     alert("Success! Your withdrawal request has been sent to the Admin Panel.");
                     amountInput.value = ""; methodInput.value = ""; accountInput.value = "";
-                    await syncUserData();
-                } else { alert(result.message || "Failed to submit request."); }
-            } catch (error) { alert("Server connectivity issue."); }
+                    await syncUserData(); 
+                } else { alert(result.message || "Request submission failed."); }
+            } catch (error) { alert("Server connection issue."); }
         }
 
-        // Referral System Link Output
-        const refId = telegramUser ? telegramUser.id : "test_12345";
-        const refLinkText = `https://t.me{botUsername}?start=${refId}`;
-        document.getElementById("referralCode").textContent = refLinkText;
-
-        function copyReferralCode() {
-            const code = document.getElementById("referralCode").textContent.trim();
-            navigator.clipboard.writeText(code).then(() => { showToast("Referral link copied!"); });
-        }
-
-        // Static Action Listeners Bindings
+        // Bind Actions
         document.getElementById("claimBtn").onclick = claimReward;
         document.getElementById("copyReferralBtn").onclick = copyReferralCode;
 
-        // Application Liftoff
+        // Bootstrap Initial Trigger
         window.onload = async function() {
             loadTelegramProfile();
             await syncUserData();
@@ -517,4 +903,4 @@
     </script>
 </body>
 </html>
-
+        
