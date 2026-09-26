@@ -1122,9 +1122,15 @@
             });
 
 
-        document
-            .getElementById(pageId)
-            .classList.add("active");
+        const selectedPage =
+            document.getElementById(pageId);
+
+
+        if (selectedPage) {
+
+            selectedPage.classList.add("active");
+
+        }
 
 
         document
@@ -1136,12 +1142,30 @@
             });
 
 
-        button.classList.add("active");
+        if (button) {
 
+            button.classList.add("active");
+
+        }
+
+
+        /*
+        PAGE DATA
+        */
 
         if (pageId === "tasksPage") {
 
             loadTasks();
+
+        }
+
+
+        if (
+            pageId === "walletPage" ||
+            pageId === "withdrawPage"
+        ) {
+
+            updateWallet();
 
         }
 
@@ -1160,11 +1184,20 @@
             );
 
 
+        if (!list) return;
+
+
         list.innerHTML = `
 
             <div class="empty">
 
-                Tasks are being prepared.
+                <div style="font-size:35px;">
+                    📋
+                </div>
+
+                <br>
+
+                No tasks available yet.
 
                 <br><br>
 
@@ -1179,7 +1212,7 @@
 
 
     /*
-    TEMPORARY HOME TASKS
+    HOME TASKS
     */
 
     function loadHomeTasks() {
@@ -1190,16 +1223,98 @@
             );
 
 
+        if (!container) return;
+
+
         container.innerHTML = `
 
             <div class="empty">
 
+                <div style="font-size:35px;">
+                    🚀
+                </div>
+
+                <br>
+
                 Complete tasks and
                 earn TaskCoins.
+
+                <br><br>
+
+                New tasks will appear here.
 
             </div>
 
         `;
+
+    }
+
+
+    /*
+    WALLET
+    */
+
+    function updateWallet() {
+
+        const balanceElement =
+            document.getElementById("balance");
+
+        const earnedElement =
+            document.getElementById("totalEarned");
+
+
+        const balance =
+            balanceElement
+                ? balanceElement.textContent
+                : "0";
+
+
+        const earned =
+            earnedElement
+                ? earnedElement.textContent
+                : "0";
+
+
+        const walletBalance =
+            document.getElementById(
+                "walletBalance"
+            );
+
+
+        const walletEarned =
+            document.getElementById(
+                "walletEarned"
+            );
+
+
+        const withdrawBalance =
+            document.getElementById(
+                "withdrawBalance"
+            );
+
+
+        if (walletBalance) {
+
+            walletBalance.textContent =
+                balance;
+
+        }
+
+
+        if (walletEarned) {
+
+            walletEarned.textContent =
+                earned;
+
+        }
+
+
+        if (withdrawBalance) {
+
+            withdrawBalance.textContent =
+                balance;
+
+        }
 
     }
 
@@ -1228,7 +1343,10 @@
             ).value.trim();
 
 
-        if (!amount || Number(amount) <= 0) {
+        if (
+            !amount ||
+            Number(amount) <= 0
+        ) {
 
             showMessage(
                 "Please enter a valid amount."
@@ -1263,15 +1381,23 @@
 
     function copyReferral() {
 
-        const code =
+        const codeElement =
             document.getElementById(
                 "referralCode"
-            ).textContent;
+            );
+
+
+        if (!codeElement) return;
+
+
+        const code =
+            codeElement.textContent;
 
 
         if (
             navigator.clipboard &&
-            code
+            code &&
+            code !== "Loading..."
         ) {
 
             navigator.clipboard
@@ -1280,6 +1406,13 @@
 
                     showMessage(
                         "Referral link copied."
+                    );
+
+                })
+                .catch(() => {
+
+                    showMessage(
+                        "Copy failed."
                     );
 
                 });
@@ -1299,6 +1432,9 @@
             document.getElementById(
                 "message"
             );
+
+
+        if (!box) return;
 
 
         box.textContent = text;
