@@ -168,7 +168,8 @@
         .page.active {
             display: block;
         }
-                /* Balance Card */
+
+        /* Balance Card */
 
         .balance-card {
             margin-top: -8px;
@@ -217,7 +218,7 @@
         }
 
         /* Section */
-
+       
         .section {
             margin-top: 18px;
         }
@@ -301,8 +302,9 @@
             font-size: 11px;
             color: #a0a7b4;
             margin-top: 3px;
-            }
-                /* Tasks */
+        }
+
+        /* Tasks */
 
         .task-card {
             background: #ffffff;
@@ -484,8 +486,9 @@
             font-size: 12px;
             line-height: 1.5;
             margin-bottom: 14px;
-            }
-                /* Referral */
+        }
+
+        /* Referral */
 
         .referral-card {
             background: #1877f2;
@@ -549,9 +552,8 @@
             font-size: 11px;
             color: #7c8797;
             margin-top: 4px;
-        }
-
-        /* Deposit */
+            }
+                /* Deposit */
 
         .deposit-disabled {
             background: #f1f3f7;
@@ -575,7 +577,8 @@
             color: #7b8595;
             line-height: 1.5;
         }
-                /* Bottom Navigation */
+
+        /* Bottom Navigation */
 
         .bottom-nav {
             position: fixed;
@@ -818,6 +821,7 @@
 
 
     <!-- Telegram Profile -->
+        <!-- Telegram Profile -->
 
     <div class="section">
 
@@ -899,6 +903,8 @@
     </div>
 
 </section>
+
+
 <!-- Tasks Page -->
 
 <section
@@ -933,9 +939,6 @@
     </div>
 
 </section>
-
-
-
 <!-- Wallet Page -->
 
 <section
@@ -1064,10 +1067,52 @@
 
     </div>
 
+
+    <div class="section">
+
+        <div class="section-title">
+            Wallet Information
+        </div>
+
+
+        <div class="notice">
+            Your TaskCoin balance is managed securely by
+            the TaskCoin backend server.
+        </div>
+
+
+        <div class="wallet-card">
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    Currency
+                </div>
+
+                <div class="wallet-value">
+                    TaskCoin
+                </div>
+
+            </div>
+
+
+            <div class="wallet-row">
+
+                <div class="wallet-label">
+                    Account Status
+                </div>
+
+                <div class="wallet-value">
+                    Active
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </section>
-
-
-
 <!-- Withdraw Page -->
 
 <section
@@ -1081,11 +1126,9 @@
 
 
     <div class="notice">
-
-        ⚠️ Withdraw processing is not active yet.
-        The withdrawal system will be connected in
-        Part 5 of the TaskCoin development.
-
+        Minimum withdrawal amount is 100 TaskCoins.
+        Make sure your account or wallet number is
+        correct before submitting your request.
     </div>
 
 
@@ -1094,7 +1137,7 @@
         <div class="form-group">
 
             <label class="form-label">
-                Payment Method
+                Withdrawal Method
             </label>
 
 
@@ -1195,9 +1238,6 @@
     </div>
 
 </section>
-
-
-
 <!-- Referral Page -->
 
 <section
@@ -1342,7 +1382,7 @@
 
     </div>
 
- </section> 
+</section>
 <!-- Bottom Navigation -->
 
 <nav class="bottom-nav">
@@ -1406,62 +1446,28 @@
 
 <script>
 
-/* =========================================
-   TaskCoin Configuration
-========================================= */
+/* =========================================================
+   TASKCOIN BACKEND
+   ========================================================= */
 
 const API_BASE_URL =
     "https://taskcoin-1.onrender.com";
 
 
-/* =========================================
-   Telegram Mini App
-========================================= */
+/* Telegram WebApp */
 
-let tg = null;
-
-let telegramUser = null;
-
-
-if (
+const tg =
     window.Telegram &&
     window.Telegram.WebApp
-) {
-
-    tg =
-        window.Telegram.WebApp;
+        ? window.Telegram.WebApp
+        : null;
 
 
-    try {
-
-        tg.ready();
-
-        tg.expand();
-
-    } catch (error) {
-
-        console.log(
-            "Telegram initialization error:",
-            error
-        );
-
-    }
-
-
-    telegramUser =
-        tg.initDataUnsafe &&
-        tg.initDataUnsafe.user
-            ? tg.initDataUnsafe.user
-            : null;
-
-}
-
-
-/* =========================================
-   App State
-========================================= */
+/* Application State */
 
 const appState = {
+
+    telegramUser: null,
 
     balance: 0,
 
@@ -1471,60 +1477,128 @@ const appState = {
 
     referralEarned: 0,
 
-    pendingWithdrawals: 0,
+    pendingWithdraw: 0,
 
-    tasks: [],
-
-    currentPage: "home"
+    tasks: []
 
 };
 
 
-/* =========================================
-   Helper
-========================================= */
+/* =========================================================
+   API REQUEST
+   ========================================================= */
 
-function getElement(id) {
+async function apiRequest(
+    endpoint,
+    options = {}
+) {
 
-    return document.getElementById(id);
+    const config = {
+
+        method:
+            options.method || "GET",
+
+        headers: {
+
+            "Content-Type":
+                "application/json",
+
+            ...(options.headers || {})
+
+        }
+
+    };
+
+
+    if (
+        options.body !== undefined
+    ) {
+
+        config.body =
+            JSON.stringify(
+                options.body
+            );
+
+    }
+
+
+    let response;
+
+
+    try {
+
+        response =
+            await fetch(
+                API_BASE_URL + endpoint,
+                config
+            );
+
+    } catch (error) {
+
+        console.error(
+            "TaskCoin network error:",
+            error
+        );
+
+        throw new Error(
+            "Could not connect to TaskCoin server."
+        );
+
+    }
+
+
+    let data;
+
+
+    try {
+
+        data =
+            await response.json();
+
+    } catch (error) {
+
+        throw new Error(
+            "Server returned an invalid response."
+        );
+
+    }
+
+
+    if (
+        !response.ok ||
+        data.success === false
+    ) {
+
+        throw new Error(
+
+            data.message ||
+            data.error ||
+            "Server request failed."
+
+        );
+
+    }
+
+
+    return data;
 
 }
 
 
-function escapeHtml(value) {
-
-    return String(value || "")
-
-        .replace(/&/g, "&amp;")
-
-        .replace(/</g, "&lt;")
-
-        .replace(/>/g, "&gt;")
-
-        .replace(/"/g, "&quot;")
-
-        .replace(/'/g, "&#039;");
-
-}
-
-
-/* =========================================
-   Toast
-========================================= */
-
-let toastTimer = null;
-
+/* =========================================================
+   TOAST
+   ========================================================= */
 
 function showToast(message) {
 
     const toast =
-        getElement("toast");
+        document.getElementById(
+            "toast"
+        );
 
 
     if (!toast) {
-
         return;
-
     }
 
 
@@ -1537,29 +1611,291 @@ function showToast(message) {
     );
 
 
-    clearTimeout(
-        toastTimer
+    setTimeout(
+        () => {
+
+            toast.classList.remove(
+                "show"
+            );
+
+        },
+        2500
     );
-
-
-    toastTimer =
-        setTimeout(
-            function () {
-
-                toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2500
-        );
 
 }
 
 
-/* =========================================
-   Page Navigation
-========================================= */
+/* =========================================================
+   TELEGRAM PROFILE
+   ========================================================= */
+
+function loadTelegramProfile() {
+
+    if (
+        !tg ||
+        !tg.initDataUnsafe ||
+        !tg.initDataUnsafe.user
+    ) {
+
+        return;
+
+    }
+
+
+    const user =
+        tg.initDataUnsafe.user;
+
+
+    appState.telegramUser =
+        user;
+
+
+    const firstName =
+        user.first_name || "";
+
+
+    const lastName =
+        user.last_name || "";
+
+
+    const fullName =
+        (
+            firstName +
+            " " +
+            lastName
+        ).trim();
+
+
+    const username =
+        user.username
+            ? "@" + user.username
+            : "@no_username";
+
+
+    const userId =
+        user.id
+            ? String(user.id)
+            : "Unknown";
+
+
+    const avatarLetter =
+        (
+            firstName ||
+            user.username ||
+            "U"
+        )
+        .charAt(0)
+        .toUpperCase();
+
+
+    const nameElements = [
+
+        document.getElementById(
+            "telegramName"
+        ),
+
+        document.getElementById(
+            "walletName"
+        )
+
+    ];
+
+
+    nameElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    fullName ||
+                    "Telegram User";
+
+            }
+
+        }
+    );
+
+
+    const usernameElements = [
+
+        document.getElementById(
+            "telegramUsername"
+        ),
+
+        document.getElementById(
+            "walletUsername"
+        )
+
+    ];
+
+
+    usernameElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    username;
+
+            }
+
+        }
+    );
+
+
+    const idElements = [
+
+        document.getElementById(
+            "telegramId"
+        ),
+
+        document.getElementById(
+            "walletTelegramId"
+        )
+
+    ];
+
+
+    idElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    "ID: " + userId;
+
+            }
+
+        }
+    );
+
+
+    const avatarElements = [
+
+        document.getElementById(
+            "homeAvatar"
+        ),
+
+        document.getElementById(
+            "walletAvatar"
+        ),
+
+        document.getElementById(
+            "headerAvatar"
+        )
+
+    ];
+
+
+    avatarElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    avatarLetter;
+
+            }
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   TELEGRAM USER SYNC
+   ========================================================= */
+
+async function syncTelegramUser() {
+
+    if (
+        !appState.telegramUser
+    ) {
+
+        throw new Error(
+            "Telegram user information not found."
+        );
+
+    }
+
+
+    const user =
+        appState.telegramUser;
+
+
+    return await apiRequest(
+        "/api/user/create",
+        {
+
+            method: "POST",
+
+            body: {
+
+                telegram_id:
+                    user.id,
+
+                username:
+                    user.username || "",
+
+                first_name:
+                    user.first_name || ""
+
+            }
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   REFERRAL LINK
+   ========================================================= */
+
+function setupReferralLink() {
+
+    const element =
+        document.getElementById(
+            "referralLink"
+        );
+
+
+    if (!element) {
+        return;
+    }
+
+
+    if (
+        !appState.telegramUser
+    ) {
+
+        element.textContent =
+            "Telegram user not available.";
+
+        return;
+
+    }
+
+
+    const userId =
+        appState.telegramUser.id;
+
+
+    const referralLink =
+        "https://t.me/TaskCoinEarnBot?start=" +
+        userId;
+
+
+    element.textContent =
+        referralLink;
+
+}
+
+
+/* =========================================================
+   PAGE NAVIGATION
+   ========================================================= */
 
 function openPage(pageName) {
 
@@ -1570,7 +1906,7 @@ function openPage(pageName) {
 
 
     pages.forEach(
-        function(page) {
+        page => {
 
             page.classList.remove(
                 "active"
@@ -1580,29 +1916,29 @@ function openPage(pageName) {
     );
 
 
-    const targetPage =
-        getElement(
+    const target =
+        document.getElementById(
             "page-" + pageName
         );
 
 
-    if (targetPage) {
+    if (target) {
 
-        targetPage.classList.add(
+        target.classList.add(
             "active"
         );
 
     }
 
 
-    const navButtons =
+    const buttons =
         document.querySelectorAll(
             ".nav-button"
         );
 
 
-    navButtons.forEach(
-        function(button) {
+    buttons.forEach(
+        button => {
 
             button.classList.remove(
                 "active"
@@ -1624,277 +1960,17 @@ function openPage(pageName) {
     );
 
 
-    appState.currentPage =
-        pageName;
-
-
     window.scrollTo(
         0,
         0
     );
 
-}    
-    
-/* =========================================
-   Telegram Profile
-========================================= */
-
-function loadTelegramProfile() {
-
-    if (!telegramUser) {
-
-        setProfileFallback();
-
-        return;
-
-    }
-
-
-    const firstName =
-        telegramUser.first_name || "";
-
-
-    const lastName =
-        telegramUser.last_name || "";
-
-
-    const fullName =
-        (
-            firstName +
-            " " +
-            lastName
-        ).trim() ||
-        "Telegram User";
-
-
-    const username =
-        telegramUser.username
-            ? "@" + telegramUser.username
-            : "@no_username";
-
-
-    const userId =
-        telegramUser.id
-            ? String(telegramUser.id)
-            : "Unknown";
-
-
-    const avatarText =
-        (
-            firstName ||
-            "U"
-        )
-        .charAt(0)
-        .toUpperCase();
-
-
-    if (getElement("telegramName")) {
-
-        getElement("telegramName")
-            .textContent =
-            fullName;
-
-    }
-
-
-    if (getElement("telegramUsername")) {
-
-        getElement("telegramUsername")
-            .textContent =
-            username;
-
-    }
-
-
-    if (getElement("telegramId")) {
-
-        getElement("telegramId")
-            .textContent =
-            "ID: " + userId;
-
-    }
-
-
-    if (getElement("walletName")) {
-
-        getElement("walletName")
-            .textContent =
-            fullName;
-
-    }
-
-
-    if (getElement("walletUsername")) {
-
-        getElement("walletUsername")
-            .textContent =
-            username;
-
-    }
-
-
-    if (getElement("walletTelegramId")) {
-
-        getElement("walletTelegramId")
-            .textContent =
-            "ID: " + userId;
-
-    }
-
-
-    if (getElement("homeAvatar")) {
-
-        getElement("homeAvatar")
-            .textContent =
-            avatarText;
-
-    }
-
-
-    if (getElement("walletAvatar")) {
-
-        getElement("walletAvatar")
-            .textContent =
-            avatarText;
-
-    }
-
-
-    if (getElement("headerAvatar")) {
-
-        getElement("headerAvatar")
-            .textContent =
-            avatarText;
-
-    }
-
-
-    if (telegramUser.photo_url) {
-
-        setAvatarImage(
-            telegramUser.photo_url
-        );
-
-    }
-
 }
 
 
-/* =========================================
-   Avatar
-========================================= */
-
-function setAvatarImage(photoUrl) {
-
-    const avatarIds = [
-
-        "homeAvatar",
-
-        "walletAvatar",
-
-        "headerAvatar"
-
-    ];
-
-
-    avatarIds.forEach(
-        function(id) {
-
-            const element =
-                getElement(id);
-
-
-            if (!element) {
-
-                return;
-
-            }
-
-
-            element.innerHTML =
-                "<img src=\"" +
-                escapeHtml(photoUrl) +
-                "\" alt=\"Profile\">";
-
-        }
-    );
-
-}
-
-
-function setProfileFallback() {
-
-    const name =
-        "Telegram User";
-
-
-    const username =
-        "@no_username";
-
-
-    const userId =
-        "Unavailable";
-
-
-    if (getElement("telegramName")) {
-
-        getElement("telegramName")
-            .textContent =
-            name;
-
-    }
-
-
-    if (getElement("telegramUsername")) {
-
-        getElement("telegramUsername")
-            .textContent =
-            username;
-
-    }
-
-
-    if (getElement("telegramId")) {
-
-        getElement("telegramId")
-            .textContent =
-            "ID: " + userId;
-
-    }
-
-
-    if (getElement("walletName")) {
-
-        getElement("walletName")
-            .textContent =
-            name;
-
-    }
-
-
-    if (getElement("walletUsername")) {
-
-        getElement("walletUsername")
-            .textContent =
-            username;
-
-    }
-
-
-    if (getElement("walletTelegramId")) {
-
-        getElement("walletTelegramId")
-            .textContent =
-            "ID: " + userId;
-
-    }
-
-}
-
-
-/* =========================================
-   Balance UI
-========================================= */
+/* =========================================================
+   BALANCE UI
+   ========================================================= */
 
 function updateBalanceUI() {
 
@@ -1916,450 +1992,738 @@ function updateBalanceUI() {
         );
 
 
-    const referralEarned =
-        Number(
-            appState.referralEarned || 0
-        );
-
-
     const pending =
         Number(
-            appState.pendingWithdrawals || 0
+            appState.pendingWithdraw || 0
         );
 
 
-    if (getElement("homeBalance")) {
+    const balanceElements = [
 
-        getElement("homeBalance")
-            .textContent =
-            balance;
+        document.getElementById(
+            "homeBalance"
+        ),
+
+        document.getElementById(
+            "walletBalance"
+        )
+
+    ];
+
+
+    balanceElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    balance;
+
+            }
+
+        }
+    );
+
+
+    const earnedElements = [
+
+        document.getElementById(
+            "homeEarned"
+        ),
+
+        document.getElementById(
+            "walletEarned"
+        )
+
+    ];
+
+
+    earnedElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    earned;
+
+            }
+
+        }
+    );
+
+
+    const referralElements = [
+
+        document.getElementById(
+            "homeReferrals"
+        ),
+
+        document.getElementById(
+            "walletReferrals"
+        ),
+
+        document.getElementById(
+            "referralTotal"
+        )
+
+    ];
+
+
+    referralElements.forEach(
+        element => {
+
+            if (element) {
+
+                element.textContent =
+                    referrals;
+
+            }
+
+        }
+    );
+
+
+    const referralEarnedElement =
+        document.getElementById(
+            "referralEarned"
+        );
+
+
+    if (
+        referralEarnedElement
+    ) {
+
+        referralEarnedElement.textContent =
+            Number(
+                appState.referralEarned || 0
+            );
 
     }
 
 
-    if (getElement("homeEarned")) {
-
-        getElement("homeEarned")
-            .textContent =
-            earned;
-
-    }
+    const pendingElement =
+        document.getElementById(
+            "walletPendingWithdraw"
+        );
 
 
-    if (getElement("homeReferrals")) {
+    if (pendingElement) {
 
-        getElement("homeReferrals")
-            .textContent =
-            referrals;
-
-    }
-
-
-    if (getElement("walletBalance")) {
-
-        getElement("walletBalance")
-            .textContent =
-            balance;
-
-    }
-
-
-    if (getElement("walletEarned")) {
-
-        getElement("walletEarned")
-            .textContent =
-            earned;
-
-    }
-
-
-    if (getElement("walletReferrals")) {
-
-        getElement("walletReferrals")
-            .textContent =
-            referrals;
-
-    }
-
-
-    if (getElement("walletPendingWithdraw")) {
-
-        getElement("walletPendingWithdraw")
-            .textContent =
+        pendingElement.textContent =
             pending;
 
     }
 
-
-    if (getElement("referralTotal")) {
-
-        getElement("referralTotal")
-            .textContent =
-            referrals;
-
-    }
-
-
-    if (getElement("referralEarned")) {
-
-        getElement("referralEarned")
-            .textContent =
-            referralEarned;
-
-    }
-
 }
 
 
-/* =========================================
-   Referral Link
-========================================= */
+/* =========================================================
+   APPLY USER DATA
+   ========================================================= */
 
-function setupReferralLink() {
+function applyUserData(user) {
 
-    const referralBox =
-        getElement(
-            "referralLink"
+    if (!user) {
+        return;
+    }
+
+
+    appState.balance =
+        Number(
+            user.balance || 0
         );
 
 
-    if (!referralBox) {
-
-        return;
-
-    }
-
-
-    if (
-        telegramUser &&
-        telegramUser.id
-    ) {
-
-        const referralLink =
-            "https://t.me/TaskCoinEarnBot?start=ref_" +
-            telegramUser.id;
+    appState.totalEarned =
+        Number(
+            user.total_earned || 0
+        );
 
 
-        referralBox.textContent =
-            referralLink;
+    appState.referrals =
+        Number(
+            user.referral_count || 0
+        );
 
-    } else {
 
-        referralBox.textContent =
-            "Open TaskCoin from Telegram to get your referral link.";
-
-    }
+    updateBalanceUI();
 
 }
 
+</script>
+<script>
 
-/* =========================================
-   Copy Referral
-========================================= */
-
-async function copyReferralLink() {
-
-    const referralBox =
-        getElement(
-            "referralLink"
-        );
+/* =========================================================
+   TASKCOIN - FINAL PART 11
+   ========================================================= */
 
 
-    if (!referralBox) {
+/* =========================================================
+   SAVE USER DATA LOCALLY
+   ========================================================= */
 
-        return;
-
-    }
-
-
-    const link =
-        referralBox.textContent.trim();
-
-
-    if (
-        !link ||
-        link.startsWith("Open TaskCoin")
-    ) {
-
-        showToast(
-            "Referral link is not available yet."
-        );
-
-        return;
-
-    }
-
+function saveAppState() {
 
     try {
 
-        await navigator.clipboard.writeText(
-            link
+        localStorage.setItem(
+            "taskcoin_balance",
+            String(
+                Number(
+                    appState.balance || 0
+                )
+            )
         );
 
 
-        showToast(
-            "Referral link copied!"
-        );
-
-    } catch (error) {
-
-        showToast(
-            "Could not copy the link."
-        );
-
-    }
-
-}
-
-
-/* =========================================
-   Tasks
-========================================= */
-
-function renderTasks() {
-
-    const container =
-        getElement(
-            "tasksContainer"
+        localStorage.setItem(
+            "taskcoin_total_earned",
+            String(
+                Number(
+                    appState.totalEarned || 0
+                )
+            )
         );
 
 
-    if (!container) {
-
-        return;
-
-    }
-
-
-    if (
-        !Array.isArray(
-            appState.tasks
-        ) ||
-        appState.tasks.length === 0
-    ) {
-
-        container.innerHTML = `
-
-            <div class="empty-box">
-
-                <div class="empty-icon">
-                    🎯
-                </div>
-
-                <div class="empty-title">
-                    No Tasks Available
-                </div>
-
-                <div class="empty-text">
-                    New tasks will appear here when
-                    they are added by the TaskCoin admin.
-                </div>
-
-            </div>
-
-        `;
-
-        return;
-
-    }
-
-
-    container.innerHTML =
-        appState.tasks.map(
-            function(task) {
-
-                return `
-
-                    <div class="task-card">
-
-                        <div class="task-top">
-
-                            <div class="task-info">
-
-                                <div class="task-title">
-                                    ${escapeHtml(task.title)}
-                                </div>
-
-                                <div class="task-description">
-                                    ${escapeHtml(task.description)}
-                                </div>
-
-                            </div>
-
-                            <div class="task-reward">
-                                +${Number(task.reward || 0)}
-                            </div>
-
-                        </div>
-
-                        <button
-                            class="task-button"
-                            onclick="startTask('${escapeHtml(task.id || "")}')"
-                        >
-                            Complete Task
-                        </button>
-
-                    </div>
-
-                `;
-
-            }
-        ).join("");
-
-}
-
-
-/* =========================================
-   Start Task
-========================================= */
-
-function startTask(taskId) {
-
-    showToast(
-        "Task system will be connected in Part 3."
-    );
-
-}
-
-
-/* =========================================
-   Withdraw
-========================================= */
-
-function submitWithdraw() {
-
-    const account =
-        getElement(
-            "withdrawAccount"
-        )?.value.trim() || "";
-
-
-    const amount =
-        getElement(
-            "withdrawAmount"
-        )?.value || "";
-
-
-    if (!account) {
-
-        showToast(
-            "Please enter your account or wallet."
+        localStorage.setItem(
+            "taskcoin_referrals",
+            String(
+                Number(
+                    appState.referrals || 0
+                )
+            )
         );
 
-        return;
 
-    }
-
-
-    if (
-        !amount ||
-        Number(amount) <= 0
-    ) {
-
-        showToast(
-            "Please enter a valid amount."
+        localStorage.setItem(
+            "taskcoin_referral_earned",
+            String(
+                Number(
+                    appState.referralEarned || 0
+                )
+            )
         );
 
-        return;
-
-    }
-
-
-    showToast(
-        "Withdraw system will be activated in Part 5."
-    );
-
-}
-
-
-/* =========================================
-   Backend Placeholder
-========================================= */
-
-async function loadBackendData() {
-
-    /*
-       Backend and PostgreSQL connection
-       will be added in Part 2.
-
-       No fake balance is created here.
-    */
-
-
-    appState.balance = 0;
-
-    appState.totalEarned = 0;
-
-    appState.referrals = 0;
-
-    appState.referralEarned = 0;
-
-    appState.pendingWithdrawals = 0;
-
-    appState.tasks = [];
-
-}
-
-
-/* =========================================
-   Initialize
-========================================= */
-
-async function initializeApp() {
-
-    try {
-
-        loadTelegramProfile();
-
-        setupReferralLink();
-
-        await loadBackendData();
-
-        updateBalanceUI();
-
-        renderTasks();
 
     } catch (error) {
 
         console.error(
-            "TaskCoin initialization error:",
+            "Could not save app state:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   LOAD LOCAL USER DATA
+   ========================================================= */
+
+function loadLocalState() {
+
+    try {
+
+        const savedBalance =
+            localStorage.getItem(
+                "taskcoin_balance"
+            );
+
+
+        const savedEarned =
+            localStorage.getItem(
+                "taskcoin_total_earned"
+            );
+
+
+        const savedReferrals =
+            localStorage.getItem(
+                "taskcoin_referrals"
+            );
+
+
+        const savedReferralEarned =
+            localStorage.getItem(
+                "taskcoin_referral_earned"
+            );
+
+
+        if (
+            savedBalance !== null
+        ) {
+
+            appState.balance =
+                Number(
+                    savedBalance
+                ) || 0;
+
+        }
+
+
+        if (
+            savedEarned !== null
+        ) {
+
+            appState.totalEarned =
+                Number(
+                    savedEarned
+                ) || 0;
+
+        }
+
+
+        if (
+            savedReferrals !== null
+        ) {
+
+            appState.referrals =
+                Number(
+                    savedReferrals
+                ) || 0;
+
+        }
+
+
+        if (
+            savedReferralEarned !== null
+        ) {
+
+            appState.referralEarned =
+                Number(
+                    savedReferralEarned
+                ) || 0;
+
+        }
+
+
+        updateBalanceUI();
+
+
+    } catch (error) {
+
+        console.error(
+            "Could not load local state:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   UPDATE REFERRAL LINK
+   ========================================================= */
+
+function updateReferralUI() {
+
+    setupReferralLink();
+
+
+    updateBalanceUI();
+
+}
+
+
+/* =========================================================
+   REFRESH APP DATA
+   ========================================================= */
+
+async function refreshAppData() {
+
+    try {
+
+        await loadUserData();
+
+        await loadTasks();
+
+        await loadReferrals();
+
+        await loadWithdrawals();
+
+        updateReferralUI();
+
+        saveAppState();
+
+
+    } catch (error) {
+
+        console.error(
+            "Refresh error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   PAGE OPEN EVENT
+   ========================================================= */
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const button =
+            event.target.closest(
+                ".nav-button"
+            );
+
+
+        if (!button) {
+
+            return;
+
+        }
+
+
+        const page =
+            button.dataset.page;
+
+
+        if (page) {
+
+            openPage(page);
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   REFERRAL LINK CLICK
+   ========================================================= */
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const element =
+            event.target.closest(
+                "#referralLink"
+            );
+
+
+        if (!element) {
+
+            return;
+
+        }
+
+
+        copyReferralLink();
+
+    }
+);
+
+
+/* =========================================================
+   WITHDRAW FORM SUBMIT
+   ========================================================= */
+
+document.addEventListener(
+    "submit",
+    function(event) {
+
+        const form =
+            event.target;
+
+
+        if (
+            !form ||
+            form.id !==
+            "withdrawForm"
+        ) {
+
+            return;
+
+        }
+
+
+        event.preventDefault();
+
+
+        submitWithdraw();
+
+    }
+);
+
+
+/* =========================================================
+   TELEGRAM MAIN BUTTON
+   ========================================================= */
+
+function setupTelegramButton() {
+
+    if (!tg) {
+
+        return;
+
+    }
+
+
+    try {
+
+        tg.MainButton.hide();
+
+    } catch (error) {
+
+        console.log(
+            "Telegram MainButton unavailable."
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   TELEGRAM BACK BUTTON
+   ========================================================= */
+
+function setupTelegramBackButton() {
+
+    if (!tg) {
+
+        return;
+
+    }
+
+
+    try {
+
+        tg.BackButton.hide();
+
+
+        tg.BackButton.onClick(
+            function() {
+
+                openPage("home");
+
+                tg.BackButton.hide();
+
+            }
+        );
+
+    } catch (error) {
+
+        console.log(
+            "Telegram BackButton unavailable."
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   TELEGRAM THEME
+   ========================================================= */
+
+function applyTelegramTheme() {
+
+    if (!tg) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const colorScheme =
+            tg.colorScheme;
+
+
+        if (
+            colorScheme === "dark"
+        ) {
+
+            document.body.classList.add(
+                "telegram-dark"
+            );
+
+        } else {
+
+            document.body.classList.remove(
+                "telegram-dark"
+            );
+
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Telegram theme detection failed."
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   TELEGRAM VIEWPORT
+   ========================================================= */
+
+function setupTelegramViewport() {
+
+    if (!tg) {
+
+        return;
+
+    }
+
+
+    try {
+
+        tg.ready();
+
+        tg.expand();
+
+    } catch (error) {
+
+        console.log(
+            "Telegram viewport setup failed."
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   APP START
+   ========================================================= */
+
+async function startTaskCoin() {
+
+    try {
+
+        loadLocalState();
+
+
+        setupTelegramViewport();
+
+
+        setupTelegramButton();
+
+
+        setupTelegramBackButton();
+
+
+        applyTelegramTheme();
+
+
+        loadTelegramProfile();
+
+
+        setupReferralLink();
+
+
+        if (
+            !appState.telegramUser
+        ) {
+
+            showToast(
+                "Please open TaskCoin from Telegram."
+            );
+
+            return;
+
+        }
+
+
+        await syncTelegramUser();
+
+
+        await loadUserData();
+
+
+        await loadTasks();
+
+
+        await loadReferrals();
+
+
+        await loadWithdrawals();
+
+
+        updateReferralUI();
+
+
+        updateBalanceUI();
+
+
+        saveAppState();
+
+
+    } catch (error) {
+
+        console.error(
+            "TaskCoin startup error:",
             error
         );
 
 
         showToast(
-            "TaskCoin loaded with limited data."
+            error.message ||
+            "TaskCoin failed to start."
         );
 
     }
 
-
-    setTimeout(
-        function() {
-
-            const loader =
-                getElement(
-                    "appLoading"
-                );
-
-
-            if (loader) {
-
-                loader.style.display =
-                    "none";
-
-            }
-
-        },
-        500
-    );
-
 }
 
 
-/* =========================================
-   Start App
-========================================= */
+/* =========================================================
+   AUTO REFRESH
+   ========================================================= */
+
+setInterval(
+    async function() {
+
+        if (
+            !appState.telegramUser
+        ) {
+
+            return;
+
+        }
+
+
+        try {
+
+            await loadUserData();
+
+            await loadReferrals();
+
+            updateBalanceUI();
+
+            saveAppState();
+
+        } catch (error) {
+
+            console.error(
+                "Auto refresh error:",
+                error
+            );
+
+        }
+
+    },
+    60000
+);
+
+
+/* =========================================================
+   START WHEN DOM IS READY
+   ========================================================= */
 
 if (
     document.readyState ===
@@ -2368,18 +2732,77 @@ if (
 
     document.addEventListener(
         "DOMContentLoaded",
-        initializeApp
+        startTaskCoin
     );
 
 } else {
 
-    initializeApp();
+    startTaskCoin();
 
 }
 
+
+/* =========================================================
+   GLOBAL EXPORTS
+   ========================================================= */
+
+window.appState =
+    appState;
+
+
+window.apiRequest =
+    apiRequest;
+
+
+window.showToast =
+    showToast;
+
+
+window.loadTelegramProfile =
+    loadTelegramProfile;
+
+
+window.syncTelegramUser =
+    syncTelegramUser;
+
+
+window.setupReferralLink =
+    setupReferralLink;
+
+
+window.openPage =
+    openPage;
+
+
+window.updateBalanceUI =
+    updateBalanceUI;
+
+
+window.applyUserData =
+    applyUserData;
+
+
+window.saveAppState =
+    saveAppState;
+
+
+window.loadLocalState =
+    loadLocalState;
+
+
+window.refreshAppData =
+    refreshAppData;
+
+
+/* =========================================================
+   FINAL CONSOLE MESSAGE
+   ========================================================= */
+
+console.log(
+    "TaskCoin Mini App initialized successfully."
+);
+
 </script>
 
-
 </body>
-
 </html>    
