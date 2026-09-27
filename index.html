@@ -10,2799 +10,3092 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     >
 
+    <meta
+        name="theme-color"
+        content="#2563eb"
+    >
+
+    <meta
+        name="mobile-web-app-capable"
+        content="yes"
+    >
+
+    <meta
+        name="apple-mobile-web-app-capable"
+        content="yes"
+    >
+
     <title>TaskCoin</title>
 
-    <!-- Telegram Mini App -->
+
+    <!-- ========================================================
+         TELEGRAM WEB APP
+    ========================================================= -->
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+
+    <!-- ========================================================
+         GOOGLE FONT
+    ========================================================= -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+
+    <!-- ========================================================
+         MAIN STYLE
+    ========================================================= -->
+
     <style>
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
 
+
         html,
         body {
+
             width: 100%;
             min-height: 100%;
-            font-family: Arial, sans-serif;
-            background: #f5f7fb;
-            color: #172033;
+
         }
 
+
         body {
-            padding-bottom: 80px;
+
+            font-family:
+                "Inter",
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            background:
+                #f4f7fb;
+
+            color:
+                #111827;
+
+            overflow-x:
+                hidden;
+
+            -webkit-tap-highlight-color:
+                transparent;
+
         }
+
 
         button,
         input,
-        select {
-            font-family: inherit;
+        select,
+        textarea {
+
+            font-family:
+                inherit;
+
         }
+
 
         button {
-            border: none;
-            cursor: pointer;
+
+            border:
+                0;
+
+            outline:
+                none;
+
+            cursor:
+                pointer;
+
         }
 
-        /* Loading */
 
-        #appLoading {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            background: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
+        a {
+
+            color:
+                inherit;
+
+            text-decoration:
+                none;
+
         }
 
-        .loading-logo {
-            width: 70px;
-            height: 70px;
-            border-radius: 20px;
-            background: #1877f2;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 26px;
-            font-weight: bold;
-            margin-bottom: 18px;
+
+        .app {
+
+            width:
+                100%;
+
+            min-height:
+                100vh;
+
+            position:
+                relative;
+
+            padding-bottom:
+                80px;
+
         }
 
-        .loading-spinner {
-            width: 32px;
-            height: 32px;
-            border: 4px solid #e5e9f2;
-            border-top-color: #1877f2;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .loading-text {
-            margin-top: 12px;
-            color: #6b7280;
-            font-size: 14px;
-        }
-
-        /* Header */
-
-        .top-header {
-            background: #1877f2;
-            color: #ffffff;
-            padding: 18px 16px 24px;
-            border-radius: 0 0 24px 24px;
-        }
-
-        .header-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .brand-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 13px;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .brand-title {
-            font-size: 20px;
-            font-weight: 700;
-        }
-
-        .brand-subtitle {
-            font-size: 11px;
-            opacity: 0.8;
-            margin-top: 2px;
-        }
-
-        .profile-button {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            overflow: hidden;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ffffff;
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        .profile-button img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* Pages */
 
         .page {
-            display: none;
-            padding: 16px;
+
+            display:
+                none;
+
+            width:
+                100%;
+
         }
+
 
         .page.active {
-            display: block;
+
+            display:
+                block;
+
         }
 
-        /* Balance Card */
 
-        .balance-card {
-            margin-top: -8px;
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-        }
+        .container {
 
-        .balance-label {
-            font-size: 13px;
-            color: #7a8496;
-        }
+            width:
+                100%;
 
-        .balance-value {
-            font-size: 32px;
-            font-weight: 800;
-            margin-top: 5px;
-            color: #152238;
-        }
+            max-width:
+                600px;
 
-        .coin-name {
-            font-size: 13px;
-            color: #1877f2;
-            margin-top: 2px;
-        }
+            margin:
+                0 auto;
 
-        .balance-bottom {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 18px;
-            padding-top: 15px;
-            border-top: 1px solid #edf0f5;
-        }
+            padding:
+                16px;
 
-        .balance-stat span {
-            display: block;
-            font-size: 12px;
-            color: #8a93a3;
-        }
-
-        .balance-stat strong {
-            display: block;
-            margin-top: 4px;
-            font-size: 15px;
-        }
-
-        /* Section */
-       
-        .section {
-            margin-top: 18px;
-        }
-
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-
-        /* Quick Actions */
-
-        .quick-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-
-        .quick-card {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 15px 8px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        .quick-icon {
-            font-size: 24px;
-            margin-bottom: 7px;
-        }
-
-        .quick-name {
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        /* User Card */
-
-        .user-card {
-            background: #ffffff;
-            border-radius: 18px;
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        .user-avatar {
-            width: 52px;
-            height: 52px;
-            border-radius: 50%;
-            background: #e8f1ff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            color: #1877f2;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .user-name {
-            font-weight: 700;
-            font-size: 15px;
-        }
-
-        .user-username {
-            font-size: 12px;
-            color: #7d8797;
-            margin-top: 3px;
-        }
-
-        .user-id {
-            font-size: 11px;
-            color: #a0a7b4;
-            margin-top: 3px;
-        }
-
-        /* Tasks */
-
-        .task-card {
-            background: #ffffff;
-            border-radius: 18px;
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        .task-top {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-        }
-
-        .task-info {
-            flex: 1;
-        }
-
-        .task-title {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .task-description {
-            font-size: 12px;
-            color: #7d8797;
-            margin-top: 6px;
-            line-height: 1.5;
-        }
-
-        .task-reward {
-            white-space: nowrap;
-            background: #eaf4ff;
-            color: #1877f2;
-            padding: 7px 9px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .task-button {
-            width: 100%;
-            margin-top: 14px;
-            background: #1877f2;
-            color: #ffffff;
-            padding: 12px;
-            border-radius: 12px;
-            font-weight: 700;
-        }
-
-        .task-button:disabled {
-            background: #cbd2dc;
-            cursor: not-allowed;
-        }
-
-        /* Empty State */
-
-        .empty-box {
-            background: #ffffff;
-            border-radius: 18px;
-            padding: 35px 20px;
-            text-align: center;
-            color: #7c8797;
-        }
-
-        .empty-icon {
-            font-size: 35px;
-            margin-bottom: 10px;
-        }
-
-        .empty-title {
-            font-weight: 700;
-            color: #354052;
-            margin-bottom: 5px;
-        }
-
-        .empty-text {
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        /* Error */
-
-        .error-box {
-            background: #fff0f0;
-            border: 1px solid #ffd0d0;
-            color: #9b3030;
-            border-radius: 14px;
-            padding: 14px;
-            font-size: 12px;
-            line-height: 1.5;
-        }
-                /* Wallet */
-
-        .wallet-card {
-            background: #ffffff;
-            border-radius: 18px;
-            padding: 18px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        .wallet-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #eef1f5;
-        }
-
-        .wallet-row:last-child {
-            border-bottom: none;
-        }
-
-        .wallet-label {
-            color: #778294;
-            font-size: 13px;
-        }
-
-        .wallet-value {
-            font-weight: 700;
-        }
-
-        /* Withdraw */
-
-        .form-card {
-            background: #ffffff;
-            border-radius: 18px;
-            padding: 18px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-
-        .form-group {
-            margin-bottom: 14px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 7px;
-        }
-
-        .form-input,
-        .form-select {
-            width: 100%;
-            padding: 13px;
-            border: 1px solid #dfe4ec;
-            border-radius: 12px;
-            outline: none;
-            background: #ffffff;
-        }
-
-        .form-input:focus,
-        .form-select:focus {
-            border-color: #1877f2;
-        }
-
-        .primary-button {
-            width: 100%;
-            background: #1877f2;
-            color: #ffffff;
-            padding: 13px;
-            border-radius: 12px;
-            font-weight: 700;
-        }
-
-        .primary-button:disabled {
-            background: #bfc7d3;
-        }
-
-        .notice {
-            background: #fff8e6;
-            border: 1px solid #f4df9d;
-            color: #765b14;
-            padding: 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            line-height: 1.5;
-            margin-bottom: 14px;
-        }
-
-        /* Referral */
-
-        .referral-card {
-            background: #1877f2;
-            color: #ffffff;
-            border-radius: 20px;
-            padding: 20px;
-        }
-
-        .referral-title {
-            font-size: 19px;
-            font-weight: 700;
-        }
-
-        .referral-text {
-            margin-top: 7px;
-            font-size: 12px;
-            opacity: 0.9;
-            line-height: 1.5;
-        }
-
-        .referral-link-box {
-            background: rgba(255,255,255,0.15);
-            border-radius: 12px;
-            padding: 12px;
-            margin-top: 16px;
-            word-break: break-all;
-            font-size: 12px;
-        }
-
-        .copy-button {
-            margin-top: 10px;
-            background: #ffffff;
-            color: #1264d8;
-            width: 100%;
-            padding: 12px;
-            border-radius: 12px;
-            font-weight: 700;
-        }
-
-        .referral-stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .referral-stat {
-            background: #ffffff;
-            color: #172033;
-            border-radius: 14px;
-            padding: 15px;
-            text-align: center;
-        }
-
-        .referral-stat-value {
-            font-size: 20px;
-            font-weight: 800;
-        }
-
-        .referral-stat-label {
-            font-size: 11px;
-            color: #7c8797;
-            margin-top: 4px;
-            }
-                /* Deposit */
-
-        .deposit-disabled {
-            background: #f1f3f7;
-            border-radius: 16px;
-            padding: 18px;
-            text-align: center;
-        }
-
-        .deposit-disabled-icon {
-            font-size: 32px;
-        }
-
-        .deposit-disabled-title {
-            margin-top: 8px;
-            font-weight: 700;
-        }
-
-        .deposit-disabled-text {
-            margin-top: 5px;
-            font-size: 12px;
-            color: #7b8595;
-            line-height: 1.5;
-        }
-
-        /* Bottom Navigation */
-
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            background: #ffffff;
-            border-top: 1px solid #e7eaf0;
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            padding: 7px 4px calc(7px + env(safe-area-inset-bottom));
-        }
-
-        .nav-button {
-            background: transparent;
-            color: #8a94a5;
-            padding: 5px 2px;
-            font-size: 10px;
-        }
-
-        .nav-icon {
-            display: block;
-            font-size: 19px;
-            margin-bottom: 3px;
-        }
-
-        .nav-button.active {
-            color: #1877f2;
-            font-weight: 700;
-        }
-
-        /* Toast */
-
-        #toast {
-            position: fixed;
-            left: 50%;
-            bottom: 90px;
-            transform: translateX(-50%) translateY(20px);
-            background: #172033;
-            color: #ffffff;
-            padding: 11px 16px;
-            border-radius: 10px;
-            font-size: 12px;
-            opacity: 0;
-            pointer-events: none;
-            transition: 0.25s;
-            z-index: 9998;
-            max-width: 85%;
-            text-align: center;
-        }
-
-        #toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
         }
 
     </style>
 
 </head>
 
+
 <body>
-<!-- Loading Screen -->
 
-<div id="appLoading">
 
-    <div class="loading-logo">
-        TC
-    </div>
+    <!-- ========================================================
+         APP ROOT
+    ========================================================= -->
 
-    <div class="loading-spinner"></div>
-
-    <div class="loading-text">
-        Loading TaskCoin...
-    </div>
-
-</div>
-
-
-<!-- Header -->
-
-<header class="top-header">
-
-    <div class="header-row">
-
-        <div class="brand">
-
-            <div class="brand-icon">
-                TC
-            </div>
-
-            <div>
-
-                <div class="brand-title">
-                    TaskCoin
-                </div>
-
-                <div class="brand-subtitle">
-                    Earn by completing tasks
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <button
-            class="profile-button"
-            onclick="openPage('wallet')"
-            id="headerAvatar"
-        >
-            U
-        </button>
-
-    </div>
-
-</header>
-
-
-<!-- Home Page -->
-
-<section
-    id="page-home"
-    class="page active"
->
-
-    <!-- Balance -->
-
-    <div class="balance-card">
-
-        <div class="balance-label">
-            Available Balance
-        </div>
-
-        <div
-            class="balance-value"
-            id="homeBalance"
-        >
-            0
-        </div>
-
-        <div class="coin-name">
-            TaskCoins
-        </div>
-
-
-        <div class="balance-bottom">
-
-            <div class="balance-stat">
-
-                <span>
-                    Total Earned
-                </span>
-
-                <strong id="homeEarned">
-                    0
-                </strong>
-
-            </div>
-
-
-            <div class="balance-stat">
-
-                <span>
-                    Referrals
-                </span>
-
-                <strong id="homeReferrals">
-                    0
-                </strong>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- Quick Actions -->
-
-    <div class="section">
-
-        <div class="section-title">
-            Quick Actions
-        </div>
-
-
-        <div class="quick-grid">
-
-            <button
-                class="quick-card"
-                onclick="openPage('tasks')"
-            >
-
-                <div class="quick-icon">
-                    🎯
-                </div>
-
-                <div class="quick-name">
-                    Tasks
-                </div>
-
-            </button>
-
-
-            <button
-                class="quick-card"
-                onclick="openPage('wallet')"
-            >
-
-                <div class="quick-icon">
-                    💰
-                </div>
-
-                <div class="quick-name">
-                    Wallet
-                </div>
-
-            </button>
-
-
-            <button
-                class="quick-card"
-                onclick="openPage('withdraw')"
-            >
-
-                <div class="quick-icon">
-                    💸
-                </div>
-
-                <div class="quick-name">
-                    Withdraw
-                </div>
-
-            </button>
-
-        </div>
-
-    </div>
-
-
-    <!-- Telegram Profile -->
-        <!-- Telegram Profile -->
-
-    <div class="section">
-
-        <div class="section-title">
-            Telegram Profile
-        </div>
-
-
-        <div class="user-card">
-
-            <div
-                class="user-avatar"
-                id="homeAvatar"
-            >
-                U
-            </div>
-
-
-            <div>
-
-                <div
-                    class="user-name"
-                    id="telegramName"
-                >
-                    Loading...
-                </div>
-
-
-                <div
-                    class="user-username"
-                    id="telegramUsername"
-                >
-                    @loading
-                </div>
-
-
-                <div
-                    class="user-id"
-                    id="telegramId"
-                >
-                    ID: Loading...
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- Deposit -->
-
-    <div class="section">
-
-        <div class="section-title">
-            Deposit
-        </div>
-
-
-        <div class="deposit-disabled">
-
-            <div class="deposit-disabled-icon">
-                🔒
-            </div>
-
-
-            <div class="deposit-disabled-title">
-                Deposit Coming Soon
-            </div>
-
-
-            <div class="deposit-disabled-text">
-                Deposit and payment processing will be
-                activated in a later system update.
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- Tasks Page -->
-
-<section
-    id="page-tasks"
-    class="page"
->
-
-    <div class="section-title">
-        Available Tasks
-    </div>
-
-
-    <div id="tasksContainer">
-
-        <div class="empty-box">
-
-            <div class="empty-icon">
-                🎯
-            </div>
-
-            <div class="empty-title">
-                No Tasks Available
-            </div>
-
-            <div class="empty-text">
-                New tasks will appear here when they are
-                added by the TaskCoin admin.
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-<!-- Wallet Page -->
-
-<section
-    id="page-wallet"
-    class="page"
->
-
-    <div class="section-title">
-        My Wallet
-    </div>
-
-
-    <div class="wallet-card">
-
-        <div class="wallet-row">
-
-            <div class="wallet-label">
-                Available Balance
-            </div>
-
-            <div
-                class="wallet-value"
-                id="walletBalance"
-            >
-                0
-            </div>
-
-        </div>
-
-
-        <div class="wallet-row">
-
-            <div class="wallet-label">
-                Total Earned
-            </div>
-
-            <div
-                class="wallet-value"
-                id="walletEarned"
-            >
-                0
-            </div>
-
-        </div>
-
-
-        <div class="wallet-row">
-
-            <div class="wallet-label">
-                Total Referrals
-            </div>
-
-            <div
-                class="wallet-value"
-                id="walletReferrals"
-            >
-                0
-            </div>
-
-        </div>
-
-
-        <div class="wallet-row">
-
-            <div class="wallet-label">
-                Pending Withdrawals
-            </div>
-
-            <div
-                class="wallet-value"
-                id="walletPendingWithdraw"
-            >
-                0
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <div class="section">
-
-        <div class="section-title">
-            Account Information
-        </div>
-
-
-        <div class="user-card">
-
-            <div
-                class="user-avatar"
-                id="walletAvatar"
-            >
-                U
-            </div>
-
-
-            <div>
-
-                <div
-                    class="user-name"
-                    id="walletName"
-                >
-                    Loading...
-                </div>
-
-
-                <div
-                    class="user-username"
-                    id="walletUsername"
-                >
-                    @loading
-                </div>
-
-
-                <div
-                    class="user-id"
-                    id="walletTelegramId"
-                >
-                    ID: Loading...
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <div class="section">
-
-        <div class="section-title">
-            Wallet Information
-        </div>
-
-
-        <div class="notice">
-            Your TaskCoin balance is managed securely by
-            the TaskCoin backend server.
-        </div>
-
-
-        <div class="wallet-card">
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    Currency
-                </div>
-
-                <div class="wallet-value">
-                    TaskCoin
-                </div>
-
-            </div>
-
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    Account Status
-                </div>
-
-                <div class="wallet-value">
-                    Active
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-<!-- Withdraw Page -->
-
-<section
-    id="page-withdraw"
-    class="page"
->
-
-    <div class="section-title">
-        Withdraw
-    </div>
-
-
-    <div class="notice">
-        Minimum withdrawal amount is 100 TaskCoins.
-        Make sure your account or wallet number is
-        correct before submitting your request.
-    </div>
-
-
-    <div class="form-card">
-
-        <div class="form-group">
-
-            <label class="form-label">
-                Withdrawal Method
-            </label>
-
-
-            <select
-                class="form-select"
-                id="withdrawMethod"
-            >
-
-                <option value="bkash">
-                    bKash
-                </option>
-
-                <option value="nagad">
-                    Nagad
-                </option>
-
-                <option value="usdt">
-                    USDT
-                </option>
-
-            </select>
-
-        </div>
-
-
-        <div class="form-group">
-
-            <label class="form-label">
-                Account / Wallet Number
-            </label>
-
-
-            <input
-                type="text"
-                class="form-input"
-                id="withdrawAccount"
-                placeholder="Enter account or wallet"
-                autocomplete="off"
-            >
-
-        </div>
-
-
-        <div class="form-group">
-
-            <label class="form-label">
-                Amount
-            </label>
-
-
-            <input
-                type="number"
-                class="form-input"
-                id="withdrawAmount"
-                placeholder="Enter TaskCoin amount"
-                min="0"
-                inputmode="numeric"
-            >
-
-        </div>
-
-
-        <button
-            class="primary-button"
-            id="withdrawButton"
-            onclick="submitWithdraw()"
-        >
-            Request Withdraw
-        </button>
-
-    </div>
-
-
-    <div class="section">
-
-        <div class="section-title">
-            Withdrawal History
-        </div>
-
-
-        <div class="empty-box">
-
-            <div class="empty-icon">
-                💸
-            </div>
-
-            <div class="empty-title">
-                No Withdrawal History
-            </div>
-
-            <div class="empty-text">
-                Your withdrawal records will appear here
-                after the withdrawal system is activated.
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-<!-- Referral Page -->
-
-<section
-    id="page-referral"
-    class="page"
->
-
-    <div class="section-title">
-        Referral Program
-    </div>
-
-
-    <div class="referral-card">
-
-        <div class="referral-title">
-            Invite Friends & Earn
-        </div>
-
-
-        <div class="referral-text">
-            Share your referral link with friends.
-            Referral rewards will be connected to the
-            TaskCoin backend later.
-        </div>
-
-
-        <div
-            class="referral-link-box"
-            id="referralLink"
-        >
-            Generating referral link...
-        </div>
-
-
-        <button
-            class="copy-button"
-            onclick="copyReferralLink()"
-        >
-            📋 Copy Referral Link
-        </button>
-
-
-        <div class="referral-stats">
-
-            <div class="referral-stat">
-
-                <div
-                    class="referral-stat-value"
-                    id="referralTotal"
-                >
-                    0
-                </div>
-
-                <div class="referral-stat-label">
-                    Total Referrals
-                </div>
-
-            </div>
-
-
-            <div class="referral-stat">
-
-                <div
-                    class="referral-stat-value"
-                    id="referralEarned"
-                >
-                    0
-                </div>
-
-                <div class="referral-stat-label">
-                    Referral Earnings
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <div class="section">
-
-        <div class="section-title">
-            How It Works
-        </div>
-
-
-        <div class="wallet-card">
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    1. Copy your referral link
-                </div>
-
-                <div>
-                    🔗
-                </div>
-
-            </div>
-
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    2. Share it with your friends
-                </div>
-
-                <div>
-                    👥
-                </div>
-
-            </div>
-
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    3. Friends join TaskCoin
-                </div>
-
-                <div>
-                    🚀
-                </div>
-
-            </div>
-
-
-            <div class="wallet-row">
-
-                <div class="wallet-label">
-                    4. Referral rewards are credited
-                </div>
-
-                <div>
-                    🪙
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-<!-- Bottom Navigation -->
-
-<nav class="bottom-nav">
-
-    <button
-        class="nav-button active"
-        data-page="home"
-        onclick="openPage('home')"
+    <div
+        class="app"
+        id="app"
     >
-        <span class="nav-icon">🏠</span>
-        Home
-    </button>
 
+        <!-- পরের Part-গুলো এখানে যুক্ত হবে -->
 
-    <button
-        class="nav-button"
-        data-page="tasks"
-        onclick="openPage('tasks')"
-    >
-        <span class="nav-icon">🎯</span>
-        Tasks
-    </button>
+    </div>
 
-
-    <button
-        class="nav-button"
-        data-page="wallet"
-        onclick="openPage('wallet')"
-    >
-        <span class="nav-icon">💰</span>
-        Wallet
-    </button>
-
-
-    <button
-        class="nav-button"
-        data-page="withdraw"
-        onclick="openPage('withdraw')"
-    >
-        <span class="nav-icon">💸</span>
-        Withdraw
-    </button>
-
-
-    <button
-        class="nav-button"
-        data-page="referral"
-        onclick="openPage('referral')"
-    >
-        <span class="nav-icon">👥</span>
-        Referral
-    </button>
-
-</nav>
-
-
-<!-- Toast -->
-
-<div id="toast"></div>
-
-
-<script>
-
-/* =========================================================
-   TASKCOIN BACKEND
-   ========================================================= */
-
-const API_BASE_URL =
-    "https://taskcoin-1.onrender.com";
-
-
-/* Telegram WebApp */
-
-const tg =
-    window.Telegram &&
-    window.Telegram.WebApp
-        ? window.Telegram.WebApp
-        : null;
-
-
-/* Application State */
-
-const appState = {
-
-    telegramUser: null,
-
-    balance: 0,
-
-    totalEarned: 0,
-
-    referrals: 0,
-
-    referralEarned: 0,
-
-    pendingWithdraw: 0,
-
-    tasks: []
-
-};
-
-
-/* =========================================================
-   API REQUEST
-   ========================================================= */
-
-async function apiRequest(
-    endpoint,
-    options = {}
-) {
-
-    const config = {
-
-        method:
-            options.method || "GET",
-
-        headers: {
-
-            "Content-Type":
-                "application/json",
-
-            ...(options.headers || {})
-
-        }
-
-    };
-
-
-    if (
-        options.body !== undefined
-    ) {
-
-        config.body =
-            JSON.stringify(
-                options.body
-            );
-
-    }
-
-
-    let response;
-
-
-    try {
-
-        response =
-            await fetch(
-                API_BASE_URL + endpoint,
-                config
-            );
-
-    } catch (error) {
-
-        console.error(
-            "TaskCoin network error:",
-            error
-        );
-
-        throw new Error(
-            "Could not connect to TaskCoin server."
-        );
-
-    }
-
-
-    let data;
-
-
-    try {
-
-        data =
-            await response.json();
-
-    } catch (error) {
-
-        throw new Error(
-            "Server returned an invalid response."
-        );
-
-    }
-
-
-    if (
-        !response.ok ||
-        data.success === false
-    ) {
-
-        throw new Error(
-
-            data.message ||
-            data.error ||
-            "Server request failed."
-
-        );
-
-    }
-
-
-    return data;
-
-}
-
-
-/* =========================================================
-   TOAST
-   ========================================================= */
-
-function showToast(message) {
-
-    const toast =
-        document.getElementById(
-            "toast"
-        );
-
-
-    if (!toast) {
-        return;
-    }
-
-
-    toast.textContent =
-        message;
-
-
-    toast.classList.add(
-        "show"
-    );
-
-
-    setTimeout(
-        () => {
-
-            toast.classList.remove(
-                "show"
-            );
-
-        },
-        2500
-    );
-
-}
-
-
-/* =========================================================
-   TELEGRAM PROFILE
-   ========================================================= */
-
-function loadTelegramProfile() {
-
-    if (
-        !tg ||
-        !tg.initDataUnsafe ||
-        !tg.initDataUnsafe.user
-    ) {
-
-        return;
-
-    }
-
-
-    const user =
-        tg.initDataUnsafe.user;
-
-
-    appState.telegramUser =
-        user;
-
-
-    const firstName =
-        user.first_name || "";
-
-
-    const lastName =
-        user.last_name || "";
-
-
-    const fullName =
-        (
-            firstName +
-            " " +
-            lastName
-        ).trim();
-
-
-    const username =
-        user.username
-            ? "@" + user.username
-            : "@no_username";
-
-
-    const userId =
-        user.id
-            ? String(user.id)
-            : "Unknown";
-
-
-    const avatarLetter =
-        (
-            firstName ||
-            user.username ||
-            "U"
-        )
-        .charAt(0)
-        .toUpperCase();
-
-
-    const nameElements = [
-
-        document.getElementById(
-            "telegramName"
-        ),
-
-        document.getElementById(
-            "walletName"
-        )
-
-    ];
-
-
-    nameElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    fullName ||
-                    "Telegram User";
-
-            }
-
-        }
-    );
-
-
-    const usernameElements = [
-
-        document.getElementById(
-            "telegramUsername"
-        ),
-
-        document.getElementById(
-            "walletUsername"
-        )
-
-    ];
-
-
-    usernameElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    username;
-
-            }
-
-        }
-    );
-
-
-    const idElements = [
-
-        document.getElementById(
-            "telegramId"
-        ),
-
-        document.getElementById(
-            "walletTelegramId"
-        )
-
-    ];
-
-
-    idElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    "ID: " + userId;
-
-            }
-
-        }
-    );
-
-
-    const avatarElements = [
-
-        document.getElementById(
-            "homeAvatar"
-        ),
-
-        document.getElementById(
-            "walletAvatar"
-        ),
-
-        document.getElementById(
-            "headerAvatar"
-        )
-
-    ];
-
-
-    avatarElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    avatarLetter;
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   TELEGRAM USER SYNC
-   ========================================================= */
-
-async function syncTelegramUser() {
-
-    if (
-        !appState.telegramUser
-    ) {
-
-        throw new Error(
-            "Telegram user information not found."
-        );
-
-    }
-
-
-    const user =
-        appState.telegramUser;
-
-
-    return await apiRequest(
-        "/api/user/create",
-        {
-
-            method: "POST",
-
-            body: {
-
-                telegram_id:
-                    user.id,
-
-                username:
-                    user.username || "",
-
-                first_name:
-                    user.first_name || ""
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   REFERRAL LINK
-   ========================================================= */
-
-function setupReferralLink() {
-
-    const element =
-        document.getElementById(
-            "referralLink"
-        );
-
-
-    if (!element) {
-        return;
-    }
-
-
-    if (
-        !appState.telegramUser
-    ) {
-
-        element.textContent =
-            "Telegram user not available.";
-
-        return;
-
-    }
-
-
-    const userId =
-        appState.telegramUser.id;
-
-
-    const referralLink =
-        "https://t.me/TaskCoinEarnBot?start=" +
-        userId;
-
-
-    element.textContent =
-        referralLink;
-
-}
-
-
-/* =========================================================
-   PAGE NAVIGATION
-   ========================================================= */
-
-function openPage(pageName) {
-
-    const pages =
-        document.querySelectorAll(
-            ".page"
-        );
-
-
-    pages.forEach(
-        page => {
-
-            page.classList.remove(
-                "active"
-            );
-
-        }
-    );
-
-
-    const target =
-        document.getElementById(
-            "page-" + pageName
-        );
-
-
-    if (target) {
-
-        target.classList.add(
-            "active"
-        );
-
-    }
-
-
-    const buttons =
-        document.querySelectorAll(
-            ".nav-button"
-        );
-
-
-    buttons.forEach(
-        button => {
-
-            button.classList.remove(
-                "active"
-            );
-
-
-            if (
-                button.dataset.page ===
-                pageName
-            ) {
-
-                button.classList.add(
-                    "active"
-                );
-
-            }
-
-        }
-    );
-
-
-    window.scrollTo(
-        0,
-        0
-    );
-
-}
-
-
-/* =========================================================
-   BALANCE UI
-   ========================================================= */
-
-function updateBalanceUI() {
-
-    const balance =
-        Number(
-            appState.balance || 0
-        );
-
-
-    const earned =
-        Number(
-            appState.totalEarned || 0
-        );
-
-
-    const referrals =
-        Number(
-            appState.referrals || 0
-        );
-
-
-    const pending =
-        Number(
-            appState.pendingWithdraw || 0
-        );
-
-
-    const balanceElements = [
-
-        document.getElementById(
-            "homeBalance"
-        ),
-
-        document.getElementById(
-            "walletBalance"
-        )
-
-    ];
-
-
-    balanceElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    balance;
-
-            }
-
-        }
-    );
-
-
-    const earnedElements = [
-
-        document.getElementById(
-            "homeEarned"
-        ),
-
-        document.getElementById(
-            "walletEarned"
-        )
-
-    ];
-
-
-    earnedElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    earned;
-
-            }
-
-        }
-    );
-
-
-    const referralElements = [
-
-        document.getElementById(
-            "homeReferrals"
-        ),
-
-        document.getElementById(
-            "walletReferrals"
-        ),
-
-        document.getElementById(
-            "referralTotal"
-        )
-
-    ];
-
-
-    referralElements.forEach(
-        element => {
-
-            if (element) {
-
-                element.textContent =
-                    referrals;
-
-            }
-
-        }
-    );
-
-
-    const referralEarnedElement =
-        document.getElementById(
-            "referralEarned"
-        );
-
-
-    if (
-        referralEarnedElement
-    ) {
-
-        referralEarnedElement.textContent =
-            Number(
-                appState.referralEarned || 0
-            );
-
-    }
-
-
-    const pendingElement =
-        document.getElementById(
-            "walletPendingWithdraw"
-        );
-
-
-    if (pendingElement) {
-
-        pendingElement.textContent =
-            pending;
-
-    }
-
-}
-
-
-/* =========================================================
-   APPLY USER DATA
-   ========================================================= */
-
-function applyUserData(user) {
-
-    if (!user) {
-        return;
-    }
-
-
-    appState.balance =
-        Number(
-            user.balance || 0
-        );
-
-
-    appState.totalEarned =
-        Number(
-            user.total_earned || 0
-        );
-
-
-    appState.referrals =
-        Number(
-            user.referral_count || 0
-        );
-
-
-    updateBalanceUI();
-
-}
-
-</script>
-<script>
-
-/* =========================================================
-   TASKCOIN - FINAL PART 11
-   ========================================================= */
-
-
-/* =========================================================
-   SAVE USER DATA LOCALLY
-   ========================================================= */
-
-function saveAppState() {
-
-    try {
-
-        localStorage.setItem(
-            "taskcoin_balance",
-            String(
-                Number(
-                    appState.balance || 0
-                )
-            )
-        );
-
-
-        localStorage.setItem(
-            "taskcoin_total_earned",
-            String(
-                Number(
-                    appState.totalEarned || 0
-                )
-            )
-        );
-
-
-        localStorage.setItem(
-            "taskcoin_referrals",
-            String(
-                Number(
-                    appState.referrals || 0
-                )
-            )
-        );
-
-
-        localStorage.setItem(
-            "taskcoin_referral_earned",
-            String(
-                Number(
-                    appState.referralEarned || 0
-                )
-            )
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "Could not save app state:",
-            error
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   LOAD LOCAL USER DATA
-   ========================================================= */
-
-function loadLocalState() {
-
-    try {
-
-        const savedBalance =
-            localStorage.getItem(
-                "taskcoin_balance"
-            );
-
-
-        const savedEarned =
-            localStorage.getItem(
-                "taskcoin_total_earned"
-            );
-
-
-        const savedReferrals =
-            localStorage.getItem(
-                "taskcoin_referrals"
-            );
-
-
-        const savedReferralEarned =
-            localStorage.getItem(
-                "taskcoin_referral_earned"
-            );
-
-
-        if (
-            savedBalance !== null
-        ) {
-
-            appState.balance =
-                Number(
-                    savedBalance
-                ) || 0;
-
-        }
-
-
-        if (
-            savedEarned !== null
-        ) {
-
-            appState.totalEarned =
-                Number(
-                    savedEarned
-                ) || 0;
-
-        }
-
-
-        if (
-            savedReferrals !== null
-        ) {
-
-            appState.referrals =
-                Number(
-                    savedReferrals
-                ) || 0;
-
-        }
-
-
-        if (
-            savedReferralEarned !== null
-        ) {
-
-            appState.referralEarned =
-                Number(
-                    savedReferralEarned
-                ) || 0;
-
-        }
-
-
-        updateBalanceUI();
-
-
-    } catch (error) {
-
-        console.error(
-            "Could not load local state:",
-            error
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   UPDATE REFERRAL LINK
-   ========================================================= */
-
-function updateReferralUI() {
-
-    setupReferralLink();
-
-
-    updateBalanceUI();
-
-}
-
-
-/* =========================================================
-   REFRESH APP DATA
-   ========================================================= */
-
-async function refreshAppData() {
-
-    try {
-
-        await loadUserData();
-
-        await loadTasks();
-
-        await loadReferrals();
-
-        await loadWithdrawals();
-
-        updateReferralUI();
-
-        saveAppState();
-
-
-    } catch (error) {
-
-        console.error(
-            "Refresh error:",
-            error
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   PAGE OPEN EVENT
-   ========================================================= */
-
-document.addEventListener(
-    "click",
-    function(event) {
-
-        const button =
-            event.target.closest(
-                ".nav-button"
-            );
-
-
-        if (!button) {
-
-            return;
-
-        }
-
-
-        const page =
-            button.dataset.page;
-
-
-        if (page) {
-
-            openPage(page);
-
-        }
-
-    }
-);
-
-
-/* =========================================================
-   REFERRAL LINK CLICK
-   ========================================================= */
-
-document.addEventListener(
-    "click",
-    function(event) {
-
-        const element =
-            event.target.closest(
-                "#referralLink"
-            );
-
-
-        if (!element) {
-
-            return;
-
-        }
-
-
-        copyReferralLink();
-
-    }
-);
-
-
-/* =========================================================
-   WITHDRAW FORM SUBMIT
-   ========================================================= */
-
-document.addEventListener(
-    "submit",
-    function(event) {
-
-        const form =
-            event.target;
-
-
-        if (
-            !form ||
-            form.id !==
-            "withdrawForm"
-        ) {
-
-            return;
-
-        }
-
-
-        event.preventDefault();
-
-
-        submitWithdraw();
-
-    }
-);
-
-
-/* =========================================================
-   TELEGRAM MAIN BUTTON
-   ========================================================= */
-
-function setupTelegramButton() {
-
-    if (!tg) {
-
-        return;
-
-    }
-
-
-    try {
-
-        tg.MainButton.hide();
-
-    } catch (error) {
-
-        console.log(
-            "Telegram MainButton unavailable."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   TELEGRAM BACK BUTTON
-   ========================================================= */
-
-function setupTelegramBackButton() {
-
-    if (!tg) {
-
-        return;
-
-    }
-
-
-    try {
-
-        tg.BackButton.hide();
-
-
-        tg.BackButton.onClick(
-            function() {
-
-                openPage("home");
-
-                tg.BackButton.hide();
-
-            }
-        );
-
-    } catch (error) {
-
-        console.log(
-            "Telegram BackButton unavailable."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   TELEGRAM THEME
-   ========================================================= */
-
-function applyTelegramTheme() {
-
-    if (!tg) {
-
-        return;
-
-    }
-
-
-    try {
-
-        const colorScheme =
-            tg.colorScheme;
-
-
-        if (
-            colorScheme === "dark"
-        ) {
-
-            document.body.classList.add(
-                "telegram-dark"
-            );
-
-        } else {
-
-            document.body.classList.remove(
-                "telegram-dark"
-            );
-
-        }
-
-    } catch (error) {
-
-        console.log(
-            "Telegram theme detection failed."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   TELEGRAM VIEWPORT
-   ========================================================= */
-
-function setupTelegramViewport() {
-
-    if (!tg) {
-
-        return;
-
-    }
-
-
-    try {
-
-        tg.ready();
-
-        tg.expand();
-
-    } catch (error) {
-
-        console.log(
-            "Telegram viewport setup failed."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   APP START
-   ========================================================= */
-
-async function startTaskCoin() {
-
-    try {
-
-        loadLocalState();
-
-
-        setupTelegramViewport();
-
-
-        setupTelegramButton();
-
-
-        setupTelegramBackButton();
-
-
-        applyTelegramTheme();
-
-
-        loadTelegramProfile();
-
-
-        setupReferralLink();
-
-
-        if (
-            !appState.telegramUser
-        ) {
-
-            showToast(
-                "Please open TaskCoin from Telegram."
-            );
-
-            return;
-
-        }
-
-
-        await syncTelegramUser();
-
-
-        await loadUserData();
-
-
-        await loadTasks();
-
-
-        await loadReferrals();
-
-
-        await loadWithdrawals();
-
-
-        updateReferralUI();
-
-
-        updateBalanceUI();
-
-
-        saveAppState();
-
-
-    } catch (error) {
-
-        console.error(
-            "TaskCoin startup error:",
-            error
-        );
-
-
-        showToast(
-            error.message ||
-            "TaskCoin failed to start."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   AUTO REFRESH
-   ========================================================= */
-
-setInterval(
-    async function() {
-
-        if (
-            !appState.telegramUser
-        ) {
-
-            return;
-
-        }
-
-
-        try {
-
-            await loadUserData();
-
-            await loadReferrals();
-
-            updateBalanceUI();
-
-            saveAppState();
-
-        } catch (error) {
-
-            console.error(
-                "Auto refresh error:",
-                error
-            );
-
-        }
-
-    },
-    60000
-);
-
-
-/* =========================================================
-   START WHEN DOM IS READY
-   ========================================================= */
-
-if (
-    document.readyState ===
-    "loading"
-) {
-
-    document.addEventListener(
-        "DOMContentLoaded",
-        startTaskCoin
-    );
-
-} else {
-
-    startTaskCoin();
-
-}
-
-
-/* =========================================================
-   GLOBAL EXPORTS
-   ========================================================= */
-
-window.appState =
-    appState;
-
-
-window.apiRequest =
-    apiRequest;
-
-
-window.showToast =
-    showToast;
-
-
-window.loadTelegramProfile =
-    loadTelegramProfile;
-
-
-window.syncTelegramUser =
-    syncTelegramUser;
-
-
-window.setupReferralLink =
-    setupReferralLink;
-
-
-window.openPage =
-    openPage;
-
-
-window.updateBalanceUI =
-    updateBalanceUI;
-
-
-window.applyUserData =
-    applyUserData;
-
-
-window.saveAppState =
-    saveAppState;
-
-
-window.loadLocalState =
-    loadLocalState;
-
-
-window.refreshAppData =
-    refreshAppData;
-
-
-/* =========================================================
-   FINAL CONSOLE MESSAGE
-   ========================================================= */
-
-console.log(
-    "TaskCoin Mini App initialized successfully."
-);
-
-</script>
 
 </body>
-</html>    
+
+</html>
+/* ============================================================
+   TASKCOIN — PART 2
+   HEADER + COMMON CARDS + BUTTONS
+============================================================ */
+
+
+/* ============================================================
+   HEADER
+============================================================ */
+
+.app-header {
+
+    width: 100%;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #1d4ed8
+        );
+
+    color: #ffffff;
+
+    padding:
+        18px 16px 24px;
+
+    border-radius:
+        0 0 24px 24px;
+
+}
+
+
+.header-inner {
+
+    max-width:
+        600px;
+
+    margin:
+        0 auto;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+}
+
+
+.header-left {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        12px;
+
+}
+
+
+.logo-circle {
+
+    width:
+        46px;
+
+    height:
+        46px;
+
+    border-radius:
+        50%;
+
+    background:
+        rgba(255,255,255,0.18);
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        18px;
+
+    font-weight:
+        800;
+
+}
+
+
+.header-title {
+
+    font-size:
+        20px;
+
+    font-weight:
+        800;
+
+    line-height:
+        1.2;
+
+}
+
+
+.header-subtitle {
+
+    margin-top:
+        3px;
+
+    font-size:
+        12px;
+
+    opacity:
+        0.85;
+
+}
+
+
+.header-profile {
+
+    width:
+        44px;
+
+    height:
+        44px;
+
+    border-radius:
+        50%;
+
+    background:
+        rgba(255,255,255,0.18);
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        18px;
+
+}
+
+
+/* ============================================================
+   BALANCE CARD
+============================================================ */
+
+.balance-card {
+
+    margin-top:
+        -8px;
+
+    background:
+        #ffffff;
+
+    border-radius:
+        20px;
+
+    padding:
+        20px;
+
+    box-shadow:
+        0 8px 25px rgba(15,23,42,0.08);
+
+}
+
+
+.balance-label {
+
+    font-size:
+        13px;
+
+    color:
+        #6b7280;
+
+}
+
+
+.balance-amount {
+
+    margin-top:
+        7px;
+
+    font-size:
+        30px;
+
+    font-weight:
+        800;
+
+    color:
+        #111827;
+
+}
+
+
+.balance-coin {
+
+    font-size:
+        14px;
+
+    color:
+        #2563eb;
+
+    font-weight:
+        600;
+
+}
+
+
+/* ============================================================
+   COMMON SECTION
+============================================================ */
+
+.section {
+
+    margin-top:
+        20px;
+
+}
+
+
+.section-header {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    margin-bottom:
+        12px;
+
+}
+
+
+.section-title {
+
+    font-size:
+        17px;
+
+    font-weight:
+        700;
+
+}
+
+
+.section-link {
+
+    font-size:
+        12px;
+
+    color:
+        #2563eb;
+
+    font-weight:
+        600;
+
+}
+
+
+/* ============================================================
+   COMMON CARD
+============================================================ */
+
+.card {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        18px;
+
+    padding:
+        16px;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+}
+
+
+/* ============================================================
+   QUICK ACTIONS
+============================================================ */
+
+.quick-actions {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap:
+        12px;
+
+}
+
+
+.quick-action {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        16px;
+
+    padding:
+        16px;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+    text-align:
+        left;
+
+}
+
+
+.quick-action-icon {
+
+    width:
+        42px;
+
+    height:
+        42px;
+
+    border-radius:
+        12px;
+
+    background:
+        #eff6ff;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        20px;
+
+    margin-bottom:
+        10px;
+
+}
+
+
+.quick-action-title {
+
+    font-size:
+        14px;
+
+    font-weight:
+        700;
+
+}
+
+
+.quick-action-text {
+
+    margin-top:
+        4px;
+
+    font-size:
+        11px;
+
+    color:
+        #6b7280;
+
+}
+
+
+/* ============================================================
+   STAT GRID
+============================================================ */
+
+.stats-grid {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap:
+        12px;
+
+}
+
+
+.stat-card {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        16px;
+
+    padding:
+        16px;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+}
+
+
+.stat-value {
+
+    font-size:
+        21px;
+
+    font-weight:
+        800;
+
+    color:
+        #111827;
+
+}
+
+
+.stat-label {
+
+    margin-top:
+        5px;
+
+    font-size:
+        11px;
+
+    color:
+        #6b7280;
+
+}
+
+
+/* ============================================================
+   PRIMARY BUTTON
+============================================================ */
+
+.primary-button {
+
+    width:
+        100%;
+
+    min-height:
+        48px;
+
+    border-radius:
+        13px;
+
+    background:
+        #2563eb;
+
+    color:
+        #ffffff;
+
+    font-size:
+        14px;
+
+    font-weight:
+        700;
+
+    padding:
+        12px 16px;
+
+}
+
+
+.primary-button:active {
+
+    transform:
+        scale(0.98);
+
+}
+
+
+/* ============================================================
+   SECONDARY BUTTON
+============================================================ */
+
+.secondary-button {
+
+    width:
+        100%;
+
+    min-height:
+        46px;
+
+    border-radius:
+        13px;
+
+    background:
+        #eff6ff;
+
+    color:
+        #2563eb;
+
+    font-size:
+        14px;
+
+    font-weight:
+        700;
+
+    padding:
+        12px 16px;
+
+}
+
+
+/* ============================================================
+   EMPTY STATE
+============================================================ */
+
+.empty-state {
+
+    text-align:
+        center;
+
+    padding:
+        35px 20px;
+
+    color:
+        #6b7280;
+
+}
+
+
+.empty-icon {
+
+    font-size:
+        36px;
+
+    margin-bottom:
+        10px;
+
+}
+
+
+.empty-title {
+
+    font-size:
+        15px;
+
+    font-weight:
+        700;
+
+    color:
+        #374151;
+
+}
+
+
+.empty-text {
+
+    margin-top:
+        5px;
+
+    font-size:
+        12px;
+
+}
+
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+
+@media (max-width: 380px) {
+
+    .header-title {
+
+        font-size:
+            18px;
+
+    }
+
+    .balance-amount {
+
+        font-size:
+            26px;
+
+    }
+
+    .quick-actions {
+
+        gap:
+            9px;
+
+    }
+
+}
+/* ============================================================
+   TASKCOIN — PART 3
+   WALLET + WITHDRAW
+============================================================ */
+
+
+/* ============================================================
+   WALLET HEADER CARD
+============================================================ */
+
+.wallet-card {
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #1d4ed8
+        );
+
+    color:
+        #ffffff;
+
+    border-radius:
+        20px;
+
+    padding:
+        22px;
+
+    box-shadow:
+        0 8px 25px rgba(37,99,235,0.22);
+
+}
+
+
+.wallet-label {
+
+    font-size:
+        13px;
+
+    opacity:
+        0.85;
+
+}
+
+
+.wallet-balance {
+
+    margin-top:
+        7px;
+
+    font-size:
+        30px;
+
+    font-weight:
+        800;
+
+}
+
+
+.wallet-balance-sub {
+
+    margin-top:
+        4px;
+
+    font-size:
+        12px;
+
+    opacity:
+        0.85;
+
+}
+
+
+/* ============================================================
+   WALLET STATS
+============================================================ */
+
+.wallet-stats {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap:
+        12px;
+
+    margin-top:
+        14px;
+
+}
+
+
+.wallet-stat {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        16px;
+
+    padding:
+        15px;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+}
+
+
+.wallet-stat-value {
+
+    font-size:
+        20px;
+
+    font-weight:
+        800;
+
+}
+
+
+.wallet-stat-label {
+
+    margin-top:
+        4px;
+
+    font-size:
+        11px;
+
+    color:
+        #6b7280;
+
+}
+
+
+/* ============================================================
+   WALLET ACTIONS
+============================================================ */
+
+.wallet-actions {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap:
+        12px;
+
+    margin-top:
+        14px;
+
+}
+
+
+.wallet-action {
+
+    min-height:
+        52px;
+
+    border-radius:
+        14px;
+
+    background:
+        #ffffff;
+
+    color:
+        #2563eb;
+
+    font-size:
+        13px;
+
+    font-weight:
+        700;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+}
+
+
+/* ============================================================
+   WITHDRAW FORM
+============================================================ */
+
+.withdraw-card {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        18px;
+
+    padding:
+        18px;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+}
+
+
+.form-group {
+
+    margin-bottom:
+        15px;
+
+}
+
+
+.form-label {
+
+    display:
+        block;
+
+    margin-bottom:
+        7px;
+
+    font-size:
+        12px;
+
+    font-weight:
+        600;
+
+    color:
+        #374151;
+
+}
+
+
+.form-input,
+.form-select {
+
+    width:
+        100%;
+
+    min-height:
+        48px;
+
+    border:
+        1px solid #e5e7eb;
+
+    border-radius:
+        12px;
+
+    background:
+        #f9fafb;
+
+    color:
+        #111827;
+
+    padding:
+        0 13px;
+
+    font-size:
+        13px;
+
+    outline:
+        none;
+
+}
+
+
+.form-input:focus,
+.form-select:focus {
+
+    border-color:
+        #2563eb;
+
+    background:
+        #ffffff;
+
+}
+
+
+.form-help {
+
+    margin-top:
+        6px;
+
+    font-size:
+        10px;
+
+    color:
+        #6b7280;
+
+}
+
+
+/* ============================================================
+   WITHDRAW SUMMARY
+============================================================ */
+
+.withdraw-summary {
+
+    background:
+        #f8fafc;
+
+    border-radius:
+        14px;
+
+    padding:
+        14px;
+
+    margin-bottom:
+        15px;
+
+}
+
+
+.withdraw-summary-row {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    padding:
+        5px 0;
+
+}
+
+
+.withdraw-summary-label {
+
+    font-size:
+        12px;
+
+    color:
+        #6b7280;
+
+}
+
+
+.withdraw-summary-value {
+
+    font-size:
+        13px;
+
+    font-weight:
+        700;
+
+    color:
+        #111827;
+
+}
+
+
+/* ============================================================
+   WITHDRAW HISTORY
+============================================================ */
+
+.withdraw-history {
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        10px;
+
+}
+
+
+.withdraw-item {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        15px;
+
+    padding:
+        14px;
+
+    box-shadow:
+        0 4px 15px rgba(15,23,42,0.05);
+
+}
+
+
+.withdraw-item-top {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+}
+
+
+.withdraw-method {
+
+    font-size:
+        13px;
+
+    font-weight:
+        700;
+
+}
+
+
+.withdraw-amount {
+
+    font-size:
+        14px;
+
+    font-weight:
+        800;
+
+}
+
+
+.withdraw-item-bottom {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    margin-top:
+        7px;
+
+}
+
+
+.withdraw-account {
+
+    font-size:
+        10px;
+
+    color:
+        #6b7280;
+
+}
+
+
+.withdraw-status {
+
+    font-size:
+        10px;
+
+    font-weight:
+        700;
+
+    text-transform:
+        capitalize;
+
+}
+
+
+/* ============================================================
+   STATUS COLORS
+============================================================ */
+
+.status-pending {
+
+    color:
+        #d97706;
+
+}
+
+
+.status-approved {
+
+    color:
+        #16a34a;
+
+}
+
+
+.status-rejected {
+
+    color:
+        #dc2626;
+
+}
+
+
+/* ============================================================
+   DEPOSIT PLACEHOLDER
+============================================================ */
+
+.deposit-card {
+
+    background:
+        #ffffff;
+
+    border-radius:
+        18px;
+
+    padding:
+        18px;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.06);
+
+}
+
+
+.deposit-notice {
+
+    padding:
+        13px;
+
+    border-radius:
+        12px;
+
+    background:
+        #eff6ff;
+
+    color:
+        #1d4ed8;
+
+    font-size:
+        12px;
+
+    line-height:
+        1.5;
+
+}
+
+
+/* ============================================================
+   PAYMENT METHOD CARDS
+============================================================ */
+
+.payment-methods {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap:
+        9px;
+
+    margin-top:
+        14px;
+
+}
+
+
+.payment-method {
+
+    min-height:
+        58px;
+
+    border:
+        1px solid #e5e7eb;
+
+    border-radius:
+        13px;
+
+    background:
+        #ffffff;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    gap:
+        4px;
+
+}
+
+
+.payment-method-icon {
+
+    font-size:
+        18px;
+
+}
+
+
+.payment-method-name {
+
+    font-size:
+        10px;
+
+    font-weight:
+        600;
+
+    color:
+        #374151;
+
+}
+
+
+/* ============================================================
+   MOBILE ADJUSTMENT
+============================================================ */
+
+@media (max-width: 360px) {
+
+    .wallet-stats,
+    .wallet-actions {
+
+        gap:
+            8px;
+
+    }
+
+
+    .payment-methods {
+
+        gap:
+            6px;
+
+    }
+
+
+    .wallet-balance {
+
+        font-size:
+            26px;
+
+    }
+
+}
+/* ============================================================
+   TASKCOIN — PART 4
+   DEPOSIT + BOTTOM NAVIGATION + TOAST
+============================================================ */
+
+
+/* ============================================================
+   DEPOSIT SECTION
+============================================================ */
+
+.deposit-section {
+
+    margin-top:
+        20px;
+
+}
+
+
+.deposit-header {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        10px;
+
+    margin-bottom:
+        12px;
+
+}
+
+
+.deposit-header-icon {
+
+    width:
+        40px;
+
+    height:
+        40px;
+
+    border-radius:
+        12px;
+
+    background:
+        #eff6ff;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        19px;
+
+}
+
+
+.deposit-title {
+
+    font-size:
+        16px;
+
+    font-weight:
+        700;
+
+}
+
+
+.deposit-subtitle {
+
+    margin-top:
+        3px;
+
+    font-size:
+        11px;
+
+    color:
+        #6b7280;
+
+}
+
+
+/* ============================================================
+   DEPOSIT AMOUNT
+============================================================ */
+
+.deposit-amount-box {
+
+    background:
+        #f8fafc;
+
+    border-radius:
+        14px;
+
+    padding:
+        14px;
+
+    margin-top:
+        14px;
+
+}
+
+
+.deposit-amount-label {
+
+    display:
+        block;
+
+    margin-bottom:
+        7px;
+
+    font-size:
+        11px;
+
+    color:
+        #6b7280;
+
+}
+
+
+.deposit-amount-input {
+
+    width:
+        100%;
+
+    height:
+        48px;
+
+    border:
+        1px solid #e5e7eb;
+
+    border-radius:
+        12px;
+
+    background:
+        #ffffff;
+
+    padding:
+        0 13px;
+
+    font-size:
+        14px;
+
+    outline:
+        none;
+
+}
+
+
+.deposit-amount-input:focus {
+
+    border-color:
+        #2563eb;
+
+}
+
+
+/* ============================================================
+   DEPOSIT INFO
+============================================================ */
+
+.deposit-info {
+
+    margin-top:
+        12px;
+
+    padding:
+        13px;
+
+    border-radius:
+        12px;
+
+    background:
+        #f8fafc;
+
+    font-size:
+        11px;
+
+    color:
+        #6b7280;
+
+    line-height:
+        1.55;
+
+}
+
+
+/* ============================================================
+   BOTTOM NAVIGATION
+============================================================ */
+
+.bottom-nav {
+
+    position:
+        fixed;
+
+    left:
+        0;
+
+    right:
+        0;
+
+    bottom:
+        0;
+
+    z-index:
+        5000;
+
+    width:
+        100%;
+
+    background:
+        rgba(255,255,255,0.96);
+
+    backdrop-filter:
+        blur(12px);
+
+    -webkit-backdrop-filter:
+        blur(12px);
+
+    border-top:
+        1px solid #e5e7eb;
+
+    padding:
+        8px 8px
+        calc(8px + env(safe-area-inset-bottom));
+
+}
+
+
+.bottom-nav-inner {
+
+    width:
+        100%;
+
+    max-width:
+        600px;
+
+    margin:
+        0 auto;
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(5, 1fr);
+
+}
+
+
+.nav-item {
+
+    min-height:
+        52px;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    gap:
+        3px;
+
+    background:
+        transparent;
+
+    color:
+        #9ca3af;
+
+    border-radius:
+        12px;
+
+}
+
+
+.nav-item.active {
+
+    color:
+        #2563eb;
+
+}
+
+
+.nav-icon {
+
+    width:
+        24px;
+
+    height:
+        24px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        18px;
+
+}
+
+
+.nav-label {
+
+    font-size:
+        9px;
+
+    font-weight:
+        600;
+
+}
+
+
+/* ============================================================
+   TOAST
+============================================================ */
+
+.toast {
+
+    position:
+        fixed;
+
+    left:
+        50%;
+
+    bottom:
+        calc(
+            82px +
+            env(safe-area-inset-bottom)
+        );
+
+    transform:
+        translateX(-50%)
+        translateY(20px);
+
+    z-index:
+        10000;
+
+    max-width:
+        calc(100% - 32px);
+
+    min-width:
+        180px;
+
+    padding:
+        12px 16px;
+
+    border-radius:
+        12px;
+
+    background:
+        rgba(17,24,39,0.95);
+
+    color:
+        #ffffff;
+
+    font-size:
+        12px;
+
+    font-weight:
+        600;
+
+    text-align:
+        center;
+
+    opacity:
+        0;
+
+    pointer-events:
+        none;
+
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+
+}
+
+
+.toast.show {
+
+    opacity:
+        1;
+
+    transform:
+        translateX(-50%)
+        translateY(0);
+
+}
+
+
+/* ============================================================
+   LOADING SCREEN
+============================================================ */
+
+#appLoading {
+
+    position:
+        fixed;
+
+    inset:
+        0;
+
+    z-index:
+        9999;
+
+    background:
+        #ffffff;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+}
+
+
+.loading-logo {
+
+    width:
+        64px;
+
+    height:
+        64px;
+
+    border-radius:
+        20px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #1d4ed8
+        );
+
+    color:
+        #ffffff;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        22px;
+
+    font-weight:
+        800;
+
+    box-shadow:
+        0 10px 30px rgba(37,99,235,0.22);
+
+}
+
+
+.loading-spinner {
+
+    width:
+        30px;
+
+    height:
+        30px;
+
+    margin-top:
+        20px;
+
+    border:
+        3px solid #dbeafe;
+
+    border-top-color:
+        #2563eb;
+
+    border-radius:
+        50%;
+
+    animation:
+        taskCoinSpin 0.8s linear infinite;
+
+}
+
+
+@keyframes taskCoinSpin {
+
+    from {
+
+        transform:
+            rotate(0deg);
+
+    }
+
+    to {
+
+        transform:
+            rotate(360deg);
+
+    }
+
+}
+
+
+.loading-text {
+
+    margin-top:
+        13px;
+
+    font-size:
+        13px;
+
+    font-weight:
+        600;
+
+    color:
+        #6b7280;
+
+}
+
+
+/* ============================================================
+   SAFE AREA
+============================================================ */
+
+@supports (padding: env(safe-area-inset-bottom)) {
+
+    .app {
+
+        padding-bottom:
+            calc(
+                80px +
+                env(safe-area-inset-bottom)
+            );
+
+    }
+
+}
+
+
+/* ============================================================
+   SMALL SCREEN
+============================================================ */
+
+@media (max-width: 360px) {
+
+    .nav-item {
+
+        min-height:
+            48px;
+
+    }
+
+
+    .nav-label {
+
+        font-size:
+            8px;
+
+    }
+
+
+    .toast {
+
+        min-width:
+            160px;
+
+        font-size:
+            11px;
+
+    }
+
+}
+<body>
+
+    <!-- ========================================================
+         TASKCOIN — PART 5
+         LOADING SCREEN + HEADER + HOME START
+    ========================================================= -->
+
+
+    <!-- ========================================================
+         LOADING SCREEN
+    ========================================================= -->
+
+    <div id="appLoading">
+
+        <div class="loading-logo">
+            TC
+        </div>
+
+        <div class="loading-spinner"></div>
+
+        <div class="loading-text">
+            Loading TaskCoin...
+        </div>
+
+    </div>
+
+
+    <!-- ========================================================
+         APP ROOT
+    ========================================================= -->
+
+    <div
+        class="app"
+        id="app"
+    >
+
+
+        <!-- ====================================================
+             HOME PAGE
+        ==================================================== -->
+
+        <section
+            class="page active"
+            id="homePage"
+        >
+
+
+            <!-- ================================================
+                 HEADER
+            ================================================= -->
+
+            <header class="app-header">
+
+                <div class="header-inner">
+
+
+                    <div class="header-left">
+
+                        <div class="logo-circle">
+                            TC
+                        </div>
+
+                        <div>
+
+                            <div class="header-title">
+                                TaskCoin
+                            </div>
+
+                            <div
+                                class="header-subtitle"
+                                id="headerGreeting"
+                            >
+                                Earn more. Complete tasks.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <button
+                        class="header-profile"
+                        type="button"
+                        onclick="openPage('profilePage')"
+                    >
+                        👤
+                    </button>
+
+
+                </div>
+
+            </header>
+
+
+            <!-- ================================================
+                 HOME CONTAINER
+            ================================================= -->
+
+            <div class="container">
+
+
+                <!-- ============================================
+                     BALANCE
+                ============================================= -->
+
+                <div class="balance-card">
+
+                    <div class="balance-label">
+                        Your TaskCoin Balance
+                    </div>
+
+                    <div
+                        class="balance-amount"
+                        id="balanceAmount"
+                    >
+                        0
+                    </div>
+
+                    <div class="balance-coin">
+                        TaskCoins
+                    </div>
+
+                </div>
+
+
+                <!-- ============================================
+                     QUICK ACTIONS
+                ============================================= -->
+
+                <div class="section">
+
+                    <div class="section-header">
+
+                        <div class="section-title">
+                            Quick Actions
+                        </div>
+
+                    </div>
+
+
+                    <div class="quick-actions">
+
+
+                        <button
+                            class="quick-action"
+                            type="button"
+                            onclick="openPage('tasksPage')"
+                        >
+
+                            <div class="quick-action-icon">
+                                📋
+                            </div>
+
+                            <div class="quick-action-title">
+                                Tasks
+                            </div>
+
+                            <div class="quick-action-text">
+                                Complete tasks and earn
+                            </div>
+
+                        </button>
+
+
+                        <button
+                            class="quick-action"
+                            type="button"
+                            onclick="openPage('walletPage')"
+                        >
+
+                            <div class="quick-action-icon">
+                                💰
+                            </div>
+
+                            <div class="quick-action-title">
+                                Wallet
+                            </div>
+
+                            <div class="quick-action-text">
+                                Manage your balance
+                            </div>
+
+                        </button>
+
+
+                        <button
+                            class="quick-action"
+                            type="button"
+                            onclick="openPage('withdrawPage')"
+                        >
+
+                            <div class="quick-action-icon">
+                                💸
+                            </div>
+
+                            <div class="quick-action-title">
+                                Withdraw
+                            </div>
+
+                            <div class="quick-action-text">
+                                Request your earnings
+                            </div>
+
+                        </button>
+
+
+                        <button
+                            class="quick-action"
+                            type="button"
+                            onclick="openPage('referralPage')"
+                        >
+
+                            <div class="quick-action-icon">
+                                👥
+                            </div>
+
+                            <div class="quick-action-title">
+                                Referral
+                            </div>
+
+                            <div class="quick-action-text">
+                                Invite friends and earn
+                            </div>
+
+                        </button>
+
+
+                    </div>
+
+                </div>
+
+
+                <!-- ============================================
+                     EARNINGS STATS
+                ============================================= -->
+
+                <div class="section">
+
+                    <div class="section-header">
+
+                        <div class="section-title">
+                            Your Earnings
+                        </div>
+
+                    </div>
+
+
+                    <div class="stats-grid">
+
+
+                        <div class="stat-card">
+
+                            <div
+                                class="stat-value"
+                                id="totalEarned"
+                            >
+                                0
+                            </div>
+
+                            <div class="stat-label">
+                                Total Earned
+                            </div>
+
+                        </div>
+
+
+                        <div class="stat-card">
+
+                            <div
+                                class="stat-value"
+                                id="totalReferrals"
+                            >
+                                0
+                            </div>
+
+                            <div class="stat-label">
+                                Total Referrals
+                            </div>
+
+                        </div>
+
+
+                    </div>
+
+                </div>
+
+
+                <!-- ============================================
+                     RECENT TASKS PREVIEW
+                ============================================= -->
+
+                <div class="section">
+
+                    <div class="section-header">
+
+                        <div class="section-title">
+                            Available Tasks
+                        </div>
+
+                        <button
+                            class="section-link"
+                            type="button"
+                            onclick="openPage('tasksPage')"
+                        >
+                            View All
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        id="homeTasksPreview"
+                        class="card"
+                    >
+
+                        <div class="empty-state">
+
+                            <div class="empty-icon">
+                                📋
+                            </div>
+
+                            <div class="empty-title">
+                                Loading Tasks
+                            </div>
+
+                            <div class="empty-text">
+                                Available tasks will appear here.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+    </section>
+    <!-- ========================================================
+     TASKCOIN — PART 6
+     TELEGRAM PROFILE + DEPOSIT + TASKS
+======================================================== -->
+
+
+<!-- ========================================================
+     PROFILE PAGE
+======================================================== -->
+
+<section
+    class="page"
+    id="profilePage"
+>
+
+    <div class="container">
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <div class="section-title">
+                    Telegram Profile
+                </div>
+
+            </div>
+
+
+            <div class="card">
+
+
+                <div
+                    style="
+                        display:flex;
+                        align-items:center;
+                        gap:14px;
+                    "
+                >
+
+                    <div
+                        id="profileAvatar"
+                        style="
+                            width:58px;
+                            height:58px;
+                            border-radius:50%;
+                            background:#eff6ff;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:24px;
+                            font-weight:800;
+                            color:#2563eb;
+                            overflow:hidden;
+                        "
+                    >
+                        👤
+                    </div>
+
+
+                    <div>
+
+                        <div
+                            id="profileName"
+                            style="
+                                font-size:16px;
+                                font-weight:700;
+                            "
+                        >
+                            Loading...
+                        </div>
+
+
+                        <div
+                            id="profileUsername"
+                            style="
+                                margin-top:4px;
+                                font-size:11px;
+                                color:#6b7280;
+                            "
+                        >
+                            Telegram
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    style="
+                        margin-top:18px;
+                        padding-top:14px;
+                        border-top:1px solid #f1f5f9;
+                    "
+                >
+
+                    <div
+                        style="
+                            display:flex;
+                            justify-content:space-between;
+                            padding:6px 0;
+                        "
+                    >
+
+                        <span
+                            style="
+                                font-size:12px;
+                                color:#6b7280;
+                            "
+                        >
+                            Telegram ID
+                        </span>
+
+                        <strong
+                            id="profileTelegramId"
+                            style="
+                                font-size:12px;
+                            "
+                        >
+                            -
+                        </strong>
+
+                    </div>
+
+
+                    <div
+                        style="
+                            display:flex;
+                            justify-content:space-between;
+                            padding:6px 0;
+                        "
+                    >
+
+                        <span
+                            style="
+                                font-size:12px;
+                                color:#6b7280;
+                            "
+                        >
+                            Balance
+                        </span>
+
+                        <strong
+                            id="profileBalance"
+                            style="
+                                font-size:12px;
+                                color:#2563eb;
+                            "
+                        >
+                            0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <button
+            class="secondary-button"
+            type="button"
+            onclick="openPage('homePage')"
+        >
+            Back to Home
+        </button>
+
+    </div>
+
+</section>
+
+
+
+<!-- ========================================================
+     TASKS PAGE
+======================================================== -->
+
+<section
+    class="page"
+    id="tasksPage"
+>
+
+    <div class="container">
+
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <div>
+
+                    <div class="section-title">
+                        Available Tasks
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:4px;
+                            font-size:11px;
+                            color:#6b7280;
+                        "
+                    >
+                        Complete tasks to earn TaskCoins
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="tasksContainer"
+                class="withdraw-history"
+            >
+
+                <div class="card">
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">
+                            📋
+                        </div>
+
+                        <div class="empty-title">
+                            Loading Tasks...
+                        </div>
+
+                        <div class="empty-text">
+                            Please wait while tasks are loaded.
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- Task information -->
+
+        <div
+            class="card"
+            style="
+                margin-top:16px;
+                background:#eff6ff;
+            "
+        >
+
+            <div
+                style="
+                    font-size:13px;
+                    font-weight:700;
+                    color:#1d4ed8;
+                "
+            >
+                💡 How Tasks Work
+            </div>
+
+            <div
+                style="
+                    margin-top:7px;
+                    font-size:11px;
+                    line-height:1.55;
+                    color:#475569;
+                "
+            >
+                Open an available task, complete the required
+                activity, and claim your TaskCoin reward.
+            </div>
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- ========================================================
+     DEPOSIT PAGE
+======================================================== -->
+
+<section
+    class="page"
+    id="depositPage"
+>
+
+    <div class="container">
+
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <div>
+
+                    <div class="section-title">
+                        Deposit
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:4px;
+                            font-size:11px;
+                            color:#6b7280;
+                        "
+                    >
+                        Add funds to your TaskCoin account
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="deposit-card">
+
+
+                <div class="deposit-header">
+
+                    <div class="deposit-header-icon">
+                        💳
+                    </div>
+
+                    <div>
+
+                        <div class="deposit-title">
+                            Deposit Funds
+                        </div>
+
+                        <div class="deposit-subtitle">
+                            Payment processing will be available soon.
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="deposit-notice">
+
+                    Deposit processing is currently
+                    <strong>not active</strong>.
+                    Please do not send money to any
+                    account until payment instructions
+                    are officially provided.
+
+                </div>
+
+
+                <div class="deposit-amount-box">
+
+                    <label
+                        class="deposit-amount-label"
+                        for="depositAmount"
+                    >
+                        Deposit Amount
+                    </label>
+
+
+                    <input
+                        type="number"
+                        id="depositAmount"
+                        class="deposit-amount-input"
+                        placeholder="Enter amount"
+                        min="1"
+                    >
+
+                </div>
+
+
+                <div class="payment-methods">
+
+
+                    <button
+                        type="button"
+                        class="payment-method"
+                    >
+
+                        <div class="payment-method-icon">
+                            📱
+                        </div>
+
+                        <div class="payment-method-name">
+                            bKash
+                        </div>
+
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="payment-method"
+                    >
+
+                        <div class="payment-method-icon">
+                            📲
+                        </div>
+
+                        <div class="payment-method-name">
+                            Nagad
+                        </div>
+
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="payment-method"
+                    >
+
+                        <div class="payment-method-icon">
+                            ₮
+                        </div>
+
+                        <div class="payment-method-name">
+                            USDT
+                        </div>
+
+                    </button>
+
+
+                </div>
+
+
+                <div class="deposit-info">
+
+                    Deposit and payment verification will
+                    be connected to the backend in the
+                    payment-system stage.
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="primary-button"
+                    style="margin-top:14px;"
+                    onclick="
+                        showToast(
+                            'Deposit system is not active yet.'
+                        )
+                    "
+                >
+                    Deposit
+                </button>
+
+
+            </div>
+
+        </div>
+
+
+    </div>
+
+</section>
+ <!-- ========================================================
+     TASKCOIN — PART 7
+     WALLET PAGE
+======================================================== -->
+
+
+<section
+    class="page"
+    id="walletPage"
+>
+
+    <div class="container">
+
+
+        <!-- ====================================================
+             WALLET BALANCE
+        ===================================================== -->
+
+        <div class="section">
+
+            <div class="wallet-card">
+
+                <div class="wallet-label">
+                    Available Balance
+                </div>
+
+                <div
+                    class="wallet-balance"
+                    id="walletBalance"
+                >
+                    0
+                </div>
+
+                <div class="wallet-balance-sub">
+                    TaskCoins
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             WALLET STATS
+        ===================================================== -->
+
+        <div class="wallet-stats">
+
+
+            <div class="wallet-stat">
+
+                <div
+                    class="wallet-stat-value"
+                    id="walletTotalEarned"
+                >
+                    0
+                </div>
+
+                <div class="wallet-stat-label">
+                    Total Earned
+                </div>
+
+            </div>
+
+
+            <div class="wallet-stat">
+
+                <div
+                    class="wallet-stat-value"
+                    id="walletPendingWithdraw"
+                >
+                    0
+                </div>
+
+                <div class="wallet-stat-label">
+                    Pending Withdrawal
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+        <!-- ====================================================
+             WALLET ACTIONS
+        ===================================================== -->
+
+        <div class="wallet-actions">
+
+
+            <button
+                class="wallet-action"
+                type="button"
+                onclick="openPage('tasksPage')"
+            >
+                📋 Earn More
+            </button>
+
+
+            <button
+                class="wallet-action"
+                type="button"
+                onclick="openPage('withdrawPage')"
+            >
+                💸 Withdraw
+            </button>
+
+
+        </div>
+
+
+        <!-- ====================================================
+             DEPOSIT
+        ===================================================== -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <div>
+
+                    <div class="section-title">
+                        Add Funds
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:4px;
+                            font-size:11px;
+                            color:#6b7280;
+                        "
+                    >
+                        Deposit system is coming soon.
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="deposit-card">
+
+                <div class="deposit-notice">
+
+                    💳 Deposit processing is currently
+                    <strong>not active</strong>.
+                    Payment integration will be connected
+                    in the next stage.
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="primary-button"
+                    style="margin-top:14px;"
+                    onclick="openPage('depositPage')"
+                >
+                    Open Deposit
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             WALLET INFORMATION
+        ===================================================== -->
+
+        <div class="section">
+
+            <div class="card">
+
+                <div
+                    style="
+                        font-size:14px;
+                        font-weight:700;
+                    "
+                >
+                    💰 About Your Wallet
+                </div>
+
+
+                <div
+                    style="
+                        margin-top:10px;
+                        font-size:11px;
+                        line-height:1.6;
+                        color:#6b7280;
+                    "
+                >
+
+                    Your TaskCoin balance is synchronized
+                    with the TaskCoin backend.
+
+                    <br><br>
+
+                    Task rewards and approved account
+                    transactions are reflected in your
+                    available balance.
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             WITHDRAW SHORTCUT
+        ===================================================== -->
+
+        <div class="section">
+
+            <button
+                type="button"
+                class="primary-button"
+                onclick="openPage('withdrawPage')"
+            >
+                💸 Go to Withdraw
+            </button>
+
+        </div>
+
+
+    </div>
+
+</section>
+        
+        
