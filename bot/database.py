@@ -405,6 +405,43 @@ def init_db():
             is_active BOOLEAN
             DEFAULT TRUE;
         """)
+        cur.execute("""
+    CREATE TABLE IF NOT EXISTS adgem_conversions (
+        id SERIAL PRIMARY KEY,
+
+        request_id TEXT UNIQUE NOT NULL,
+
+        conversion_id TEXT UNIQUE,
+
+        player_id TEXT NOT NULL,
+
+        telegram_id BIGINT NOT NULL,
+
+        app_id TEXT,
+
+        campaign_id TEXT,
+
+        offer_id TEXT,
+
+        goal_id TEXT,
+
+        offer_name TEXT,
+
+        goal_name TEXT,
+
+        amount NUMERIC(20, 2) NOT NULL DEFAULT 0,
+
+        payout NUMERIC(20, 6) NOT NULL DEFAULT 0,
+
+        conversion_type TEXT,
+
+        country TEXT,
+
+        status TEXT NOT NULL DEFAULT 'credited',
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+""")
 
         # ----------------------------------------------------
         # INDEXES
@@ -1906,6 +1943,303 @@ def get_dashboard_stats():
             "total_balance":
                 money["total_balance"]
         }
+
+    finally:
+
+        cur.close()
+        conn.close()
+def process_adgem_conversion(data):
+    """
+    Process one AdGem v3 reward postback.
+
+    AdGem player_id:
+        tg_<telegram_id>
+
+    Reward:
+        data["amount"]
+
+    Revenue:
+        data["payout"]
+    """
+
+    conn = get_connection()
+
+    cur = conn.cursor(
+        cursor_factory=RealDictCursor
+    )
+
+    try:
+
+        request_id = str(
+            data.get("request_id") or ""
+        ).strip()
+
+        conversion_id = str(
+            data.get("conversion_id") or ""
+        ).strip()
+
+        player_id = str(
+            data.get("player_id") or ""
+        ).strip()
+
+        if not request_id:
+            return {
+                "success": False,
+                "message": "Missing request_id"
+            }
+
+        if not player_id:
+            return {
+                "success": False,
+                "message": "Missing player_id"
+            }
+
+        # --------------------------------------------------
+        # GET TELEGRAM ID FROM PLAYER ID
+        # --------------------------------------------------
+
+        if not player_id.startswith("tg_"):
+            return {
+                "success": False,
+                "message": "Invalid player_id"
+            }
+
+        try:
+            telegram_id = int(
+                player_id[3:]
+            )
+        except ValueError:
+            return {
+                "success": False,
+                "message": "Invalid Telegram ID"
+            }
+
+        # --------------------------------------------------
+        # ONLY REWARD POSTBACKS
+        # --------------------------------------------------
+
+        conversion_type = str(
+            data.get("conversion_type") or ""
+        ).lower()
+
+        if conversion_type != "reward":
+            return {
+                "success": True,
+                "credited": False,
+                "message": "Non-reward conversion ignored"
+            }
+
+        # --------------------------------------------------
+        # REWARD AMOUNT
+        # --------------------------------------------------
+
+        try:
+            reward = float(
+                data.get("amount") or 0
+            )
+        except (TypeError, ValueError):
+            reward = 0
+
+        if reward <= 0:
+            return {
+                "success": False,
+                "message": "Invalid reward amount"
+            }
+
+        # --------------------------------------------------
+        # LOCK USER
+        # --------------------------------------------------
+
+        cur.execute("""
+            SELECT *
+            FROM users
+            WHERE telegram_id = %s
+            FOR UPDATE;
+        """, (
+            telegram_id,
+        ))
+
+        user = cur.fetchone()
+
+        if not user:
+
+            conn.rollback()
+
+            return {
+                "success": False,
+                "message": "User not found"
+            }
+
+        # --------------------------------------------------
+        # DUPLICATE REQUEST CHECK
+        # --------------------------------------------------
+
+        cur.execute("""
+            SELECT id
+            FROM adgem_conversions
+            WHERE request_id = %s
+            LIMIT 1;
+        """, (
+            request_id,
+        ))
+
+        if cur.fetchone():
+
+            conn.rollback()
+
+            return {
+                "success": True,
+                "credited": False,
+                "duplicate": True,
+                "message": "Conversion already processed"
+            }
+
+        # --------------------------------------------------
+        # DUPLICATE CONVERSION CHECK
+        # --------------------------------------------------
+
+        if conversion_id:
+
+            cur.execute("""
+                SELECT id
+                FROM adgem_conversions
+                WHERE conversion_id = %s
+                LIMIT 1;
+            """, (
+                conversion_id,
+            ))
+
+            if cur.fetchone():
+
+                conn.rollback()
+
+                return {
+                    "success": True,
+                    "credited": False,
+                    "duplicate": True,
+                    "message": "Conversion already processed"
+                }
+
+        # --------------------------------------------------
+        # INSERT CONVERSION
+        # --------------------------------------------------
+
+        cur.execute("""
+            INSERT INTO adgem_conversions (
+                request_id,
+                conversion_id,
+                player_id,
+                telegram_id,
+                app_id,
+                campaign_id,
+                offer_id,
+                goal_id,
+                offer_name,
+                goal_name,
+                amount,
+                payout,
+                conversion_type,
+                country,
+                status
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                'credited'
+            )
+            RETURNING *;
+        """, (
+            request_id,
+            conversion_id or None,
+            player_id,
+            telegram_id,
+
+            str(data.get("app_id") or ""),
+            str(data.get("campaign_id") or ""),
+            str(data.get("offer_id") or ""),
+            str(data.get("goal_id") or ""),
+
+            str(data.get("offer_name") or ""),
+            str(data.get("goal_name") or ""),
+
+            reward,
+
+            float(
+                data.get("payout") or 0
+            ),
+
+            conversion_type,
+
+            str(
+                data.get("country") or ""
+            )
+        ))
+
+        conversion = cur.fetchone()
+
+        # --------------------------------------------------
+        # CREDIT USER
+        # --------------------------------------------------
+
+        cur.execute("""
+            UPDATE users
+            SET
+                balance =
+                    COALESCE(balance, 0) + %s,
+
+                total_earned =
+                    COALESCE(total_earned, 0) + %s,
+
+                last_active =
+                    CURRENT_TIMESTAMP
+
+            WHERE telegram_id = %s
+
+            RETURNING *;
+        """, (
+            reward,
+            reward,
+            telegram_id
+        ))
+
+        updated_user = cur.fetchone()
+
+        if not updated_user:
+            raise RuntimeError(
+                "User disappeared while processing AdGem reward."
+            )
+
+        # --------------------------------------------------
+        # COMMIT EVERYTHING TOGETHER
+        # --------------------------------------------------
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "credited": True,
+            "reward": reward,
+            "conversion": conversion,
+            "user": updated_user
+        }
+
+    except Exception:
+
+        conn.rollback()
+
+        raise
 
     finally:
 
