@@ -4281,8 +4281,9 @@ async function loadTasks() {
    ========================================================= */
 
 const TASK_PENDING_KEY = "taskcoin_pending_tasks";
-const TASK_CLAIMED_KEY = "taskcoin_claimed_tasks";
+const TASK_CLAIMED_KEY = "taskcoin_claimed_tasks"
 
+renderTasks();
 // Task state is stored per Bangladesh-local calendar day.
 // This makes a claimed task available again after 12:00 AM, while
 // the backend remains the final authority through CURRENT_DATE.
@@ -4546,6 +4547,11 @@ async function startTask(taskId) {
     }
 
     addTaskId(TASK_PENDING_KEY, id);
+    console.log("TASK STARTED:", id);
+console.log(
+    "PENDING TASKS:",
+    getTaskIdList(TASK_PENDING_KEY)
+);
     renderTasks();
 
     try {
