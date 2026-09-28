@@ -2520,7 +2520,7 @@ def add_monetag_reward(telegram_id, reward):
         if reward <= 0:
             return {"success": False, "message": "Invalid reward."}
 
-        # ইউজারের রো লক করা হচ্ছে যাতে কোনো ভুল না হয়
+        # ইউজারের রো লক করা হচ্ছে যাতে ডেটা সুরক্ষিত থাকে
         cur.execute("SELECT * FROM users WHERE telegram_id = %s FOR UPDATE;", (telegram_id,))
         user = cur.fetchone()
 
@@ -2554,4 +2554,3 @@ def add_monetag_reward(telegram_id, reward):
     finally:
         cur.close()
         conn.close()
-    
