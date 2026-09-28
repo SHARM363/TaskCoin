@@ -2504,3 +2504,54 @@ def process_adgem_conversion(data):
 
         cur.close()
         conn.close()
+# ============================================================
+# MONETAG REWARD
+# ============================================================
+
+def add_monetag_reward(telegram_id, reward):
+    """
+    Credit a Monetag reward to a user.
+    """
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        reward = float(reward)
+        if reward <= 0:
+            return {"success": False, "message": "Invalid reward."}
+
+        # ইউজারের রো লক করা হচ্ছে যাতে কোনো ভুল না হয়
+        cur.execute("SELECT * FROM users WHERE telegram_id = %s FOR UPDATE;", (telegram_id,))
+        user = cur.fetchone()
+
+        if not user:
+            conn.rollback()
+            return {"success": False, "message": "User not found."}
+
+        # ইউজারের ব্যালেন্স এবং টোটাল আর্নিংয়ে কয়েন যোগ করা হচ্ছে
+        cur.execute("""
+            UPDATE users
+            SET
+                balance = COALESCE(balance, 0) + %s,
+                total_earned = COALESCE(total_earned, 0) + %s,
+                last_active = CURRENT_TIMESTAMP
+            WHERE telegram_id = %s
+            RETURNING *;
+        """, (reward, reward, telegram_id))
+        
+        updated_user = cur.fetchone()
+        conn.commit()
+
+        return {
+            "success": True,
+            "reward": reward,
+            "user": updated_user
+        }
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+    
