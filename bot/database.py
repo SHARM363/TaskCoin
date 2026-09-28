@@ -2521,7 +2521,10 @@ def add_monetag_reward(telegram_id, reward):
             return {"success": False, "message": "Invalid reward."}
 
         # ইউজারের রো লক করা হচ্ছে যাতে ডেটা সুরক্ষিত থাকে
-        cur.execute("SELECT * FROM users WHERE telegram_id = %s FOR UPDATE;", (telegram_id,))
+        cur.execute(
+            "SELECT * FROM users WHERE telegram_id = %s FOR UPDATE;",
+            (telegram_id,)
+        )
         user = cur.fetchone()
 
         if not user:
@@ -2529,7 +2532,8 @@ def add_monetag_reward(telegram_id, reward):
             return {"success": False, "message": "User not found."}
 
         # ইউজারের ব্যালেন্স এবং টোটাল আর্নিংয়ে কয়েন যোগ করা হচ্ছে
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE users
             SET
                 balance = COALESCE(balance, 0) + %s,
@@ -2537,8 +2541,10 @@ def add_monetag_reward(telegram_id, reward):
                 last_active = CURRENT_TIMESTAMP
             WHERE telegram_id = %s
             RETURNING *;
-        """, (reward, reward, telegram_id))
-        
+            """,
+            (reward, reward, telegram_id)
+        )
+
         updated_user = cur.fetchone()
         conn.commit()
 
