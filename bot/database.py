@@ -1255,14 +1255,22 @@ def create_withdrawal(
             "message": "Invalid withdrawal amount."
         }
 
-    if amount < 100:
+    if amount < 1000:
 
-        return {
-            "success": False,
-            "message":
-                "Minimum withdrawal is 100 TaskCoins."
-        }
+    return {
+        "success": False,
+        "message":
+            "Minimum withdrawal is 1000 TaskCoins."
+    }
 
+
+if amount > 25000:
+
+    return {
+        "success": False,
+        "message":
+            "Maximum withdrawal is 25000 TaskCoins."
+    }
     allowed_methods = (
         "bKash",
         "Nagad",
@@ -1339,12 +1347,131 @@ def create_withdrawal(
                     total_withdrawn + %s
 
             WHERE telegram_id = %s;
+# ============================================================
+# WITHDRAWAL FUNCTIONS
+# ============================================================
+
+def create_withdrawal(
+    telegram_id,
+    method,
+    account_number,
+    amount
+):
+
+    try:
+
+        amount = float(amount)
+
+    except (ValueError, TypeError):
+
+        return {
+            "success": False,
+            "message": "Invalid withdrawal amount."
+        }
+
+    # Minimum withdrawal
+    if amount < 1000:
+
+        return {
+            "success": False,
+            "message":
+                "Minimum withdrawal is 1000 TaskCoins."
+        }
+
+    # Maximum withdrawal
+    if amount > 25000:
+
+        return {
+            "success": False,
+            "message":
+                "Maximum withdrawal is 25000 TaskCoins."
+        }
+
+    allowed_methods = (
+        "bKash",
+        "Nagad",
+        "USDT",
+        "usdt",
+        "bkash",
+        "nagad"
+    )
+
+    if method not in allowed_methods:
+
+        return {
+            "success": False,
+            "message": "Invalid withdrawal method."
+        }
+
+    if not account_number:
+
+        return {
+            "success": False,
+            "message":
+                "Account number or wallet address is required."
+        }
+
+    conn = get_connection()
+
+    cur = conn.cursor(
+        cursor_factory=RealDictCursor
+    )
+
+    try:
+
+        cur.execute("""
+            SELECT *
+            FROM users
+            WHERE telegram_id = %s
+            FOR UPDATE;
+        """, (
+            telegram_id,
+        ))
+
+        user = cur.fetchone()
+
+        if not user:
+
+            conn.rollback()
+
+            return {
+                "success": False,
+                "message": "User not found."
+            }
+
+        current_balance = float(
+            user["balance"]
+        )
+
+        # Check balance
+        if current_balance < amount:
+
+            conn.rollback()
+
+            return {
+                "success": False,
+                "message": "Insufficient balance."
+            }
+
+        # Deduct balance
+        cur.execute("""
+            UPDATE users
+            SET
+
+                balance =
+                    balance - %s,
+
+                total_withdrawn =
+                    total_withdrawn + %s
+
+            WHERE telegram_id = %s;
         """, (
             amount,
             amount,
             telegram_id
         ))
 
+        # Create withdrawal request
         cur.execute("""
             INSERT INTO withdrawals (
                 telegram_id,
