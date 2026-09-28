@@ -5,6 +5,7 @@ from flask_cors import CORS
 from database import (
 
     get_user,
+    add_adsgram_reward,
     get_all_users,
     create_or_update_user,
     process_adgem_conversion,
@@ -1234,7 +1235,59 @@ def adgem_postback():
         "message": "AdGem postback received.",
         "data": data
     })
+# ============================================================
+# ADSGRAM REWARD
+# ============================================================
 
+@app.route(
+    "/api/adsgram/reward",
+    methods=["GET"]
+)
+def adsgram_reward():
+
+    userid = request.args.get("userid")
+
+    if not userid:
+        return jsonify({
+            "success": False,
+            "message": "userid is required."
+        }), 400
+
+    try:
+        telegram_id = int(userid)
+    except (ValueError, TypeError):
+
+        return jsonify({
+            "success": False,
+            "message": "Invalid userid."
+        }), 400
+
+    reward = 100
+
+    try:
+
+        result = add_adsgram_reward(
+            telegram_id=telegram_id,
+            reward=reward
+        )
+
+        if not result.get("success"):
+
+            return jsonify(result), 400
+
+        return jsonify({
+            "success": True,
+            "message": "AdsGram reward credited.",
+            "reward": reward
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "message": "AdsGram reward failed.",
+            "error": str(e)
+        }), 500
 # ============================================================
 # RUN APP
 # ============================================================
