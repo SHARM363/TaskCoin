@@ -4346,14 +4346,13 @@ function renderTasks() {
         const reward = Number(task.reward || 0);
         let buttonHtml;
 
-        if (claimedTasks.includes(taskId)) {
-            buttonHtml = `<button class="primary-button" style="margin-top:14px;" disabled>✅ Reward Claimed</button>`;
-        } else if (pendingTasks.includes(taskId)) {
-            buttonHtml = `<button class="primary-button" style="margin-top:14px;" onclick="claimTask(${taskId})">🎁 Claim Reward</button>`;
-        } else {
-            buttonHtml = `<button class="primary-button" style="margin-top:14px;" onclick="startTask(${taskId})">🚀 Start Task</button>`;
-        }
-
+if (claimedTasks.includes(taskId)) {
+    buttonHtml = `<button type="button" class="primary-button" style="margin-top:14px;" disabled>✅ Reward Claimed</button>`;
+} else if (pendingTasks.includes(taskId)) {
+    buttonHtml = `<button type="button" class="primary-button claim-task-btn" data-task-id="${taskId}" style="margin-top:14px;">🎁 Claim Reward</button>`;
+} else {
+    buttonHtml = `<button type="button" class="primary-button" style="margin-top:14px;" onclick="startTask(${taskId})">🚀 Start Task</button>`;
+}
         return `
             <div class="card" style="margin-bottom:12px;">
                 <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
@@ -4560,7 +4559,7 @@ async function claimTask(taskId) {
         return;
     }
 
-    const button = document.querySelector(`button[onclick="claimTask(${id})"]`);
+    const button = document.querySelector(`button[data-task-id="${id}"]`);
     if (button) { button.disabled = true; button.textContent = "⏳ Claiming..."; }
 
     try {
@@ -4593,7 +4592,24 @@ async function claimTask(taskId) {
         renderTasks();
     }
 }
+document.addEventListener("click", function (event) {
+    const button = event.target.closest(".claim-task-btn");
 
+    if (!button) return;
+
+    event.preventDefault();
+
+    const taskId = Number(button.dataset.taskId);
+
+    console.log("CLAIM BUTTON CLICKED:", taskId);
+
+    if (!taskId) {
+        console.error("Invalid task ID");
+        return;
+    }
+
+    claimTask(taskId);
+});
 
 /* =========================================================
    11-C — REFERRAL + WITHDRAWAL
