@@ -306,7 +306,31 @@ def init_db():
                     DEFAULT CURRENT_TIMESTAMP
             );
         """)
-                # ----------------------------------------------------
+                 # ----------------------------------------------------
+        # ADSGRAM REWARDS
+        # ----------------------------------------------------
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS adsgram_rewards (
+
+                id SERIAL PRIMARY KEY,
+
+                telegram_id BIGINT NOT NULL,
+
+                reward NUMERIC(20, 2)
+                    NOT NULL DEFAULT 0,
+
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS
+            idx_adsgram_rewards_user
+            ON adsgram_rewards(telegram_id);
+        """)
+        # ----------------------------------------------------
         # OLD DATABASE COMPATIBILITY
         # ----------------------------------------------------
 
@@ -937,7 +961,115 @@ def task_completed_today(
 
         cur.close()
         conn.close()
+ # ============================================================
+# ADSGRAM REWARD
+# ============================================================
 
+def add_adsgram_reward(
+    telegram_id,
+    reward
+):
+    """
+    Credit an AdsGram reward to a user.
+    """
+
+    conn = get_connection()
+
+    cur = conn.cursor(
+        cursor_factory=RealDictCursor
+    )
+
+    try:
+
+        reward = float(reward)
+
+        if reward <= 0:
+            return {
+                "success": False,
+                "message": "Invalid reward."
+            }
+
+        # Lock user row
+        cur.execute("""
+            SELECT *
+            FROM users
+            WHERE telegram_id = %s
+            FOR UPDATE;
+        """, (
+            telegram_id,
+        ))
+
+        user = cur.fetchone()
+
+        if not user:
+            conn.rollback()
+
+            return {
+                "success": False,
+                "message": "User not found."
+            }
+
+        # Credit balance
+        cur.execute("""
+            UPDATE users
+            SET
+                balance =
+                    COALESCE(balance, 0) + %s,
+
+                total_earned =
+                    COALESCE(total_earned, 0) + %s,
+
+                last_active =
+                    CURRENT_TIMESTAMP
+
+            WHERE telegram_id = %s
+
+            RETURNING *;
+        """, (
+            reward,
+            reward,
+            telegram_id
+        ))
+
+        updated_user = cur.fetchone()
+
+        # Save reward record
+        cur.execute("""
+            INSERT INTO adsgram_rewards (
+                telegram_id,
+                reward
+            )
+            VALUES (
+                %s,
+                %s
+            )
+            RETURNING *;
+        """, (
+            telegram_id,
+            reward
+        ))
+
+        reward_record = cur.fetchone()
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "reward": reward,
+            "user": updated_user,
+            "reward_record": reward_record
+        }
+
+    except Exception:
+
+        conn.rollback()
+
+        raise
+
+    finally:
+
+        cur.close()
+        conn.close()
 
 def claim_task_reward(
     telegram_id,
