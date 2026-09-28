@@ -1262,7 +1262,7 @@ def adsgram_reward():
             "message": "Invalid userid."
         }), 400
 
-    reward = 100
+    reward = 50
 
     try:
 
