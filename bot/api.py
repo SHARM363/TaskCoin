@@ -1213,7 +1213,25 @@ def api_referrals():
                 "Failed to load referrals.",
             "error": str(e)
         }), 500
+# ============================================================
+# ADGEM POSTBACK
+# ============================================================
 
+@app.route(
+    "/api/adgem/postback",
+    methods=["POST"]
+)
+def adgem_postback():
+
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    return jsonify({
+        "success": True,
+        "message": "AdGem postback received.",
+        "data": data
+    })
 
 # ============================================================
 # RUN APP
