@@ -34,7 +34,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
      <script src="https://sad.adsgram.ai/js/sad.min.js"></script> 
-
+     <script src='//libtl.com/sdk.js' data-zone='11915530' data-sdk='show_11915530'></script>
     <!-- ========================================================
          GOOGLE FONT
     ========================================================= -->
@@ -5838,7 +5838,44 @@ window.copyReferralLink =
 
 window.refreshAppData = 
   refreshAppData;
+function watchMonetagAd() {
+    if (typeof show_11915530 === 'function') {
+        show_11915530().then(() => {
+            claimMonetagReward(50);
+        }).catch((error) => {
+            console.error("Monetag error:", error);
+            alert('বিজ্ঞাপনটি লোড হতে পারেনি, আবার চেষ্টা করুন।');
+        });
+    } else {
+        alert('বিজ্ঞাপন নেটওয়ার্ক এখনও লোড হচ্ছে, কিছু সেকেন্ড অপেক্ষা করুন।');
+    }
+}
 
+function claimMonetagReward(amount) {
+    const telegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+    if (!telegramId) {
+        alert("টেলিগ্রাম ইউজার আইডি পাওয়া যায়নি!");
+        return;
+    }
+    fetch('/api/monetag/reward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegram_id: telegramId, reward_amount: amount })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`অভিনন্দন! আপনি ${amount} TaskCoins পেয়েছেন।`);
+            if (typeof refreshAppData === 'function') refreshAppData();
+        } else {
+            alert('ভুল: ' + data.message);
+        }
+    })
+    .catch(err => console.error("Fetch Error:", err));
+}
+
+window.watchMonetagAd = watchMonetagAd;
+                  
 </script>
 
 </div>
