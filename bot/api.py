@@ -1288,6 +1288,51 @@ def adsgram_reward():
             "message": "AdsGram reward failed.",
             "error": str(e)
         }), 500
+        # ============================================================
+# MONETAG REWARD API
+# ============================================================
+
+@app.route("/api/monetag/reward", methods=["POST"])
+def monetag_reward():
+    data = request.get_json(silent=True) or {}
+    telegram_id = data.get("telegram_id")
+    reward_amount = data.get("reward_amount", 50)  # ডিফল্ট ৫০ কয়েন [1]
+
+    if not telegram_id:
+        return jsonify({
+            "success": False,
+            "message": "telegram_id is required."
+        }), 400
+
+    try:
+        tg_id = int(telegram_id)
+    except (ValueError, TypeError):
+        return jsonify({
+            "success": False,
+            "message": "Invalid telegram_id."
+        }), 400
+
+    try:
+        from database import add_monetag_reward
+        result = add_monetag_reward(telegram_id=tg_id, reward=reward_amount)
+
+        if not result.get("success"):
+            return jsonify(result), 400
+
+        return jsonify({
+            "success": True,
+            "message": "Monetag reward credited successfully.",
+            "reward": reward_amount,
+            "user": dict(result["user"])
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": "Monetag reward processing failed.",
+            "error": str(e)
+        }), 500
+        
 # ============================================================
 # RUN APP
 # ============================================================
