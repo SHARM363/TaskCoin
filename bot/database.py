@@ -2509,7 +2509,6 @@ def process_adgem_conversion(data):
 # ============================================================
 
 def add_monetag_reward(telegram_id, reward):
-    """Credit a Monetag reward to a user."""
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
