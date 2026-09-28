@@ -33,7 +33,7 @@
     ========================================================= -->
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
+     <script src="https://sad.adsgram.ai/js/sad.min.js"></script> 
 
     <!-- ========================================================
          GOOGLE FONT
@@ -4549,47 +4549,154 @@ async function startTask(taskId) {
 }
 
 async function claimTask(taskId) {
-    const id = Number(taskId);
-    const task = appState.tasks.find(item => Number(item.id) === id);
-    if (!task) { showToast("Task not found."); return; }
 
-    if (!appState.telegramUser) loadTelegramProfile();
-    if (!appState.telegramUser || !appState.telegramUser.id) {
-        showToast("Telegram user not detected. Please reopen the Mini App.");
+    const id = Number(taskId);
+
+    const task = appState.tasks.find(
+        item => Number(item.id) === id
+    );
+
+    if (!task) {
+        showToast("Task not found.");
         return;
     }
 
-    const button = document.querySelector(`button[data-task-id="${id}"]`);
-    if (button) { button.disabled = true; button.textContent = "⏳ Claiming..."; }
+    if (!appState.telegramUser) {
+        await loadTelegramProfile();
+    }
+
+    if (
+        !appState.telegramUser ||
+        !appState.telegramUser.id
+    ) {
+        showToast(
+            "Telegram user not detected. Please reopen the Mini App."
+        );
+        return;
+    }
+
+    const button = document.querySelector(
+        `button[data-task-id="${id}"]`
+    );
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "📺 Loading Ad...";
+    }
 
     try {
-        console.log("Claiming task:", { telegram_id: appState.telegramUser.id, task_id: id });
-        const result = await apiRequest("/api/tasks/claim", {
-            method: "POST",
-            body: { telegram_id: appState.telegramUser.id, task_id: id }
+
+        if (typeof window.Adsgram === "undefined") {
+
+            if (button) {
+                button.disabled = false;
+                button.textContent = "🎁 Claim Reward";
+            }
+
+            showToast(
+                "Ads are not available right now."
+            );
+
+            return;
+        }
+
+        const AdController = window.Adsgram.init({
+            blockId: "50568"
         });
 
-        if (!result) { renderTasks(); return; }
-        console.log("Claim result:", result);
+        if (button) {
+            button.textContent = "📺 Watching Ad...";
+        }
 
-        if (result.success === false) {
-            showToast(result.message || "Task could not be claimed.");
+        await AdController.show();
+
+        /*
+         * Ads successfully completed.
+         * Now claim the task reward.
+         */
+
+        const result = await apiRequest(
+            "/api/tasks/claim",
+            {
+                method: "POST",
+
+                body: {
+                    telegram_id:
+                        appState.telegramUser.id,
+
+                    task_id: id
+                }
+            }
+        );
+
+        if (!result) {
             renderTasks();
             return;
         }
 
-        if (result.user) applyUserData(result.user);
-        removeTaskId(TASK_PENDING_KEY, id);
-        addTaskId(TASK_CLAIMED_KEY, id);
+        if (result.success === false) {
+            showToast(
+                result.message ||
+                "Task could not be claimed."
+            );
 
-        try { await loadTasks(); } catch (refreshError) { console.error("Task refresh error:", refreshError); }
+            renderTasks();
+            return;
+        }
+
+        if (result.user) {
+            applyUserData(result.user);
+        }
+
+        removeTaskId(
+            TASK_PENDING_KEY,
+            id
+        );
+
+        addTaskId(
+            TASK_CLAIMED_KEY,
+            id
+        );
+
+        try {
+            await loadTasks();
+        } catch (refreshError) {
+            console.error(
+                "Task refresh error:",
+                refreshError
+            );
+        }
+
         updateBalanceUI();
+
         renderTasks();
-        showToast(result.message || `Task completed! +${Number(result.reward || task.reward || 0)} TaskCoins`);
+
+        showToast(
+            result.message ||
+            `Task completed! +${
+                Number(
+                    result.reward ||
+                    task.reward ||
+                    0
+                )
+            } TaskCoins`
+        );
+
     } catch (error) {
-        console.error("Claim task error:", error);
-        showToast(error.message || "Failed to claim task.");
-        renderTasks();
+
+        console.error(
+            "AdsGram / Claim error:",
+            error
+        );
+
+        if (button) {
+            button.disabled = false;
+            button.textContent = "🎁 Claim Reward";
+        }
+
+        showToast(
+            "Advertisement was not completed."
+        );
     }
 }
 document.addEventListener("click", function (event) {
