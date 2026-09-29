@@ -4257,13 +4257,9 @@ async function loadTasks() {
             "/api/tasks"
         );
 
-
     if (!data) {
-
         return;
-
     }
-
 
     appState.tasks =
         Array.isArray(data.tasks)
@@ -4272,17 +4268,24 @@ async function loadTasks() {
 
     // Preserve a started task as pending until the backend claim succeeds.
     const pendingIds = getTaskIdList(TASK_PENDING_KEY);
-    const activeTaskIds = new Set(appState.tasks.map(task => Number(task.id)));
-    const claimedIds = new Set(getTaskIdList(TASK_CLAIMED_KEY));
+    const activeTaskIds = new Set(
+        appState.tasks.map(task => Number(task.id))
+    );
+    const claimedIds = new Set(
+        getTaskIdList(TASK_CLAIMED_KEY)
+    );
+
     setTaskIdList(
         TASK_PENDING_KEY,
-        pendingIds.filter(id => activeTaskIds.has(Number(id)) && !claimedIds.has(Number(id)))
+        pendingIds.filter(
+            id =>
+                activeTaskIds.has(Number(id)) &&
+                !claimedIds.has(Number(id))
+        )
     );
 
     renderTasks();
-
 }
-
 
 /* =========================================================
    RENDER TASKS
@@ -4555,6 +4558,7 @@ async function startTask(taskId) {
 
     addTaskId(TASK_PENDING_KEY, id);
     renderTasks();
+    sessionStorage.setItem("taskcoin_last_pending_task", String(id));
 
     try {
         // Telegram links should stay inside Telegram when possible.
