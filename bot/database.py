@@ -1281,24 +1281,23 @@ def create_withdrawal(
             "message": "Invalid withdrawal amount."
         }
 
-    # Minimum withdrawal
-    if amount < 1000:
+ # Minimum withdrawal
+if amount < 1500:
 
-        return {
-            "success": False,
-            "message":
-                "Minimum withdrawal is 1000 TaskCoins."
-        }
+    return {
+        "success": False,
+        "message":
+            "Minimum withdrawal is 1500 TaskCoins."
+    }
 
-    # Maximum withdrawal
-    if amount > 25000:
+# Maximum withdrawal
+if amount > 30000:
 
-        return {
-            "success": False,
-            "message":
-                "Maximum withdrawal is 25000 TaskCoins."
-        }
-
+    return {
+        "success": False,
+        "message":
+            "Maximum withdrawal is 30000 TaskCoins."
+    }
     allowed_methods = (
         "bKash",
         "Nagad",
