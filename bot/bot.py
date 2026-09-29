@@ -5,23 +5,24 @@ import threading
 from flask import request, jsonify
 
 from telegram import (
-Update,
-InlineKeyboardButton,
-InlineKeyboardMarkup,
-WebAppInfo
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    WebAppInfo
 )
 
 from telegram.ext import (
-Application,
-CommandHandler,
-ContextTypes
+    Application,
+    CommandHandler,
+    ContextTypes
 )
 
 from api import app
 from database import (
-init_db,
-create_or_update_user
+    init_db,
+    create_or_update_user
 )
+
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -33,222 +34,178 @@ RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
+
 async def start(
-update: Update,
-context: ContextTypes.DEFAULT_TYPE
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
 ):
+    # Telegram user information
+    telegram_user = update.effective_user
 
-# Telegram user information  
-telegram_user = update.effective_user  
+    if telegram_user:
+        try:
+            create_or_update_user(
+                telegram_id=telegram_user.id,
+                username=telegram_user.username,
+                first_name=telegram_user.first_name
+            )
 
-if telegram_user:  
+            print(
+                f"User saved: {telegram_user.id}"
+            )
 
-    try:  
+        except Exception as e:
+            print(
+                f"User save error: {e}"
+            )
 
-        create_or_update_user(  
-            telegram_id=telegram_user.id,  
-            username=telegram_user.username,  
-            first_name=telegram_user.first_name  
-        )  
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🚀 Open TaskCoin",
+                web_app=WebAppInfo(
+                    url=WEB_APP_URL
+                )
+            )
+        ]
+    ]
 
-        print(  
-            f"User saved: {telegram_user.id}"  
-        )  
+    reply_markup = InlineKeyboardMarkup(
+        keyboard
+    )
 
-    except Exception as e:  
+    await update.message.reply_text(
+        "👋 Welcome to TaskCoin!\n\n"
+        "🎯 Complete available tasks\n"
+        "🪙 Earn TaskCoins\n"
+        "💰 Manage your rewards\n\n"
+        "Tap the button below to open TaskCoin.",
+        reply_markup=reply_markup
+    )
 
-        print(  
-            f"User save error: {e}"  
-        )  
-
-
-keyboard = [  
-    [  
-        InlineKeyboardButton(  
-            "🚀 Open TaskCoin",  
-            web_app=WebAppInfo(  
-                url=WEB_APP_URL  
-            )  
-        )  
-    ]  
-]  
-
-reply_markup = InlineKeyboardMarkup(  
-    keyboard  
-)  
-
-
-await update.message.reply_text(  
-
-    "👋 Welcome to TaskCoin!\n\n"  
-
-    "🎯 Complete available tasks\n"  
-    "🪙 Earn TaskCoins\n"  
-    "💰 Manage your rewards\n\n"  
-
-    "Tap the button below to open TaskCoin.",  
-
-    reply_markup=reply_markup  
-)
 
 async def setup_bot(application):
+    await application.initialize()
 
-await application.initialize()  
+    await application.start()
 
-await application.start()  
+    await application.bot.set_webhook(
+        url=f"{RENDER_EXTERNAL_URL}/telegram",
+        secret_token=WEBHOOK_SECRET
+    )
 
-await application.bot.set_webhook(  
-    url=f"{RENDER_EXTERNAL_URL}/telegram",  
-    secret_token=WEBHOOK_SECRET  
-)  
+    print(
+        "TaskCoin Bot webhook is ready."
+    )
 
-print(  
-    "TaskCoin Bot webhook is ready."  
-)  
+    await asyncio.Event().wait()
 
-await asyncio.Event().wait()
 
 def run_flask():
+    print(
+        f"TaskCoin API is starting on port {PORT}..."
+    )
 
-print(  
-    f"TaskCoin API is starting on port {PORT}..."  
-)  
+    app.run(
+        host="0.0.0.0",
+        port=PORT,
+        debug=False,
+        use_reloader=False
+    )
 
-app.run(  
-    host="0.0.0.0",  
-    port=PORT,  
-    debug=False,  
-    use_reloader=False  
-)
 
 def main():
+    # Initialize database
+    init_db()
 
-# Initialize database  
-init_db()  
+    print(
+        "TaskCoin database initialized successfully."
+    )
 
-print(  
-    "TaskCoin database initialized successfully."  
-)  
+    if not BOT_TOKEN:
+        raise RuntimeError(
+            "BOT_TOKEN environment variable is missing."
+        )
 
+    if not RENDER_EXTERNAL_URL:
+        raise RuntimeError(
+            "RENDER_EXTERNAL_URL environment variable is missing."
+        )
 
-if not BOT_TOKEN:  
+    if not WEBHOOK_SECRET:
+        raise RuntimeError(
+            "WEBHOOK_SECRET environment variable is missing."
+        )
 
-    raise RuntimeError(  
-        "BOT_TOKEN environment variable is missing."  
-    )  
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .build()
+    )
 
+    application.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
 
-if not RENDER_EXTERNAL_URL:  
+    loop = asyncio.new_event_loop()
 
-    raise RuntimeError(  
-        "RENDER_EXTERNAL_URL environment variable is missing."  
-    )  
+    asyncio.set_event_loop(loop)
 
+    @app.route(
+        "/telegram",
+        methods=["POST"]
+    )
+    def telegram():
+        secret = request.headers.get(
+            "X-Telegram-Bot-Api-Secret-Token"
+        )
 
-if not WEBHOOK_SECRET:  
+        if secret != WEBHOOK_SECRET:
+            return jsonify({
+                "success": False,
+                "message": "Unauthorized"
+            }), 403
 
-    raise RuntimeError(  
-        "WEBHOOK_SECRET environment variable is missing."  
-    )  
+        update_data = request.get_json(
+            force=True
+        )
 
+        update = Update.de_json(
+            update_data,
+            application.bot
+        )
 
-application = (  
-    Application.builder()  
-    .token(BOT_TOKEN)  
-    .build()  
-)  
+        asyncio.run_coroutine_threadsafe(
+            application.update_queue.put(
+                update
+            ),
+            loop
+        )
 
+        return jsonify({
+            "success": True
+        })
 
-application.add_handler(  
+    flask_thread = threading.Thread(
+        target=run_flask,
+        daemon=True
+    )
 
-    CommandHandler(  
-        "start",  
-        start  
-    )  
+    flask_thread.start()
 
-)  
+    print(
+        "TaskCoin Bot + API is starting..."
+    )
 
-
-loop = asyncio.new_event_loop()  
-
-asyncio.set_event_loop(loop)  
-
-
-@app.route(  
-    "/telegram",  
-    methods=["POST"]  
-)  
-def telegram():  
-
-    secret = request.headers.get(  
-        "X-Telegram-Bot-Api-Secret-Token"  
-    )  
-
-
-    if secret != WEBHOOK_SECRET:  
-
-        return jsonify({  
-
-            "success": False,  
-            "message": "Unauthorized"  
-
-        }), 403  
-
-
-    update_data = request.get_json(  
-        force=True  
-    )  
-
-
-    update = Update.de_json(  
-        update_data,  
-        application.bot  
-    )  
-
-
-    asyncio.run_coroutine_threadsafe(  
-
-        application.update_queue.put(  
-            update  
-        ),  
-
-        loop  
-
-    )  
+    loop.run_until_complete(
+        setup_bot(
+            application
+        )
+    )
 
 
-    return jsonify({  
-
-        "success": True  
-
-    })  
-
-
-flask_thread = threading.Thread(  
-
-    target=run_flask,  
-
-    daemon=True  
-
-)  
-
-
-flask_thread.start()  
-
-
-print(  
-    "TaskCoin Bot + API is starting..."  
-)  
-
-
-loop.run_until_complete(  
-
-    setup_bot(  
-        application  
-    )  
-
-)
-
-if name == "main":
-
-main()
+if __name__ == "__main__":
+    main()
