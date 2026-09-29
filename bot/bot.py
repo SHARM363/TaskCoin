@@ -5,307 +5,250 @@ import threading
 from flask import request, jsonify
 
 from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    WebAppInfo,
+Update,
+InlineKeyboardButton,
+InlineKeyboardMarkup,
+WebAppInfo
 )
 
 from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    CallbackQueryHandler,
+Application,
+CommandHandler,
+ContextTypes
 )
 
 from api import app
 from database import (
-    init_db,
-    create_or_update_user,
-    update_deposit_status,
-    update_exchange_status,
-    update_withdrawal_status,
-    update_premium_membership_status,
-    get_dashboard_stats,
+init_db,
+create_or_update_user
 )
 
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 WEB_APP_URL = "https://sharm363.github.io/TaskCoin/"
 
 PORT = int(os.getenv("PORT", "10000"))
 
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "").strip()
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
-# Optional: if this bot also receives admin callback buttons,
-# configure ADMIN_TELEGRAM_IDS as comma-separated Telegram IDs.
-ADMIN_TELEGRAM_IDS = {
-    int(x.strip())
-    for x in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",")
-    if x.strip().isdigit()
-}
+async def start(
+update: Update,
+context: ContextTypes.DEFAULT_TYPE
+):
 
+# Telegram user information  
+telegram_user = update.effective_user  
 
-# ============================================================
-# USER / MAIN BOT
-# ============================================================
+if telegram_user:  
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Register the Telegram user and open the TaskCoin WebApp."""
+    try:  
 
-    telegram_user = update.effective_user
+        create_or_update_user(  
+            telegram_id=telegram_user.id,  
+            username=telegram_user.username,  
+            first_name=telegram_user.first_name  
+        )  
 
-    if telegram_user:
-        try:
-            create_or_update_user(
-                telegram_id=telegram_user.id,
-                username=telegram_user.username,
-                first_name=telegram_user.first_name,
-            )
-            print(f"User saved: {telegram_user.id}")
-        except Exception as exc:
-            print(f"User save error: {exc}")
+        print(  
+            f"User saved: {telegram_user.id}"  
+        )  
 
-    keyboard = [[
-        InlineKeyboardButton(
-            "🚀 Open TaskCoin",
-            web_app=WebAppInfo(url=WEB_APP_URL),
-        )
-    ]]
+    except Exception as e:  
 
-    await update.message.reply_text(
-        "👋 Welcome to TaskCoin!\n\n"
-        "🎯 Complete available tasks\n"
-        "🪙 Earn TaskCoins\n"
-        "💰 Manage your rewards\n\n"
-        "Tap the button below to open TaskCoin.",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+        print(  
+            f"User save error: {e}"  
+        )  
 
 
-# ============================================================
-# OPTIONAL ADMIN CALLBACK SUPPORT
-# ============================================================
+keyboard = [  
+    [  
+        InlineKeyboardButton(  
+            "🚀 Open TaskCoin",  
+            web_app=WebAppInfo(  
+                url=WEB_APP_URL  
+            )  
+        )  
+    ]  
+]  
 
-async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Process approve/reject callbacks when they belong to this bot.
-
-    The normal TaskCoin Admin Bot may live in telegram_admin_bot.py.
-    This handler is kept here so that, if the same bot token receives
-    admin buttons, VIP/Deposit/Exchange/Withdrawal callbacks do not
-    fall through to an 'Unknown request type' response.
-    """
-
-    query = update.callback_query
-    if not query:
-        return
-
-    user = query.from_user
-    if not user or user.id not in ADMIN_TELEGRAM_IDS:
-        await query.answer("Not authorized.", show_alert=True)
-        return
-
-    data = query.data or ""
-
-    try:
-        parts = data.split(":")
-
-        if len(parts) != 3 or parts[0] not in ("approve", "reject"):
-            await query.answer("Unknown request type.", show_alert=True)
-            return
-
-        action, request_type, raw_id = parts
-        request_id = int(raw_id)
-
-        approved = action == "approve"
-
-        if request_type == "deposit":
-            status = "approved" if approved else "rejected"
-            result = update_deposit_status(request_id, status)
-            label = "Deposit"
-
-        elif request_type == "exchange":
-            status = "approved" if approved else "rejected"
-            result = update_exchange_status(request_id, status)
-            label = "Exchange"
-
-        elif request_type == "withdrawal":
-            status = "approved" if approved else "rejected"
-            result = update_withdrawal_status(request_id, status)
-            label = "Withdrawal"
-
-        elif request_type == "premium":
-            # Database uses 'active' for an approved Premium membership.
-            status = "active" if approved else "rejected"
-            result = update_premium_membership_status(request_id, status)
-            label = "VIP / Premium"
-
-        else:
-            await query.answer("Unknown request type.", show_alert=True)
-            return
-
-        if not result or not result.get("success"):
-            message = (result or {}).get("message", "Request processing failed.")
-            await query.answer(message[:190], show_alert=True)
-            return
-
-        await query.answer(
-            "Approved successfully." if approved else "Rejected successfully."
-        )
-
-        # Remove the action buttons after successful processing.
-        try:
-            await query.edit_message_reply_markup(reply_markup=None)
-        except Exception:
-            pass
-
-        if request_type == "premium":
-            if approved:
-                admin_text = (
-                    f"✅ <b>{label} #{request_id} approved.</b>\n"
-                    "The Premium membership is now active."
-                )
-            else:
-                admin_text = (
-                    f"❌ <b>{label} #{request_id} rejected.</b>\n"
-                    "The reserved Deposit Balance has been refunded by the database."
-                )
-        else:
-            admin_text = (
-                f"{'✅' if approved else '❌'} <b>{label} #{request_id} "
-                f"{'approved' if approved else 'rejected'} successfully.</b>"
-            )
-
-        await query.message.reply_text(admin_text)
-
-    except Exception as exc:
-        print(f"Admin callback error: {exc}")
-        await query.answer("Processing error.", show_alert=True)
+reply_markup = InlineKeyboardMarkup(  
+    keyboard  
+)  
 
 
-# ============================================================
-# TELEGRAM WEBHOOK
-# ============================================================
+await update.message.reply_text(  
 
-async def setup_bot(application: Application):
-    await application.initialize()
-    await application.start()
+    "👋 Welcome to TaskCoin!\n\n"  
 
-    webhook_url = f"{RENDER_EXTERNAL_URL}/telegram"
+    "🎯 Complete available tasks\n"  
+    "🪙 Earn TaskCoins\n"  
+    "💰 Manage your rewards\n\n"  
 
-    await application.bot.set_webhook(
-        url=webhook_url,
-        secret_token=WEBHOOK_SECRET,
-        allowed_updates=["message", "callback_query"],
-        drop_pending_updates=False,
-    )
+    "Tap the button below to open TaskCoin.",  
 
-    print(f"TaskCoin Bot webhook is ready: {webhook_url}")
+    reply_markup=reply_markup  
+)
 
-    # Keep the async application alive while Flask serves the webhook.
-    await asyncio.Event().wait()
+async def setup_bot(application):
 
+await application.initialize()  
+
+await application.start()  
+
+await application.bot.set_webhook(  
+    url=f"{RENDER_EXTERNAL_URL}/telegram",  
+    secret_token=WEBHOOK_SECRET  
+)  
+
+print(  
+    "TaskCoin Bot webhook is ready."  
+)  
+
+await asyncio.Event().wait()
 
 def run_flask():
-    print(f"TaskCoin API is starting on port {PORT}...")
 
-    app.run(
-        host="0.0.0.0",
-        port=PORT,
-        debug=False,
-        use_reloader=False,
-    )
+print(  
+    f"TaskCoin API is starting on port {PORT}..."  
+)  
 
+app.run(  
+    host="0.0.0.0",  
+    port=PORT,  
+    debug=False,  
+    use_reloader=False  
+)
 
 def main():
-    # Initialize database.
-    init_db()
-    print("TaskCoin database initialized successfully.")
 
-    if not BOT_TOKEN:
-        raise RuntimeError("BOT_TOKEN environment variable is missing.")
+# Initialize database  
+init_db()  
 
-    if not RENDER_EXTERNAL_URL:
-        raise RuntimeError("RENDER_EXTERNAL_URL environment variable is missing.")
-
-    if not WEBHOOK_SECRET:
-        raise RuntimeError("WEBHOOK_SECRET environment variable is missing.")
-
-    application = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .build()
-    )
-
-    # Main user command.
-    application.add_handler(CommandHandler("start", start))
-
-    # Support callback buttons if this bot receives them.
-    application.add_handler(
-        CallbackQueryHandler(
-            admin_callback,
-            pattern=r"^(approve|reject):(deposit|exchange|withdrawal|premium):\d+$",
-        )
-    )
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    @app.route("/telegram", methods=["POST"])
-    def telegram():
-        # Telegram webhook secret validation.
-        secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-
-        if secret != WEBHOOK_SECRET:
-            return jsonify({
-                "success": False,
-                "message": "Unauthorized",
-            }), 403
-
-        update_data = request.get_json(silent=True)
-        if not update_data:
-            return jsonify({
-                "success": False,
-                "message": "Invalid Telegram update",
-            }), 400
-
-        try:
-            update = Update.de_json(
-                update_data,
-                application.bot,
-            )
-
-            asyncio.run_coroutine_threadsafe(
-                application.update_queue.put(update),
-                loop,
-            )
-
-            return jsonify({"success": True})
-
-        except Exception as exc:
-            print(f"Telegram webhook error: {exc}")
-            return jsonify({
-                "success": False,
-                "message": "Webhook processing failed",
-            }), 500
-
-    flask_thread = threading.Thread(
-        target=run_flask,
-        daemon=True,
-    )
-    flask_thread.start()
-
-    print("TaskCoin Bot + API is starting...")
-
-    loop.run_until_complete(setup_bot(application))
+print(  
+    "TaskCoin database initialized successfully."  
+)  
 
 
-if __name__ == "__main__":
-    main()
+if not BOT_TOKEN:  
+
+    raise RuntimeError(  
+        "BOT_TOKEN environment variable is missing."  
+    )  
+
+
+if not RENDER_EXTERNAL_URL:  
+
+    raise RuntimeError(  
+        "RENDER_EXTERNAL_URL environment variable is missing."  
+    )  
+
+
+if not WEBHOOK_SECRET:  
+
+    raise RuntimeError(  
+        "WEBHOOK_SECRET environment variable is missing."  
+    )  
+
+
+application = (  
+    Application.builder()  
+    .token(BOT_TOKEN)  
+    .build()  
+)  
+
+
+application.add_handler(  
+
+    CommandHandler(  
+        "start",  
+        start  
+    )  
+
+)  
+
+
+loop = asyncio.new_event_loop()  
+
+asyncio.set_event_loop(loop)  
+
+
+@app.route(  
+    "/telegram",  
+    methods=["POST"]  
+)  
+def telegram():  
+
+    secret = request.headers.get(  
+        "X-Telegram-Bot-Api-Secret-Token"  
+    )  
+
+
+    if secret != WEBHOOK_SECRET:  
+
+        return jsonify({  
+
+            "success": False,  
+            "message": "Unauthorized"  
+
+        }), 403  
+
+
+    update_data = request.get_json(  
+        force=True  
+    )  
+
+
+    update = Update.de_json(  
+        update_data,  
+        application.bot  
+    )  
+
+
+    asyncio.run_coroutine_threadsafe(  
+
+        application.update_queue.put(  
+            update  
+        ),  
+
+        loop  
+
+    )  
+
+
+    return jsonify({  
+
+        "success": True  
+
+    })  
+
+
+flask_thread = threading.Thread(  
+
+    target=run_flask,  
+
+    daemon=True  
+
+)  
+
+
+flask_thread.start()  
+
+
+print(  
+    "TaskCoin Bot + API is starting..."  
+)  
+
+
+loop.run_until_complete(  
+
+    setup_bot(  
+        application  
+    )  
+
+)
+
+if name == "main":
+
+main()
