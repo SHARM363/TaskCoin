@@ -5262,21 +5262,16 @@ async function submitWithdraw() {
     }
 
 
-    /* Minimum withdrawal */
-
     if (
-        !Number.isFinite(amount) ||
-        amount < 100
-    ) {
-
-        showToast(
-            "Minimum withdrawal is 1500 TaskCoins."
-        );
-
-        return;
-
-    }
-
+    !Number.isFinite(amount) ||
+    amount < 1500 ||
+    amount > 30000
+) {
+    showToast(
+        "Withdrawal amount must be between 1500 and 30000 TaskCoins."
+    );
+    return;
+}
 
     /* Balance check */
 
