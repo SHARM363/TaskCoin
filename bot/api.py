@@ -32,7 +32,6 @@ from database import (
     get_dashboard_stats
 )
 
-
 app = Flask(__name__)
 CORS(
     app,
