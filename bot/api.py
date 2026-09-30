@@ -37,6 +37,13 @@ from database import (
     get_lucky_spin_config,
     lucky_spin,
     update_lucky_spin_prize,
+    get_premium_plans,
+    get_premium_plan,
+    get_active_premium,
+    purchase_premium,
+    get_premium_membership_requests,
+    get_all_premium_memberships,
+    update_premium_membership_status,
 
     get_admin_by_username,
     create_admin_session,
@@ -1307,6 +1314,179 @@ def user_withdrawals():
                 "Failed to load withdrawal history.",
             "error": str(e)
         }), 500
+
+
+# ============================================================
+# VIP / PREMIUM MEMBERSHIP API
+# ============================================================
+
+@app.route("/api/premium/plans", methods=["GET"])
+def api_premium_plans():
+    try:
+        return jsonify({"success": True, "plans": [dict(x) for x in get_premium_plans(True)]})
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to load VIP plans.", "error": str(e)}), 500
+
+
+@app.route("/api/premium", methods=["GET"])
+def api_premium_status():
+    telegram_id = request.args.get("telegram_id")
+    if not telegram_id:
+        return jsonify({"success": False, "message": "telegram_id is required."}), 400
+    try:
+        telegram_id = int(telegram_id)
+        membership = get_active_premium(telegram_id)
+        # Include the latest pending request so the frontend can show the correct state.
+        pending = [x for x in get_premium_membership_requests("pending") if int(x.get("telegram_id")) == telegram_id]
+        pending_row = pending[0] if pending else None
+        current = dict(membership) if membership else (dict(pending_row) if pending_row else None)
+        progress = None
+        if current:
+            progress = {
+                "level": int(current.get("level") or 0),
+                "bonus_website_tasks": int(current.get("bonus_website_tasks") or 0),
+                "daily_lucky_spins": int(current.get("daily_lucky_spins") or 0),
+                "expires_at": current.get("expires_at"),
+            }
+        return jsonify({"success": True, "membership": current, "progress": progress, "plans": [dict(x) for x in get_premium_plans(True)]})
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "message": "Invalid telegram_id."}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to load VIP status.", "error": str(e)}), 500
+
+
+@app.route("/api/premium/purchase", methods=["POST"])
+def api_premium_purchase():
+    data = request.get_json(silent=True) or {}
+    try:
+        telegram_id = int(data.get("telegram_id"))
+        level = int(data.get("level"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid telegram_id or VIP level."}), 400
+    try:
+        result = purchase_premium(telegram_id, level)
+        if result.get("success"):
+            membership = result.get("membership") or {}
+            plan = result.get("plan") or {}
+            notify_admins(
+                "💎 <b>New VIP / Premium Request</b>\n"
+                f"ID: <code>{membership.get('id')}</code>\n"
+                f"User: <code>{telegram_id}</code>\n"
+                f"VIP Level: <b>{plan.get('level')}</b>\n"
+                f"Price: <b>৳{float(plan.get('price') or 0):,.2f}</b>\n"
+                f"Duration: <b>{plan.get('duration_days')} days</b>\n"
+                f"Bonus Website Tasks: <b>{plan.get('bonus_website_tasks', 0)}</b>\n"
+                f"Daily Lucky Spin: <b>{plan.get('daily_lucky_spins', 0)}</b>",
+                {"inline_keyboard": [[
+                    {"text": "✅ Approve", "callback_data": f"approve:premium:{membership.get('id')}"},
+                    {"text": "❌ Reject", "callback_data": f"reject:premium:{membership.get('id')}"}
+                ]]}
+            )
+        return jsonify(result), (200 if result.get("success") else 400)
+    except Exception as e:
+        app.logger.exception("VIP purchase failed")
+        return jsonify({"success": False, "message": "VIP purchase failed.", "error": str(e)}), 500
+
+
+# ============================================================
+# ADMIN VIP / PREMIUM CONTROL
+# ============================================================
+
+@app.route("/api/admin/premium/plans", methods=["GET"])
+def admin_premium_plans():
+    admin, error = require_admin()
+    if error:
+        return error
+    try:
+        return jsonify({"success": True, "plans": [dict(x) for x in get_premium_plans(False)]})
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to load VIP plans.", "error": str(e)}), 500
+
+
+@app.route("/api/admin/premium/plans/<int:level>", methods=["PUT"])
+def admin_update_premium_plan(level):
+    admin, error = require_admin()
+    if error:
+        return error
+    data = request.get_json(silent=True) or {}
+    allowed = {"duration_days", "price", "bonus_website_tasks", "daily_lucky_spins", "is_active"}
+    payload = {k: data[k] for k in allowed if k in data}
+    if not payload:
+        return jsonify({"success": False, "message": "No VIP plan fields supplied."}), 400
+    try:
+        if "duration_days" in payload:
+            payload["duration_days"] = max(1, int(payload["duration_days"]))
+        if "price" in payload:
+            payload["price"] = float(payload["price"])
+            if payload["price"] < 0: raise ValueError("Price cannot be negative.")
+        if "bonus_website_tasks" in payload:
+            payload["bonus_website_tasks"] = max(0, int(payload["bonus_website_tasks"]))
+        if "daily_lucky_spins" in payload:
+            payload["daily_lucky_spins"] = max(0, int(payload["daily_lucky_spins"]))
+        if "is_active" in payload:
+            payload["is_active"] = bool(payload["is_active"])
+        fields = ", ".join(f"{k}=%s" for k in payload)
+        values = list(payload.values()) + [level]
+        from database import get_connection
+        conn = get_connection(); cur = conn.cursor()
+        try:
+            cur.execute(f"UPDATE premium_plans SET {fields}, updated_at=CURRENT_TIMESTAMP WHERE level=%s RETURNING *;", values)
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                return jsonify({"success": False, "message": "VIP level not found."}), 404
+            conn.commit()
+        finally:
+            cur.close(); conn.close()
+        # RealDictCursor is not used here, so return the plan through a fresh query.
+        plan = get_premium_plan(level)
+        return jsonify({"success": True, "plan": dict(plan) if plan else None})
+    except (ValueError, TypeError) as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to update VIP plan.", "error": str(e)}), 500
+
+
+@app.route("/api/admin/premium/requests", methods=["GET"])
+def admin_premium_requests():
+    admin, error = require_admin()
+    if error:
+        return error
+    status = str(request.args.get("status") or "pending").lower()
+    if status not in {"pending", "active", "rejected", "expired"}:
+        return jsonify({"success": False, "message": "Invalid Premium status."}), 400
+    try:
+        return jsonify({"success": True, "requests": [dict(x) for x in get_premium_membership_requests(status)]})
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to load VIP requests.", "error": str(e)}), 500
+
+
+@app.route("/api/admin/premium/members", methods=["GET"])
+def admin_premium_members():
+    admin, error = require_admin()
+    if error:
+        return error
+    try:
+        return jsonify({"success": True, "members": [dict(x) for x in get_all_premium_memberships()]})
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to load VIP members.", "error": str(e)}), 500
+
+
+@app.route("/api/admin/premium/requests/<int:membership_id>", methods=["PUT"])
+def admin_update_premium_request(membership_id):
+    admin, error = require_admin()
+    if error:
+        return error
+    data = request.get_json(silent=True) or {}
+    status = str(data.get("status") or "").lower()
+    reason = data.get("reason")
+    if status not in {"active", "rejected", "expired"}:
+        return jsonify({"success": False, "message": "Status must be active, rejected or expired."}), 400
+    try:
+        result = update_premium_membership_status(membership_id, status, reason=reason)
+        return jsonify(result), (200 if result.get("success") else 400)
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to update VIP request.", "error": str(e)}), 500
 
 
 # ============================================================
