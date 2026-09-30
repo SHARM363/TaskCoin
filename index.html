@@ -2047,6 +2047,34 @@
 
 }
 
+
+/* =========================================================
+   VIP PREMIUM — POLISHED CARDS / BANNERS
+========================================================= */
+.vip-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.vip-card{position:relative;overflow:hidden;border-radius:22px;padding:18px;color:#fff;box-shadow:0 12px 30px rgba(15,23,42,.14);border:1px solid rgba(255,255,255,.25)}
+.vip-card::after{content:"";position:absolute;width:170px;height:170px;border-radius:50%;right:-65px;top:-75px;background:rgba(255,255,255,.13)}
+.vip-card-head{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.vip-badge{font-size:11px;font-weight:900;letter-spacing:.8px;background:rgba(0,0,0,.24);padding:6px 10px;border-radius:999px}
+.vip-title{font-size:22px;font-weight:900;line-height:1.1}
+.vip-days{font-size:11px;background:#ef4444;color:#fff;padding:5px 9px;border-radius:999px;font-weight:800}
+.vip-price{position:relative;z-index:2;font-size:27px;font-weight:900;margin-top:14px}
+.vip-benefits{position:relative;z-index:2;display:grid;gap:7px;margin-top:12px;font-size:12px;line-height:1.45}
+.vip-benefit{background:rgba(0,0,0,.16);padding:8px 10px;border-radius:11px}
+.vip-buy{position:relative;z-index:2;background:#fff!important;color:#111827!important;margin-top:14px!important;font-weight:900!important}
+.vip-1{background:linear-gradient(135deg,#2563eb,#06b6d4)}
+.vip-2{background:linear-gradient(135deg,#16a34a,#22c55e)}
+.vip-3{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+.vip-4{background:linear-gradient(135deg,#ea580c,#f59e0b)}
+.vip-5{background:linear-gradient(135deg,#0891b2,#2563eb)}
+.vip-6{background:linear-gradient(135deg,#dc2626,#f97316)}
+.vip-7{background:linear-gradient(135deg,#0f766e,#06b6d4)}
+.vip-8{background:linear-gradient(135deg,#9333ea,#ec4899)}
+.vip-9{background:linear-gradient(135deg,#15803d,#22c55e)}
+.vip-10{background:linear-gradient(135deg,#111827,#ca8a04)}
+.vip-info-strip{display:grid;gap:10px;margin-top:14px}
+.vip-info-box{background:#fff;border-radius:16px;padding:13px;box-shadow:0 5px 18px rgba(15,23,42,.06);font-size:12px;line-height:1.65}
+@media(min-width:520px){.vip-grid{grid-template-columns:1fr 1fr}.vip-info-strip{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -2892,28 +2920,28 @@
             <div class="section-header">
                 <div>
                     <div class="section-title">💎 VIP / Premium Membership</div>
-                    <div style="margin-top:4px;font-size:11px;color:#6b7280;">
-                        Deposit Balance দিয়ে একটি VIP Level কিনুন
-                    </div>
+                    <div style="margin-top:4px;font-size:11px;color:#6b7280;">Deposit Balance দিয়ে VIP কিনুন • Admin approval required</div>
                 </div>
             </div>
 
-            <div class="card" style="margin-bottom:12px;">
-                <div style="font-size:13px;line-height:1.7;color:#334155;">
-                    <b>সাধারণ Task:</b> 📱 ৫টি Social + 🌐 ৬টি Website প্রতিদিন।<br>
-                    <b>VIP সুবিধা:</b> আপনার Level অনুযায়ী অতিরিক্ত Website Task।<br>
-                    <span style="font-size:11px;color:#64748b;">
-                        Website Task-এর Coin reward Admin Panel থেকে নিয়ন্ত্রণ করা যাবে।
-                    </span>
+            <div class="vip-info-strip">
+                <div class="vip-info-box">
+                    💰 <b>Daily Saving</b><br>
+                    VIP চালু থাকলে নির্ধারিত Bonus Website Tasks প্রতিদিন ব্যবহার করতে পারবেন।
                 </div>
-                <div id="premiumStatusCard" style="margin-top:14px;"></div>
+                <div class="vip-info-box">
+                    🎁 <b>Daily Bonus</b><br>
+                    VIP 1–5: প্রতিদিন 1 Spin • VIP 6–10: প্রতিদিন 3 Spin।
+                </div>
             </div>
 
-            <div class="section-title" style="margin-bottom:10px;">💎 Choose your VIP Level 1–10</div>
-            <div style="font-size:11px;color:#64748b;margin-bottom:12px;">
-                7 দিনের Level 1–4 এবং 30 দিনের Level 5–10
+            <div class="card" style="margin-top:12px;">
+                <div id="premiumStatusCard" style="line-height:1.7;"></div>
             </div>
-            <div id="vipLevelsContainer"></div>
+
+            <div class="section-title" style="margin:18px 0 8px;">👑 VIP Level 1–10</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:12px;">প্রতিটি VIP-এর আলাদা Banner, Price, Bonus Task ও Lucky Spin সুবিধা আছে।</div>
+            <div id="vipLevelsContainer" class="vip-grid"></div>
         </div>
     </div>
 </section>
@@ -4922,11 +4950,11 @@ async function loadLuckySpin() {
         const level = Number(membership.level || 0);
         const group = level <= 5 ? "vip_1_5" : "vip_6_10";
         const prizes = luckySpinPrizes.filter(x => x.wheel_group === group);
-        const limit = level <= 5 ? 1 : (level === 10 ? 4 : 3);
+        const limit = Number(membership.daily_lucky_spins || (level <= 5 ? 1 : 3));
         const labels = prizes.map(x => escapeHtml(x.prize_name));
         access.innerHTML = `<div style="padding:12px;background:#f5f3ff;border-radius:12px;line-height:1.7;">
             💎 <b>VIP Level ${level}</b> · ${group === "vip_1_5" ? "VIP 1–5 Wheel" : "VIP 6–10 Wheel"}<br>
-            🎟️ Daily Spins: <b>${limit}</b>
+            🎟️ Daily Spins: <b>${limit}</b><br>🏆 Reward: TaskCoins → TaskCoin Balance, BDT → Deposit/Real Balance
         </div>`;
         if (!prizes.length) { wheels.innerHTML = `<div class="card">Lucky Spin prizes are not configured.</div>`; return; }
         wheels.innerHTML = `
@@ -4979,25 +5007,35 @@ async function spinLuckyWheel() {
 
 /* =========================================================
    VIP / PREMIUM MEMBERSHIP — LEVELS 1–10
-   Lucky Spin is intentionally not included in this version.
+   Server-side catalog is authoritative; Admin Panel can edit it.
    ========================================================= */
 
-const VIP_LEVELS = [
-    {level:1, days:7,  price:450,   bonusTasks:5},
-    {level:2, days:7,  price:680,   bonusTasks:8},
-    {level:3, days:7,  price:1080,  bonusTasks:12},
-    {level:4, days:7,  price:1650,  bonusTasks:18},
-    {level:5, days:30, price:4200,  bonusTasks:24},
-    {level:6, days:30, price:5780,  bonusTasks:29},
-    {level:7, days:30, price:7280,  bonusTasks:35},
-    {level:8, days:30, price:8530,  bonusTasks:42},
-    {level:9, days:30, price:9840,  bonusTasks:57},
-    {level:10,days:30, price:12099, bonusTasks:80}
+let VIP_LEVELS = [
+    {level:1, days:7,  price:150,  bonusTasks:5,  dailyLuckySpins:1},
+    {level:2, days:7,  price:300,  bonusTasks:8,  dailyLuckySpins:1},
+    {level:3, days:7,  price:600,  bonusTasks:12, dailyLuckySpins:1},
+    {level:4, days:7,  price:900,  bonusTasks:18, dailyLuckySpins:1},
+    {level:5, days:30, price:1450, bonusTasks:24, dailyLuckySpins:1},
+    {level:6, days:30, price:1899, bonusTasks:29, dailyLuckySpins:3},
+    {level:7, days:30, price:2344, bonusTasks:35, dailyLuckySpins:3},
+    {level:8, days:30, price:2899, bonusTasks:42, dailyLuckySpins:3},
+    {level:9, days:30, price:3466, bonusTasks:48, dailyLuckySpins:3},
+    {level:10,days:30, price:4599, bonusTasks:50, dailyLuckySpins:3}
 ];
 
+function normalizeVipPlans(plans) {
+    if (!Array.isArray(plans) || !plans.length) return;
+    VIP_LEVELS = plans.map(p => ({
+        level:Number(p.level),
+        days:Number(p.duration_days || p.days || 0),
+        price:Number(p.price || 0),
+        bonusTasks:Number(p.bonus_website_tasks || p.bonusTasks || 0),
+        dailyLuckySpins:Number(p.daily_lucky_spins || p.dailyLuckySpins || 0),
+        isActive:p.is_active !== false
+    })).filter(p => p.level >= 1 && p.level <= 10);
+}
+
 async function loadPremium() {
-    // Always render the 10 VIP cards from the local VIP configuration.
-    // Membership status is optional and will be filled from the API when available.
     if (!appState.telegramUser) {
         appState.premium = null;
         appState.premiumProgress = null;
@@ -5007,21 +5045,16 @@ async function loadPremium() {
 
     try {
         const data = await apiRequest(
-            "/api/premium?telegram_id=" +
-            encodeURIComponent(appState.telegramUser.id)
+            "/api/premium?telegram_id=" + encodeURIComponent(appState.telegramUser.id)
         );
-
         if (data) {
+            normalizeVipPlans(data.plans);
             appState.premium = data.membership || null;
             appState.premiumProgress = data.progress || null;
         }
     } catch (error) {
-        console.warn("Premium status API unavailable; showing VIP levels:", error);
-        appState.premium = appState.premium || null;
-        appState.premiumProgress = appState.premiumProgress || null;
+        console.warn("Premium status API unavailable; using cached VIP catalog:", error);
     }
-
-    // Do not hide the Level 1–10 cards if the status API is unavailable.
     renderPremium();
 }
 
@@ -5031,64 +5064,52 @@ function renderPremium() {
     if (!box || !container) return;
 
     const m = appState.premium;
+    const statusText = String(m?.status || "").toLowerCase();
 
-    if (m) {
-        const exp = m.expires_at
-            ? new Date(m.expires_at).toLocaleString()
-            : "-";
-
-        const statusText = String(m.status || "").toLowerCase();
-
-        if (statusText === "pending") {
-            box.innerHTML = `
-                <div style="padding:12px;background:#fff7ed;border-radius:12px;line-height:1.6;">
-                    ⏳ <b>VIP request pending</b><br>
-                    Admin approval-এর অপেক্ষায় আছে।
-                </div>`;
-        } else if (statusText === "active") {
-            box.innerHTML = `
-                <div style="padding:12px;background:#eff6ff;border-radius:12px;line-height:1.7;">
-                    💎 <b>VIP Level ${Number(m.level || 0)} Active</b><br>
-                    ⏰ Expires: ${escapeHtml(exp)}<br>
-                    ⭐ Bonus Website Tasks: <b>${Number(m.bonus_website_tasks || 0)}</b>
-                </div>`;
-        } else {
-            box.innerHTML = `
-                <div style="padding:12px;background:#f8fafc;border-radius:12px;">
-                    VIP membership active নয়।
-                </div>`;
-        }
+    if (statusText === "pending") {
+        box.innerHTML = `
+            <div style="padding:13px;background:#fff7ed;border-radius:14px;">
+                ⏳ <b>VIP Request Pending</b><br>
+                আপনার টাকা নিরাপদভাবে reserve করা হয়েছে। Admin approval-এর অপেক্ষায় আছে।<br>
+                <small style="color:#64748b;">Reject হলে টাকা Deposit Balance-এ ফেরত যাবে।</small>
+            </div>`;
+    } else if (statusText === "active") {
+        const exp = m.expires_at ? new Date(m.expires_at).toLocaleString() : "-";
+        box.innerHTML = `
+            <div style="padding:13px;background:#eff6ff;border-radius:14px;">
+                💎 <b>VIP Level ${Number(m.level || 0)} Active</b><br>
+                ⏰ Expires: <b>${escapeHtml(exp)}</b><br>
+                🌐 Bonus Website Tasks: <b>${Number(m.bonus_website_tasks || 0)}</b><br>
+                🎁 Daily Lucky Spin: <b>${Number(m.daily_lucky_spins || 0)}</b><br>
+                <small style="color:#64748b;">মেয়াদ শেষ হলে VIP, Bonus Task ও Lucky Spin অটোমেটিক লক হবে।</small>
+            </div>`;
     } else {
         box.innerHTML = `
-            <div style="padding:12px;background:#f8fafc;border-radius:12px;">
-                কোনো VIP membership নেই। নিচের একটি Level নির্বাচন করুন।
+            <div style="padding:13px;background:#f8fafc;border-radius:14px;line-height:1.6;">
+                🔒 <b>VIP Membership Locked</b><br>
+                আপনার Deposit Balance যথেষ্ট হলে একটি VIP Level নির্বাচন করে request পাঠান।
             </div>`;
     }
 
-    container.innerHTML = VIP_LEVELS.map(vip => `
-        <div class="card" style="margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+    container.innerHTML = VIP_LEVELS.filter(vip => vip.isActive !== false).map(vip => `
+        <div class="vip-card vip-${vip.level}">
+            <div class="vip-card-head">
                 <div>
-                    <div style="font-size:15px;font-weight:700;">
-                        💎 VIP Level ${vip.level}
-                    </div>
-                    <div style="font-size:11px;color:#64748b;margin-top:4px;">
-                        ${vip.days} দিন • +${vip.bonusTasks} Bonus Website Tasks
-                    </div>
+                    <div class="vip-badge">👑 PREMIUM MEMBERSHIP</div>
+                    <div class="vip-title" style="margin-top:8px;">VIP ${vip.level}</div>
                 </div>
-                <div style="font-size:16px;font-weight:800;">
-                    ৳${vip.price.toLocaleString()}
-                </div>
+                <div class="vip-days">${vip.days} Days</div>
             </div>
-
-            <button
-                type="button"
-                class="primary-button"
-                style="margin-top:12px;"
-                onclick="buyPremiumLevel(${vip.level})"
-                ${m && String(m.status).toLowerCase() === "pending" ? "disabled" : ""}
-            >
-                💎 Buy VIP Level ${vip.level}
+            <div class="vip-price">৳${vip.price.toLocaleString()}</div>
+            <div class="vip-benefits">
+                <div class="vip-benefit">🌐 Bonus Website Task: <b>${vip.bonusTasks}</b></div>
+                <div class="vip-benefit">🎡 Daily Lucky Spin: <b>${vip.dailyLuckySpins}</b></div>
+                <div class="vip-benefit">💰 Daily Saving & Premium Access</div>
+                <div class="vip-benefit">🔐 Admin Approval • মেয়াদ শেষে Auto Lock</div>
+            </div>
+            <button type="button" class="primary-button vip-buy" onclick="buyPremiumLevel(${vip.level})"
+                ${statusText === "pending" || statusText === "active" ? "disabled" : ""}>
+                ${statusText === "active" ? "✅ VIP Active" : statusText === "pending" ? "⏳ Request Pending" : "💎 Buy VIP ${vip.level}"}
             </button>
         </div>
     `).join("");
@@ -5099,37 +5120,29 @@ async function buyPremiumLevel(level) {
         showToast("Telegram user not detected.");
         return;
     }
-
+    if (appState.premium && ["active","pending"].includes(String(appState.premium.status).toLowerCase())) {
+        showToast("আপনার একটি VIP request/membership ইতিমধ্যে আছে।");
+        return;
+    }
     const vip = VIP_LEVELS.find(v => v.level === Number(level));
-    if (!vip) {
-        showToast("Invalid VIP level.");
-        return;
-    }
-
+    if (!vip) { showToast("Invalid VIP level."); return; }
     if (Number(appState.depositBalance || 0) < vip.price) {
-        showToast(
-            `Deposit Balance-এ কমপক্ষে ৳${vip.price.toLocaleString()} থাকতে হবে।`
-        );
+        showToast(`Deposit Balance-এ কমপক্ষে ৳${vip.price.toLocaleString()} থাকতে হবে।`);
         return;
     }
+    const confirmed = confirm(
+        `VIP ${vip.level} কিনবেন?\n\nPrice: ৳${vip.price.toLocaleString()}\nBonus Website Task: ${vip.bonusTasks}\nDaily Lucky Spin: ${vip.dailyLuckySpins}\nDuration: ${vip.days} days\n\nPurchase করলে টাকা Admin approval পর্যন্ত reserve থাকবে।`
+    );
+    if (!confirmed) return;
 
     const result = await apiRequest("/api/premium/purchase", {
         method: "POST",
-        body: {
-            telegram_id: appState.telegramUser.id,
-            level: vip.level
-        }
+        body: {telegram_id: appState.telegramUser.id, level: vip.level}
     });
-
     if (!result) return;
-
     if (result.user) applyUserData(result.user);
-
-    showToast(
-        result.message ||
-        `VIP Level ${vip.level} purchase request submitted.`
-    );
-
+    showToast(result.message || `VIP ${vip.level} request submitted.`);
+    await loadUserData();
     await loadPremium();
 }
 
