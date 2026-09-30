@@ -1419,7 +1419,7 @@ def claim_task_reward(telegram_id, task_id):
             if remain>0: conn.rollback(); return {"success":False,"message":"Please wait before starting this task again.","cooldown":int(remain)+1}
         reward=float(task['reward'] or 0)
         cur.execute("INSERT INTO task_completions(telegram_id,task_id,reward,completed_date) VALUES(%s,%s,%s,CURRENT_DATE) RETURNING *;",(telegram_id,task_id,reward)); completion=cur.fetchone()
-        cur.execute("UPDATE users SET task_balance=COALESCE(balance,0)+%s,balance=COALESCE(balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s,completed_tasks=COALESCE(completed_tasks,0)+1,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;",(reward,reward,reward,telegram_id)); updated=cur.fetchone()
+        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(task_balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s,completed_tasks=COALESCE(completed_tasks,0)+1,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;",(reward,reward,reward,telegram_id)); updated=cur.fetchone()
         if not updated: raise RuntimeError('User disappeared while claiming task.')
         # 10-second cooldown after a successful reward.
         cur.execute("INSERT INTO task_cooldowns(telegram_id,task_id,available_at) VALUES(%s,%s,CURRENT_TIMESTAMP+INTERVAL '10 seconds') ON CONFLICT(telegram_id,task_id) DO UPDATE SET available_at=EXCLUDED.available_at;",(telegram_id,task_id))
