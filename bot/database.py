@@ -644,6 +644,7 @@ def init_db():
                 duration_days INTEGER NOT NULL,
                 price NUMERIC(20,2) NOT NULL,
                 bonus_website_tasks INTEGER NOT NULL DEFAULT 0,
+                daily_lucky_spins INTEGER NOT NULL DEFAULT 1,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -672,29 +673,38 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_premium_memberships_status
             ON premium_memberships(status);
         """)
-        # Seed the fixed VIP catalog. Prices/bonus counts remain editable later from Admin.
+        cur.execute("ALTER TABLE premium_plans ADD COLUMN IF NOT EXISTS daily_lucky_spins INTEGER NOT NULL DEFAULT 1;")
+        # Seed the final VIP catalog once. After the catalog version is recorded,
+        # Admin Panel edits are preserved across restarts.
+        cur.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
         premium_seed = [
-            (1, 7, 150, 5),
-            (2, 7, 300, 8),
-            (3, 7, 600, 12),
-            (4, 7, 900, 18),
-            (5, 30, 1450, 24),
-            (6, 30, 1899, 29),
-            (7, 30, 2344, 35),
-            (8, 30, 2899, 42),
-            (9, 30, 3466, 57),
-            (10, 30, 4599, 80),
+            (1, 7, 150, 5, 1),
+            (2, 7, 300, 8, 1),
+            (3, 7, 600, 12, 1),
+            (4, 7, 900, 18, 1),
+            (5, 30, 1450, 24, 1),
+            (6, 30, 1899, 29, 3),
+            (7, 30, 2344, 35, 3),
+            (8, 30, 2899, 42, 3),
+            (9, 30, 3466, 48, 3),
+            (10, 30, 4599, 50, 3),
         ]
-        for level, days, price, bonus in premium_seed:
+        for level, days, price, bonus, spins in premium_seed:
             cur.execute("""
-                INSERT INTO premium_plans(level,duration_days,price,bonus_website_tasks)
-                VALUES(%s,%s,%s,%s)
-                ON CONFLICT(level) DO UPDATE SET
-                    duration_days=EXCLUDED.duration_days,
-                    price=EXCLUDED.price,
-                    bonus_website_tasks=EXCLUDED.bonus_website_tasks,
-                    updated_at=CURRENT_TIMESTAMP;
-            """, (level, days, price, bonus))
+                INSERT INTO premium_plans(level,duration_days,price,bonus_website_tasks,daily_lucky_spins)
+                VALUES(%s,%s,%s,%s,%s)
+                ON CONFLICT(level) DO NOTHING;
+            """, (level, days, price, bonus, spins))
+        cur.execute("SELECT value FROM app_settings WHERE key='vip_catalog_version' LIMIT 1;")
+        vip_version = cur.fetchone()
+        if not vip_version:
+            for level, days, price, bonus, spins in premium_seed:
+                cur.execute("""
+                    UPDATE premium_plans
+                    SET duration_days=%s, price=%s, bonus_website_tasks=%s, daily_lucky_spins=%s, updated_at=CURRENT_TIMESTAMP
+                    WHERE level=%s;
+                """, (days, price, bonus, spins, level))
+            cur.execute("INSERT INTO app_settings(key,value) VALUES('vip_catalog_version','2');")
 
         # ----------------------------------------------------
         # INDEXES
@@ -816,7 +826,7 @@ def create_or_update_user(
                     cur.execute("SELECT 1 FROM referrals WHERE referred_id=%s LIMIT 1;", (telegram_id,))
                     if not cur.fetchone():
                         cur.execute("INSERT INTO referrals(referrer_id,referred_id,reward) VALUES(%s,%s,%s) RETURNING *;", (referrer_id, telegram_id, REFERRAL_REWARD))
-                        cur.execute("UPDATE users SET referral_count=COALESCE(referral_count,0)+1, task_balance=COALESCE(balance,0)+%s, balance=COALESCE(balance,0)+%s, total_earned=COALESCE(total_earned,0)+%s WHERE telegram_id=%s;", (REFERRAL_REWARD, REFERRAL_REWARD, REFERRAL_REWARD, referrer_id))
+                        cur.execute("UPDATE users SET referral_count=COALESCE(referral_count,0)+1, task_balance=COALESCE(task_balance,0)+%s, balance=COALESCE(task_balance,0)+%s, total_earned=COALESCE(total_earned,0)+%s WHERE telegram_id=%s;", (REFERRAL_REWARD, REFERRAL_REWARD, REFERRAL_REWARD, referrer_id))
                         cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s;", (referrer_id, telegram_id))
         conn.commit()
         return user
@@ -1321,7 +1331,7 @@ def claim_task_reward(telegram_id, task_id):
             if remain>0: conn.rollback(); return {"success":False,"message":"Please wait before starting this task again.","cooldown":int(remain)+1}
         reward=float(task['reward'] or 0)
         cur.execute("INSERT INTO task_completions(telegram_id,task_id,reward,completed_date) VALUES(%s,%s,%s,CURRENT_DATE) RETURNING *;",(telegram_id,task_id,reward)); completion=cur.fetchone()
-        cur.execute("UPDATE users SET task_balance=COALESCE(balance,0)+%s,balance=COALESCE(balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s,completed_tasks=COALESCE(completed_tasks,0)+1,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;",(reward,reward,reward,telegram_id)); updated=cur.fetchone()
+        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(task_balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s,completed_tasks=COALESCE(completed_tasks,0)+1,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;",(reward,reward,reward,telegram_id)); updated=cur.fetchone()
         if not updated: raise RuntimeError('User disappeared while claiming task.')
         # 10-second cooldown after a successful reward.
         cur.execute("INSERT INTO task_cooldowns(telegram_id,task_id,available_at) VALUES(%s,%s,CURRENT_TIMESTAMP+INTERVAL '10 seconds') ON CONFLICT(telegram_id,task_id) DO UPDATE SET available_at=EXCLUDED.available_at;",(telegram_id,task_id))
@@ -1371,7 +1381,7 @@ def get_active_premium(telegram_id):
         """, (telegram_id,))
         conn.commit()
         cur.execute("""
-            SELECT pm.*, pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks
+            SELECT pm.*, pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.daily_lucky_spins
             FROM premium_memberships pm
             JOIN premium_plans pp ON pp.id=pm.plan_id
             WHERE pm.telegram_id=%s AND pm.status='active'
@@ -1421,12 +1431,34 @@ def purchase_premium(telegram_id, level):
         cur.close(); conn.close()
 
 
+def get_all_premium_memberships():
+    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            UPDATE premium_memberships
+            SET status='expired'
+            WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP;
+        """)
+        conn.commit()
+        cur.execute("""
+            SELECT pm.*, u.username, u.first_name, u.deposit_balance,
+                   pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.daily_lucky_spins
+            FROM premium_memberships pm
+            JOIN users u ON u.telegram_id=pm.telegram_id
+            JOIN premium_plans pp ON pp.id=pm.plan_id
+            ORDER BY pm.id DESC;
+        """)
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+
 def get_premium_membership_requests(status='pending'):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT pm.*, u.username, u.first_name, u.deposit_balance,
-                   pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks
+                   pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.daily_lucky_spins
             FROM premium_memberships pm
             JOIN users u ON u.telegram_id=pm.telegram_id
             JOIN premium_plans pp ON pp.id=pm.plan_id
@@ -1480,8 +1512,8 @@ def update_premium_membership_status(membership_id, status, reason=None):
 def get_premium_daily_status(telegram_id):
     membership=get_active_premium(telegram_id)
     if not membership:
-        return {'active':False,'level':None,'bonus_website_tasks':0,'expires_at':None}
-    return {'active':True,'level':int(membership['level']),'bonus_website_tasks':int(membership['bonus_website_tasks'] or 0),'expires_at':membership['expires_at']}
+        return {'active':False,'level':None,'bonus_website_tasks':0,'daily_lucky_spins':0,'expires_at':None}
+    return {'active':True,'level':int(membership['level']),'bonus_website_tasks':int(membership['bonus_website_tasks'] or 0),'daily_lucky_spins':int(membership.get('daily_lucky_spins') or 0),'expires_at':membership['expires_at']}
 
 
 def _daily_platform_count(cur, telegram_id, platforms):
@@ -1841,7 +1873,7 @@ def create_referral(referrer_id, referred_id, reward=500):
         cur.execute("SELECT 1 FROM users WHERE telegram_id=%s;",(referrer_id,))
         if not cur.fetchone(): conn.rollback(); return {"success":False,"message":"Referrer not found."}
         cur.execute("INSERT INTO referrals(referrer_id,referred_id,reward) VALUES(%s,%s,%s) RETURNING *;",(referrer_id,referred_id,reward)); referral=cur.fetchone()
-        cur.execute("UPDATE users SET referral_count=COALESCE(referral_count,0)+1,task_balance=COALESCE(balance,0)+%s,balance=COALESCE(balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s WHERE telegram_id=%s;",(reward,reward,reward,referrer_id))
+        cur.execute("UPDATE users SET referral_count=COALESCE(referral_count,0)+1,task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(task_balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s WHERE telegram_id=%s;",(reward,reward,reward,referrer_id))
         cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s AND referred_by IS NULL;",(referrer_id,referred_id))
         conn.commit(); return {"success":True,"referral":referral,"reward":reward}
     except Exception: conn.rollback(); raise
@@ -1869,7 +1901,7 @@ def lucky_spin(telegram_id):
             conn.rollback(); return {'success':False,'message':'VIP Membership required. Please upgrade your VIP.'}
         level=int(membership['level'])
         wheel='vip_1_5' if level<=5 else 'vip_6_10'
-        daily_limit=1 if level<=5 else (4 if level==10 else 3)
+        daily_limit=int(membership.get('daily_lucky_spins') or (1 if level<=5 else 3))
         cur.execute("SELECT COUNT(*) AS c FROM lucky_spin_records WHERE telegram_id=%s AND wheel_group=%s AND created_at::date=CURRENT_DATE;", (telegram_id,wheel))
         used=int(cur.fetchone()['c'] or 0)
         if used>=daily_limit:
