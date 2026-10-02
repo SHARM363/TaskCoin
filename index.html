@@ -2260,12 +2260,6 @@
                         </button>
 
 
-                        <button class="quick-action" type="button" onclick="openPage('depositPage')">
-                            <div class="quick-action-icon">💳</div>
-                            <div class="quick-action-title">Deposit</div>
-                            <div class="quick-action-text">bKash • Nagad • USDT TRC20</div>
-                        </button>
-
                         <button class="quick-action" type="button" onclick="openPage('premiumPage')">
                             <div class="quick-action-icon">💎</div>
                             <div class="quick-action-title">Premium</div>
@@ -2809,14 +2803,6 @@
                 </div>
 
 
-                <div id="depositPaymentInstruction" style="display:none;margin:12px 0;padding:12px 14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;line-height:1.6;">
-                    <div style="font-weight:800;margin-bottom:4px;">Payment Instructions</div>
-                    <div id="depositWalletLabel">Select a payment method.</div>
-                    <div id="depositWalletAddress" style="font-weight:800;word-break:break-all;margin-top:4px;"></div>
-                    <div id="depositInstructionType" style="margin-top:4px;font-weight:700;"></div>
-                    <div id="depositNetworkText" style="margin-top:4px;"></div>
-                </div>
-
                 <div class="payment-methods">
 
 
@@ -2879,12 +2865,7 @@
 
 
                 <div style="margin-top:12px;">
-                    <label class="deposit-amount-label" for="depositPayerNumber">Payment Number / Sender Wallet</label>
-                    <input id="depositPayerNumber" class="deposit-amount-input" type="text" placeholder="bKash/Nagad sender number or USDT TRC20 wallet">
-                </div>
-
-                <div style="margin-top:12px;">
-                    <label class="deposit-amount-label">Transaction ID / Hash</label>
+                    <label class="deposit-amount-label">Transaction ID</label>
                     <input id="depositTransactionId" class="deposit-amount-input" type="text" placeholder="Enter transaction ID">
                 </div>
                 <button type="button" class="primary-button" style="margin-top:14px;" onclick="submitDeposit()">Deposit Submit</button>
@@ -3105,7 +3086,7 @@
                             color:#6b7280;
                         "
                     >
-                        Use the Deposit button to pay the admin-configured bKash, Nagad or USDT TRC20 wallet.
+                        Deposit system is coming soon.
                     </div>
 
                 </div>
@@ -3117,7 +3098,10 @@
 
                 <div class="deposit-notice">
 
-                    💳 Deposit is active. Select a payment method, send the exact amount to the admin-configured wallet, then submit your sender number/wallet and transaction ID.
+                    💳 Deposit processing is currently
+                    <strong>not active</strong>.
+                    Payment integration will be connected
+                    in the next stage.
 
                 </div>
 
@@ -3672,8 +3656,19 @@
 
                     </div>
 
+                    <div class="stat-card">
+                        <div class="stat-value" id="referralCommission">0</div>
+                        <div class="stat-label">Lifetime Commission (5%)</div>
+                    </div>
+
                 </div>
 
+
+                <!-- Referral List -->
+                <div style="margin-top:18px;">
+                    <div class="section-title" style="font-size:15px;margin-bottom:8px;">Your Referrals & Earnings</div>
+                    <div id="referralList" style="display:grid;gap:10px;"></div>
+                </div>
 
                 <!-- Referral Information -->
 
@@ -5235,59 +5230,15 @@ async function buyPremiumLevel(level) {
    ========================================================= */
 
 async function loadReferrals() {
-
-    if (!appState.telegramUser) {
-
-        return;
-
-    }
-
-
-    const data =
-        await apiRequest(
-            "/api/referrals?telegram_id=" +
-            encodeURIComponent(
-                appState.telegramUser.id
-            )
-        );
-
-
-    if (!data) {
-
-        return;
-
-    }
-
-
-    const referrals =
-        Array.isArray(data.referrals)
-            ? data.referrals
-            : [];
-
-
-    appState.referrals =
-        referrals.length;
-
-
-    appState.referralEarned =
-        referrals.reduce(
-            (
-                total,
-                item
-            ) => {
-
-                return total +
-                    Number(
-                        item.reward || 0
-                    );
-
-            },
-            0
-        );
-
-
+    if (!appState.telegramUser) return;
+    const data=await apiRequest("/api/referrals?telegram_id="+encodeURIComponent(appState.telegramUser.id));
+    if(!data)return;
+    const referrals=Array.isArray(data.referrals)?data.referrals:[];
+    appState.referrals=referrals.filter(x=>String(x.status||"approved")!=="rejected").length;
+    appState.referralEarned=referrals.reduce((t,x)=>t+Number(x.bonus_earned||0),0);
+    appState.referralCommission=referrals.reduce((t,x)=>t+Number(x.lifetime_commission||0),0);
+    appState.referralRecords=referrals;
     updateReferralUI();
-
 }
 
 
@@ -5344,7 +5295,19 @@ function updateReferralUI() {
 
     }
 
+    const commissionEl=document.getElementById("referralCommission");
+    if(commissionEl) commissionEl.textContent=Number(appState.referralCommission||0).toFixed(2);
+    const list=document.getElementById("referralList");
+    if(list){
+        const rows=Array.isArray(appState.referralRecords)?appState.referralRecords:[];
+        if(!rows.length){list.innerHTML='<div style="padding:12px;color:#6b7280;text-align:center;border:1px dashed #dbe3ef;border-radius:10px;">No referrals yet.</div>';}
+        else{list.innerHTML=rows.map(item=>{const status=String(item.status||"approved").toLowerCase();const label=status==="approved"?"✅ Approved":status==="pending"?"⏳ Pending Admin Approval":"❌ Rejected";return `<div style="padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;"><div style="font-weight:700;margin-bottom:5px;">👤 ${escapeReferralText(item.first_name||item.username||"User")}</div><div style="font-size:12px;color:#64748b;">ID: <code>${item.referred_id}</code> · ${label}</div><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;font-size:13px;"><span>🎁 Bonus: <b>${Number(item.bonus_earned||0).toFixed(2)} TC</b></span><span>💰 Lifetime commission: <b>${Number(item.lifetime_commission||0).toFixed(2)}</b></span></div></div>`;}).join("");}
+    }
+
 }
+
+
+function escapeReferralText(value){return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[ch]));}
 
 
 /* =========================================================
@@ -5433,70 +5396,26 @@ async function copyReferralLink() {
 }
 
 
-async function loadDepositSettings() {
-    const box = document.getElementById("depositPaymentInstruction");
-    if (!box) return;
-    try {
-        const data = await apiRequest("/api/deposit/settings");
-        window.depositSettings = {};
-        (data?.settings || []).forEach(x => { window.depositSettings[String(x.method || '').toLowerCase()] = x; });
-        updateDepositInstruction();
-    } catch (e) {
-        console.error("Deposit settings load failed", e);
-    }
-}
-
-function updateDepositInstruction() {
-    const key = String(window.selectedDepositMethod || '').toLowerCase();
-    const setting = (window.depositSettings || {})[key];
-    const box = document.getElementById("depositPaymentInstruction");
-    const label = document.getElementById("depositWalletLabel");
-    const addr = document.getElementById("depositWalletAddress");
-    const network = document.getElementById("depositNetworkText");
-    const instruction = document.getElementById("depositInstructionType");
-    if (!box || !label || !addr || !network || !instruction) return;
-    if (!key || !setting || !setting.is_active || !setting.wallet_address) {
-        box.style.display = "none";
-        return;
-    }
-    box.style.display = "block";
-    const name = key === 'bkash' ? 'bKash' : key === 'nagad' ? 'Nagad' : 'USDT';
-    label.textContent = key === 'usdt' ? 'Send USDT to this wallet address:' : `Send payment to this ${name} number:`;
-    addr.textContent = setting.wallet_address;
-    instruction.textContent = `Payment method: ${setting.instruction_type || (key === 'usdt' ? 'Send USDT' : 'Send Money')}`;
-    network.textContent = key === 'usdt' ? 'Network: TRON (TRC20). Do not use ERC20/BEP20.' : 'After payment, enter your sender number and transaction ID below.';
-}
-
 async function submitDeposit() {
     if (!appState.telegramUser) { showToast("Telegram user not detected."); return; }
-    const method = String(window.selectedDepositMethod || '').toLowerCase();
-    const amount = Number(document.getElementById("depositAmount")?.value);
-    const account_number = (document.getElementById("depositPayerNumber")?.value || "").trim();
-    const transaction_id = (document.getElementById("depositTransactionId")?.value || "").trim();
+    const method=document.querySelector(".payment-method.active")?.dataset?.method || window.selectedDepositMethod || "";
+    const amount=Number(document.getElementById("depositAmount")?.value);
+    const transaction_id=(document.getElementById("depositTransactionId")?.value || "").trim();
     if (!method) { showToast("Select bKash, Nagad or USDT."); return; }
-    if (!Number.isFinite(amount) || amount < 500 || amount > 25000) { showToast("Deposit amount must be between ৳500 and ৳25,000."); return; }
-    if (!account_number) { showToast(method === 'usdt' ? 'Enter the sender USDT TRC20 wallet address.' : 'Enter the payment sender number.'); return; }
-    if (!transaction_id) { showToast("Enter the transaction ID / hash."); return; }
-    const result = await apiRequest("/api/deposit", {method:"POST", body:{telegram_id:appState.telegramUser.id,method,amount,account_number,transaction_id}});
-    if (result?.success) {
-        showToast("Deposit submitted. Waiting for admin approval.");
-        document.getElementById("depositPayerNumber").value = "";
-        document.getElementById("depositTransactionId").value = "";
-        loadDeposits();
-    } else if (result?.message) {
-        showToast(result.message);
-    }
+    if (!Number.isFinite(amount) || amount<=0) { showToast("Enter a valid deposit amount."); return; }
+    if (!transaction_id) { showToast("Enter the transaction ID."); return; }
+    const result=await apiRequest("/api/deposit",{method:"POST",body:{telegram_id:appState.telegramUser.id,method,amount,transaction_id}});
+    if (result?.success) { showToast("Deposit submitted. Waiting for admin approval."); document.getElementById("depositTransactionId").value=""; loadDeposits(); }
 }
-
 async function loadDeposits() {
     if (!appState.telegramUser) return;
-    const data = await apiRequest("/api/deposits?telegram_id=" + encodeURIComponent(appState.telegramUser.id));
-    const box = document.getElementById("depositHistory"); if (!box) return;
-    const rows = Array.isArray(data?.deposits) ? data.deposits : [];
-    box.innerHTML = rows.length ? rows.map(x=>`<div class="card" style="margin-top:8px;font-size:12px;"><b>${escapeHtml(x.method||"")}</b> — ৳${Number(x.amount||0).toFixed(2)}<br>Sender: ${escapeHtml(x.account_number||"—")}<br>TX: ${escapeHtml(x.transaction_id||"")}<br>Status: ${escapeHtml(x.status||"")}</div>`).join("") : "";
+    const data=await apiRequest("/api/deposits?telegram_id="+encodeURIComponent(appState.telegramUser.id));
+    const box=document.getElementById("depositHistory"); if(!box) return;
+    const rows=Array.isArray(data?.deposits)?data.deposits:[];
+    box.innerHTML=rows.length ? rows.map(x=>`<div class="card" style="margin-top:8px;font-size:12px;"><b>${escapeHtml(x.method||"")}</b> — ${Number(x.amount||0).toFixed(2)}<br>TX: ${escapeHtml(x.transaction_id||"")}<br>Status: ${escapeHtml(x.status||"")}</div>`).join("") : "";
 }
 window.selectedDepositMethod="";
-document.addEventListener("click",e=>{const b=e.target.closest(".payment-method"); if(!b)return; document.querySelectorAll(".payment-method").forEach(x=>x.classList.remove("active")); b.classList.add("active"); window.selectedDepositMethod=String(b.dataset.method||b.textContent||"").trim().toLowerCase(); updateDepositInstruction();});
+document.addEventListener("click",e=>{const b=e.target.closest(".payment-method"); if(!b)return; document.querySelectorAll(".payment-method").forEach(x=>x.classList.remove("active")); b.classList.add("active"); window.selectedDepositMethod=(b.textContent||"").trim();});
 
 /* =========================================================
    LOAD WITHDRAWALS
@@ -6085,11 +6004,6 @@ function openPage(pageId) {
 
     }
 
-
-    if (pageId === "depositPage") {
-        loadDepositSettings();
-        loadDeposits();
-    }
 
     /* Bottom navigation */
 
