@@ -2,7 +2,6 @@ import os
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from telegram_admin_bot import start_bot, notify_admins
 from database import (
@@ -38,6 +37,8 @@ from database import (
     update_withdrawal_status,
 
     get_user_referrals,
+    get_referral_requests,
+    process_referral_request,
     admin_give_referral_bonus,
 
     # VIP / Premium Membership
@@ -66,8 +67,6 @@ from database import (
 )
 
 app = Flask(__name__)
-# Render sits behind a trusted reverse proxy; recover the real client IP.
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 # Start the private Telegram Admin Bot in the same Render service.
 # Configure TELEGRAM_ADMIN_BOT_TOKEN and ADMIN_TELEGRAM_IDS in Render.
@@ -186,8 +185,6 @@ def create_user():
     )
 
     referrer_id = data.get("referrer_id")
-    # Capture the server-observed client IP; do not trust a client-supplied IP.
-    signup_ip = request.remote_addr
 
     if not telegram_id:
 
@@ -218,18 +215,29 @@ def create_user():
             username=username,
             first_name=first_name,
             referrer_id=referrer_id,
-            signup_ip=signup_ip
+            signup_ip=(request.headers.get("X-Forwarded-For", request.remote_addr) or "").split(",")[0].strip()
         )
+
+        if referrer_id and int(referrer_id) != telegram_id:
+            try:
+                pending = get_referral_requests("pending")
+                req = next((dict(x) for x in pending if int(x.get("referred_id")) == telegram_id), None)
+                if req:
+                    notify_admins(
+                        "👥 <b>New Referral Approval Request</b>\n"
+                        f"Referrer: <code>{req.get('referrer_id')}</code>\n"
+                        f"Referred User: <code>{req.get('referred_id')}</code>\n"
+                        f"Bonus: <b>{float(req.get('reward') or 500):,.2f} TaskCoins</b>\n\n"
+                        "Open Admin Panel → 🎁 Referral Bonus to approve or reject."
+                    )
+            except Exception:
+                app.logger.exception("Failed to notify admins about referral request")
 
         return jsonify({
             "success": True,
-            "message":
-                "User created/updated successfully",
+            "message": "User created/updated successfully",
             "user": dict(user)
         })
-
-    except ValueError as e:
-        return jsonify({"success": False, "message": str(e)}), 400
 
     except Exception as e:
 
@@ -1027,32 +1035,6 @@ def admin_update_deposit(deposit_id):
 
 
 # ============================================================
-# ADMIN REFERRAL BONUS
-# ============================================================
-
-@app.route("/api/admin/referral-bonus", methods=["POST"])
-def admin_referral_bonus():
-    admin, error = require_admin()
-    if error:
-        return error
-
-    data = request.get_json(silent=True) or {}
-    try:
-        result = admin_give_referral_bonus(
-            data.get("referrer_id"),
-            data.get("referred_id"),
-            data.get("amount")
-        )
-        return jsonify(result), (400 if not result.get("success") else 200)
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "message": "Failed to give referral bonus.",
-            "error": str(e)
-        }), 500
-
-
-# ============================================================
 # ADMIN WITHDRAWAL MANAGEMENT
 # ============================================================
 
@@ -1500,6 +1482,42 @@ def api_premium_purchase():
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "message": "Premium purchase request failed.", "error": str(e)}), 500
+
+
+# ============================================================
+# ADMIN REFERRAL MANAGEMENT
+# ============================================================
+
+@app.route("/api/admin/referral-requests", methods=["GET"])
+def admin_get_referral_requests():
+    admin,error=require_admin()
+    if error: return error
+    try: return jsonify({"success":True,"requests":[dict(x) for x in get_referral_requests(request.args.get("status","pending"))]})
+    except Exception as e: return jsonify({"success":False,"message":"Failed to load referral requests.","error":str(e)}),500
+
+@app.route("/api/admin/referral-requests/<int:referral_id>", methods=["PUT"])
+def admin_process_referral_request(referral_id):
+    admin,error=require_admin()
+    if error: return error
+    data=request.get_json(silent=True) or {}
+    try:
+        result=process_referral_request(referral_id,data.get("status"),data.get("amount",500),admin.get("id"))
+        return jsonify(result),(200 if result.get("success") else 400)
+    except Exception as e:
+        app.logger.exception("Referral approval failed")
+        return jsonify({"success":False,"message":"Failed to process referral request.","error":str(e)}),500
+
+@app.route("/api/admin/referral-bonus", methods=["POST"])
+def admin_referral_bonus():
+    admin,error=require_admin()
+    if error: return error
+    data=request.get_json(silent=True) or {}
+    try:
+        result=admin_give_referral_bonus(data.get("referrer_id"),data.get("referred_id"),data.get("amount",500),admin.get("id"))
+        return jsonify(result),(200 if result.get("success") else 400)
+    except Exception as e:
+        app.logger.exception("Manual referral bonus failed")
+        return jsonify({"success":False,"message":"Failed to give referral bonus.","error":str(e)}),500
 
 
 # ============================================================
