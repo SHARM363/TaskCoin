@@ -1372,24 +1372,17 @@
     </div>
 
     <section id="referralBonusSection" class="section">
-        <div class="page-title">🎁 Referral Bonus</div>
-        <div class="page-subtitle">Admin can issue one manual referral bonus per referral. Duplicate awards are blocked.</div>
-        <div class="card" style="max-width:700px;">
-            <div class="card-title">Give Referral Bonus</div>
-            <div id="referralBonusAlert" class="alert"></div>
-            <div class="form-group">
-                <label>Referrer Telegram ID</label>
-                <input id="refBonusReferrer" type="number" placeholder="e.g. 123456789">
+        <div class="page-title">🎁 Referral Requests</div>
+        <div class="page-subtitle">New referrals appear here automatically. Approve once to send the bonus and activate lifetime 5% deposit commission.</div>
+        <div id="referralBonusAlert" class="alert"></div>
+        <div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <span>Pending Referral Requests</span>
+                <button class="action-button" onclick="loadReferralRequests()">🔄 Refresh</button>
             </div>
-            <div class="form-group">
-                <label>Referred User Telegram ID</label>
-                <input id="refBonusReferred" type="number" placeholder="e.g. 987654321">
-            </div>
-            <div class="form-group">
-                <label>Bonus Amount (TaskCoins)</label>
-                <input id="refBonusAmount" type="number" min="0.01" step="0.01" value="500">
-            </div>
-            <button class="action-button green" onclick="giveReferralBonus()">🎁 Give Bonus</button>
+            <div id="referralRequestsLoading" style="padding:18px;color:#6b7280;">Loading...</div>
+            <div id="referralRequestsEmpty" style="display:none;padding:18px;color:#6b7280;text-align:center;">No pending referral requests.</div>
+            <div id="referralRequestsList" style="display:grid;gap:12px;"></div>
         </div>
     </section>
 
@@ -2855,32 +2848,38 @@ async function updateWithdrawal(
 // REFERRAL BONUS
 // ================================
 
-async function giveReferralBonus() {
-    const referrer_id = Number(document.getElementById("refBonusReferrer")?.value);
-    const referred_id = Number(document.getElementById("refBonusReferred")?.value);
-    const amount = Number(document.getElementById("refBonusAmount")?.value);
-
-    if (!Number.isInteger(referrer_id) || referrer_id <= 0 ||
-        !Number.isInteger(referred_id) || referred_id <= 0 ||
-        !Number.isFinite(amount) || amount <= 0) {
-        showAlert("referralBonusAlert", "Enter valid Telegram IDs and a bonus amount.", "error");
-        return;
-    }
-
-    if (!confirm(`Give ${amount.toFixed(2)} TaskCoins referral bonus to ${referrer_id}?`)) return;
-
-    try {
-        const data = await apiRequest("/api/admin/referral-bonus", {
-            method: "POST",
-            body: { referrer_id, referred_id, amount }
+async function loadReferralRequests() {
+    const loading=document.getElementById("referralRequestsLoading"), empty=document.getElementById("referralRequestsEmpty"), list=document.getElementById("referralRequestsList");
+    if(!loading||!list)return; loading.style.display="block"; empty.style.display="none"; list.innerHTML="";
+    try{
+        const data=await apiRequest("/api/admin/referral-requests?status=pending");
+        const requests=Array.isArray(data.requests)?data.requests:[]; loading.style.display="none";
+        if(!requests.length){empty.style.display="block";return;}
+        requests.forEach(r=>{
+            const card=document.createElement("div"); card.style.cssText="border:1px solid #e5e7eb;border-radius:14px;padding:14px;background:#fff;";
+            const refName=r.referrer_first_name||r.referrer_username||"User", userName=r.referred_first_name||r.referred_username||"User";
+            card.innerHTML=`<div style="font-weight:800;margin-bottom:8px;">👥 Referral #${r.id}</div>
+            <div style="font-size:14px;line-height:1.7;"><b>Referrer:</b> ${escapeHtml(String(refName))} (<code>${r.referrer_id}</code>)<br>
+            <b>Referred:</b> ${escapeHtml(String(userName))} (<code>${r.referred_id}</code>)<br>
+            <b>Requested Bonus:</b> ${Number(r.reward||500).toFixed(2)} TaskCoins</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+            <input id="refAmt_${r.id}" type="number" min="0.01" step="0.01" value="${Number(r.reward||500)}" style="padding:10px;border:1px solid #dbe3ef;border-radius:9px;width:150px;">
+            <button class="action-button green" onclick="approveReferral(${r.id})">✅ Approve & Give Bonus</button>
+            <button class="action-button" onclick="rejectReferral(${r.id})" style="background:#dc2626;color:#fff;">❌ Reject</button></div>`;
+            list.appendChild(card);
         });
-        if (!data.success) throw new Error(data.message || "Unable to give referral bonus.");
-        showAlert("referralBonusAlert", `Referral bonus of ${Number(data.award.amount).toFixed(2)} TaskCoins given successfully.`, "success");
-    } catch (e) {
-        showAlert("referralBonusAlert", e.message || "Unable to give referral bonus.", "error");
-    }
+    }catch(e){loading.style.display="none";showAlert("referralBonusAlert",e.message||"Unable to load referral requests.","error");}
 }
-
+function escapeHtml(value){return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[ch]));}
+async function approveReferral(id){
+    const amount=Number(document.getElementById(`refAmt_${id}`)?.value||500); if(!Number.isFinite(amount)||amount<=0){showAlert("referralBonusAlert","Enter a valid bonus amount.","error");return;}
+    if(!confirm(`Approve referral #${id} and give ${amount.toFixed(2)} TaskCoins?`))return;
+    try{const data=await apiRequest(`/api/admin/referral-requests/${id}`,{method:"PUT",body:{status:"approved",amount}});if(!data.success)throw new Error(data.message||"Unable to approve referral.");showAlert("referralBonusAlert",`${amount.toFixed(2)} TaskCoins credited and lifetime commission activated.` ,"success");await loadReferralRequests();}catch(e){showAlert("referralBonusAlert",e.message||"Unable to approve referral.","error");}
+}
+async function rejectReferral(id){
+    if(!confirm(`Reject referral request #${id}?`))return;
+    try{const data=await apiRequest(`/api/admin/referral-requests/${id}`,{method:"PUT",body:{status:"rejected"}});if(!data.success)throw new Error(data.message||"Unable to reject referral.");showAlert("referralBonusAlert","Referral request rejected.","success");await loadReferralRequests();}catch(e){showAlert("referralBonusAlert",e.message||"Unable to reject referral.","error");}
+}
 
 // ================================
 // LOAD USERS
