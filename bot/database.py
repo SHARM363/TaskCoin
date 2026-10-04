@@ -1,4 +1,5 @@
-EXCHANGE_FEE_PERCENT = 5
+from decimal import Decimal, ROUND_DOWN
+EXCHANGE_FEE_PERCENT = 3
 import os
 import hashlib
 import secrets
@@ -1885,13 +1886,17 @@ def create_exchange_request(telegram_id, coin_amount):
     if coin_amount < 1500: return {"success":False,"message":"Minimum exchange is 1500 TaskCoins."}
     if coin_amount % 1500 != 0: return {"success":False,"message":"TaskCoins must be exchanged in multiples of 1500."}
     cash_amount=coin_amount/15.0
+    from decimal import Decimal, ROUND_DOWN
+    gross_cash=Decimal(str(cash_amount)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    fee_cash=(gross_cash*Decimal(str(EXCHANGE_FEE_PERCENT))/Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    net_cash=(gross_cash-fee_cash).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;",(telegram_id,)); user=cur.fetchone()
         if not user: conn.rollback(); return {"success":False,"message":"User not found."}
         balance=float(user['task_balance'] or 0)
         if balance < coin_amount: conn.rollback(); return {"success":False,"message":"Insufficient TaskCoin balance."}
-        cur.execute("INSERT INTO coin_exchanges(telegram_id,coin_amount,cash_amount,status) VALUES(%s,%s,%s,'pending') RETURNING *;",(telegram_id,coin_amount,cash_amount))
+        cur.execute("INSERT INTO coin_exchanges(telegram_id,coin_amount,cash_amount,status) VALUES(%s,%s,%s,'pending') RETURNING *;",(telegram_id,coin_amount,float(net_cash)))
         row=cur.fetchone(); conn.commit(); return {"success":True,"message":"Exchange request sent to admin for approval.","exchange":row}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
@@ -1920,6 +1925,14 @@ def update_exchange_status(exchange_id,status):
             if not user: conn.rollback(); return {"success":False,"message":"User not found."}
             if float(user['task_balance'] or 0) < float(ex['coin_amount']): conn.rollback(); return {"success":False,"message":"User no longer has enough TaskCoins for this exchange."}
             cur.execute("UPDATE users SET task_balance=task_balance-%s,balance=task_balance-%s,deposit_balance=COALESCE(deposit_balance,0)+%s WHERE telegram_id=%s RETURNING *;",(ex['coin_amount'],ex['coin_amount'],ex['cash_amount'],ex['telegram_id']))
+            gross_cash = Decimal(str(ex['coin_amount'])) / Decimal('15')
+            fee_cash = (gross_cash * Decimal(str(EXCHANGE_FEE_PERCENT)) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+            cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;", (OWNER_TELEGRAM_ID,))
+            owner = cur.fetchone()
+            if not owner:
+                conn.rollback()
+                return {"success":False,"message":"Owner account not found. Register Telegram ID 8746453103 first."}
+            cur.execute("UPDATE users SET deposit_balance=COALESCE(deposit_balance,0)+%s WHERE telegram_id=%s;", (fee_cash, OWNER_TELEGRAM_ID))
             cur.execute("INSERT INTO admin_coin_ledger(exchange_id,telegram_id,coin_amount) VALUES(%s,%s,%s);",(exchange_id,ex['telegram_id'],ex['coin_amount']))
         cur.execute("UPDATE coin_exchanges SET status=%s,processed_at=CURRENT_TIMESTAMP WHERE id=%s RETURNING *;",(status,exchange_id)); row=cur.fetchone(); conn.commit(); return {"success":True,"exchange":row}
     except Exception: conn.rollback(); raise
@@ -2147,6 +2160,15 @@ def update_withdrawal_status(
                 "message":
                     "Withdrawal already processed."
             }
+
+        if status == "approved":
+            if withdrawal["source"] == "task":
+                cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;", (OWNER_TELEGRAM_ID,))
+                owner = cur.fetchone()
+                if not owner:
+                    conn.rollback()
+                    return {"success": False, "message": "Owner account not found. Register Telegram ID 8746453103 first."}
+                cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s;", (withdrawal["amount"],withdrawal["amount"],OWNER_TELEGRAM_ID))
 
         if status == "rejected":
 
@@ -2570,87 +2592,48 @@ def process_referral_request(referral_id, status, amount=500, admin_id=None):
 
 
 def transfer_taskcoins(sender_id, receiver_id, amount):
-    """Atomically transfer TaskCoins between two existing users."""
+    """Atomically transfer TaskCoins with 5% VAT credited to the owner account."""
     try:
-        sender_id = int(sender_id)
-        receiver_id = int(receiver_id)
-        amount = round(float(amount), 2)
+        sender_id = int(sender_id); receiver_id = int(receiver_id); amount = round(float(amount), 2)
     except (TypeError, ValueError):
         return {'success': False, 'message': 'Invalid sender, receiver or amount.'}
-
     if sender_id == receiver_id:
         return {'success': False, 'message': 'You cannot send TaskCoins to yourself.'}
     if amount <= 0:
         return {'success': False, 'message': 'Transfer amount must be greater than 0.'}
-
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    if sender_id == OWNER_TELEGRAM_ID or receiver_id == OWNER_TELEGRAM_ID:
+        return {'success': False, 'message': 'Owner account cannot be used as a normal transfer participant.'}
+    from decimal import Decimal, ROUND_DOWN
+    gross = Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    fee = (gross * Decimal(str(TRANSFER_FEE_PERCENT)) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    net = (gross - fee).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Always lock accounts in numeric order to reduce deadlock risk.
-        first_id, second_id = sorted((sender_id, receiver_id))
-        cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;', (first_id,))
-        first = cur.fetchone()
-        cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;', (second_id,))
-        second = cur.fetchone()
-
-        if not first or not second:
-            conn.rollback()
-            return {'success': False, 'message': 'Sender or receiver account was not found.'}
-
-        sender = first if int(first['telegram_id']) == sender_id else second
-        receiver = second if int(second['telegram_id']) == receiver_id else first
-        sender_balance = float(sender.get('task_balance') or 0)
-        if sender_balance < amount:
-            conn.rollback()
-            return {'success': False, 'message': f'Insufficient TaskCoins. Available: {sender_balance:,.2f}'}
-
-        cur.execute(
-            """UPDATE users
-               SET task_balance=COALESCE(task_balance,0)-%s,
-                   balance=COALESCE(balance,0)-%s,
-                   last_active=CURRENT_TIMESTAMP
-               WHERE telegram_id=%s AND COALESCE(task_balance,0)>=%s
-               RETURNING *;""",
-            (amount, amount, sender_id, amount)
-        )
-        sender = cur.fetchone()
+        locked = {}
+        for uid in sorted((sender_id, receiver_id, OWNER_TELEGRAM_ID)):
+            cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;', (uid,)); row = cur.fetchone()
+            if row: locked[uid] = row
+        if len(locked) != 3:
+            conn.rollback(); return {'success': False, 'message': 'Sender, receiver or owner account was not found.'}
+        sender = locked[sender_id]
+        sender_balance = Decimal(str(sender.get('task_balance') or 0))
+        if sender_balance < gross:
+            conn.rollback(); return {'success': False, 'message': f'Insufficient TaskCoins. Available: {sender_balance:,.2f}'}
+        cur.execute('UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(balance,0)-%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s AND COALESCE(task_balance,0)>=%s RETURNING *;', (gross,gross,sender_id,gross))
+        sender=cur.fetchone()
         if not sender:
-            conn.rollback()
-            return {'success': False, 'message': 'Transfer failed because the sender balance changed. Please try again.'}
-
-        cur.execute(
-            """UPDATE users
-               SET task_balance=COALESCE(task_balance,0)+%s,
-                   balance=COALESCE(balance,0)+%s,
-                   last_active=CURRENT_TIMESTAMP
-               WHERE telegram_id=%s RETURNING *;""",
-            (amount, amount, receiver_id)
-        )
-        receiver = cur.fetchone()
-        if not receiver:
-            conn.rollback()
-            return {'success': False, 'message': 'Receiver account was not found.'}
-
-        cur.execute(
-            """INSERT INTO taskcoin_transfers(sender_id,receiver_id,amount)
-               VALUES(%s,%s,%s) RETURNING *;""",
-            (sender_id, receiver_id, amount)
-        )
-        transfer = cur.fetchone()
+            conn.rollback(); return {'success':False,'message':'Transfer failed because the sender balance changed. Please try again.'}
+        cur.execute('UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;', (net,net,receiver_id))
+        receiver=cur.fetchone()
+        cur.execute('UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;', (fee,fee,OWNER_TELEGRAM_ID))
+        owner=cur.fetchone()
+        cur.execute('INSERT INTO taskcoin_transfers(sender_id,receiver_id,amount) VALUES(%s,%s,%s) RETURNING *;', (sender_id,receiver_id,gross)); transfer=cur.fetchone()
         conn.commit()
-        return {
-            'success': True,
-            'message': f'{amount:,.2f} TaskCoins sent successfully.',
-            'transfer': transfer,
-            'sender': sender,
-            'receiver': receiver
-        }
+        return {'success':True,'message':f'{gross:,.2f} TaskCoins sent. Receiver received {net:,.2f}; 5% VAT {fee:,.2f} credited to owner.','transfer':transfer,'sender':sender,'receiver':receiver,'owner':owner,'gross_amount':float(gross),'fee_amount':float(fee),'receiver_amount':float(net)}
     except Exception:
-        conn.rollback()
-        raise
+        conn.rollback(); raise
     finally:
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
 
 
 # ============================================================
@@ -3505,7 +3488,9 @@ def process_monetag_postback(
 # ----------------------------------------------------
 # MAIN-BALANCE BDT EXCHANGE (5% FEE)
 # ----------------------------------------------------
-EXCHANGE_FEE_PERCENT = 5
+EXCHANGE_FEE_PERCENT = 3
+OWNER_TELEGRAM_ID = 8746453103
+TRANSFER_FEE_PERCENT = 5
 
 def calculate_exchange_payout(amount):
     """Return (gross, fee, net) for a main-balance -> BDT exchange."""
