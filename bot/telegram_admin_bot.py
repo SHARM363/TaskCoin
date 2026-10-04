@@ -2,6 +2,8 @@ import os
 import json
 import time
 import threading
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from urllib import request as urlrequest
 from urllib import parse as urlparse
 
@@ -27,6 +29,16 @@ ADMIN_IDS = {
 }
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
+
+# Public channel used for transparent, anonymized withdrawal payment proofs.
+# The admin bot must be an administrator of this public channel with
+# permission to post/manage messages.
+PAYMENT_PROOF_CHANNEL = os.getenv(
+    "PAYMENT_PROOF_CHANNEL",
+    "@TaskCoinPaymentProof",
+).strip()
+
+DHAKA_TZ = ZoneInfo("Asia/Dhaka")
 _stop = False
 
 
@@ -81,6 +93,53 @@ def answer_callback(callback_id, text=""):
 def notify_admins(text, reply_markup=None):
     for admin_id in ADMIN_IDS:
         send_message(admin_id, text, reply_markup)
+
+
+def _mask_account(value):
+    """Hide the user payment account from the public channel."""
+    raw = str(value or "").strip()
+    if not raw:
+        return "Hidden"
+    if len(raw) <= 4:
+        return "****"
+    return "*" * max(4, len(raw) - 4) + raw[-4:]
+
+
+def _publish_withdrawal_proof(row):
+    """Publish one anonymized successful withdrawal to the public proof channel.
+
+    This is deliberately called only after the database has successfully
+    changed the withdrawal to ``approved``. A channel-post failure must not
+    undo the financial database transaction; it is reported to the admin.
+    """
+    if not PAYMENT_PROOF_CHANNEL:
+        return {
+            "ok": False,
+            "description": "PAYMENT_PROOF_CHANNEL is empty",
+        }
+
+    method = str(row.get("method") or "Payment").strip()
+    amount = _money(row.get("amount"))
+    withdrawal_id = row.get("id")
+    account = _mask_account(row.get("account_number"))
+    source = str(row.get("source") or "task").strip()
+    date_text = datetime.now(DHAKA_TZ).strftime("%d %B %Y")
+
+    text = (
+        "✅ <b>TaskCoin Payment Successful</b>\n\n"
+        f"🧾 Withdrawal: <b>#{withdrawal_id}</b>\n"
+        f"💰 Amount: <b>৳{amount}</b>\n"
+        f"💳 Method: <b>{method}</b>\n"
+        f"🔐 Account: <code>{account}</code>\n"
+        f"📅 Date: <b>{date_text}</b>\n"
+        f"📌 Type: <b>{source.title()} Balance</b>\n"
+        "\n"
+        "🎉 <b>Payment has been successfully processed.</b>\n"
+        "\n"
+        "ℹ️ Personal Telegram ID and full payment account details are hidden for privacy."
+    )
+
+    return send_message(PAYMENT_PROOF_CHANNEL, text)
 
 
 def _money(value):
@@ -256,7 +315,11 @@ def send_list(chat_id, kind):
                 "inline_keyboard": [
                     [
                         {
-                            "text": "✅ Approve",
+                            "text": (
+                                "✅ Approve / Paid"
+                                if kind == "withdrawal"
+                                else "✅ Approve"
+                            ),
                             "callback_data": f"approve:{callback_data}",
                         },
                         {
@@ -536,6 +599,36 @@ def handle_callback(cb):
                 row["telegram_id"],
                 text,
             )
+
+        # A withdrawal marked approved is treated as paid. Publish an
+        # anonymized proof only for successful withdrawal approvals.
+        if kind == "withdrawal" and status == "approved" and row:
+            proof_result = _publish_withdrawal_proof(row)
+            if proof_result.get("ok"):
+                send_message(
+                    chat_id,
+                    (
+                        f"📢 <b>Payment proof published.</b>\n"
+                        f"Withdrawal #{item_id} is now visible in "
+                        f"{PAYMENT_PROOF_CHANNEL}."
+                    ),
+                    main_menu(),
+                )
+            else:
+                error_text = proof_result.get(
+                    "description",
+                    "Unknown Telegram error",
+                )
+                send_message(
+                    chat_id,
+                    (
+                        f"⚠️ <b>Withdrawal #{item_id} was approved, "
+                        "but the public payment proof could not be posted.</b>\n\n"
+                        f"Channel: <code>{PAYMENT_PROOF_CHANNEL}</code>\n"
+                        f"Reason: <code>{error_text}</code>"
+                    ),
+                    main_menu(),
+                )
 
     except ValueError:
         answer_callback(
