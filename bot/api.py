@@ -35,6 +35,7 @@ from database import (
     get_user_withdrawals,
     get_all_withdrawals,
     update_withdrawal_status,
+    get_public_withdrawal_proofs,
 
     get_user_referrals,
     get_referral_requests,
@@ -1400,6 +1401,30 @@ def user_withdrawals():
             "error": str(e)
         }), 500
 
+
+
+# ============================================================
+# PUBLIC WITHDRAWAL PROOF
+# ============================================================
+@app.route("/api/public/withdrawals", methods=["GET"])
+def public_withdrawals():
+    """Public, privacy-safe list of successfully processed withdrawals."""
+    try:
+        limit = min(max(int(request.args.get("limit", 50)), 1), 100)
+    except (TypeError, ValueError):
+        limit = 50
+    try:
+        rows = get_public_withdrawal_proofs(limit)
+        total_paid = round(sum(float(x.get("amount") or 0) for x in rows), 2)
+        return jsonify({
+            "success": True,
+            "payments": rows,
+            "count": len(rows),
+            "total_paid_in_list": total_paid,
+            "privacy": "User IDs and full payment account details are not publicly exposed."
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": "Failed to load public payment proof."}), 500
 
 # ============================================================
 # VIP / PREMIUM MEMBERSHIP API
