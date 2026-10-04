@@ -189,6 +189,20 @@
 
         }
 
+
+        /* Professional TaskCoin page themes */
+        .page { min-height: calc(100vh - 70px); }
+        #homePage { background: linear-gradient(180deg,#eef6ff 0%,#f8fbff 48%,#fff 100%); }
+        #profilePage { background: linear-gradient(180deg,#f2f5f8 0%,#fff 100%); }
+        #tasksPage { background: linear-gradient(180deg,#edf9f4 0%,#f8fffc 100%); }
+        #premiumPage { background: linear-gradient(180deg,#f4efff 0%,#fbf9ff 100%); }
+        #luckySpinPage { background: linear-gradient(180deg,#fff5e8 0%,#fffaf3 100%); }
+        #exchangePage { background: linear-gradient(180deg,#eef5ff 0%,#f8fbff 100%); }
+        #walletPage { background: linear-gradient(180deg,#eefaf8 0%,#f8fffd 100%); }
+        #withdrawPage { background: linear-gradient(180deg,#f0f7ff 0%,#f8fbff 100%); }
+        #referralPage { background: linear-gradient(180deg,#f5f0ff 0%,#fbf9ff 100%); }
+        #depositPage { background: linear-gradient(180deg,#eefaf4 0%,#f9fffc 100%); }
+
     </style>
 
 
@@ -2803,14 +2817,6 @@
                 </div>
 
 
-                <div id="depositPaymentInstruction" style="display:none;margin:12px 0;padding:12px 14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;line-height:1.6;">
-                    <div style="font-weight:800;margin-bottom:4px;">Payment Instructions</div>
-                    <div id="depositWalletLabel">Select a payment method.</div>
-                    <div id="depositWalletAddress" style="font-weight:800;word-break:break-all;margin-top:4px;"></div>
-                    <div id="depositInstructionType" style="margin-top:4px;font-weight:700;"></div>
-                    <div id="depositNetworkText" style="margin-top:4px;"></div>
-                </div>
-
                 <div class="payment-methods">
 
 
@@ -2873,13 +2879,8 @@
 
 
                 <div style="margin-top:12px;">
-                    <label class="deposit-amount-label" for="depositPayerNumber">Payment Number / Sender Wallet</label>
-                    <input id="depositPayerNumber" class="deposit-amount-input" type="text" placeholder="bKash/Nagad sender number or USDT TRC20 wallet">
-                </div>
-
-                <div style="margin-top:12px;">
-                    <label class="deposit-amount-label" for="depositTransactionId">Transaction ID / Hash <span style="font-weight:500;color:#64748b;">(optional)</span></label>
-                    <input id="depositTransactionId" class="deposit-amount-input" type="text" placeholder="Enter transaction ID (optional)">
+                    <label class="deposit-amount-label">Transaction ID</label>
+                    <input id="depositTransactionId" class="deposit-amount-input" type="text" placeholder="Enter transaction ID">
                 </div>
                 <button type="button" class="primary-button" style="margin-top:14px;" onclick="submitDeposit()">Deposit Submit</button>
                 <div id="depositHistory" style="margin-top:14px;"></div>
@@ -2950,7 +2951,7 @@
     <div class="container">
         <div class="section">
             <div class="section-title">🔄 Exchange TaskCoins</div>
-            <div style="margin-top:4px;font-size:11px;color:#6b7280;">1500 TaskCoins = 100 BDT. Admin approval required.</div>
+            <div style="margin-top:4px;font-size:11px;color:#6b7280;">1500 TaskCoins = 100 BDT gross. 3% VAT applies on exchange. Admin approval required.</div>
             <div class="wallet-card" style="margin-top:12px;">
                 <div class="wallet-label">Available TaskCoins</div>
                 <div class="wallet-balance" id="exchangeTaskBalance">0</div>
@@ -2962,9 +2963,9 @@
                 <div class="form-group">
                     <label class="form-label" for="exchangeCoinAmount">TaskCoins to exchange</label>
                     <input type="number" id="exchangeCoinAmount" class="form-input" min="1500" step="1500" placeholder="1500">
-                    <div class="form-help">1500 Coins = 100 BDT. 3000 Coins = 200 BDT.</div>
+                    <div class="form-help">3% VAT is deducted from the exchange value before BDT is credited to Main Balance.</div>
                 </div>
-                <div class="withdraw-summary"><div class="withdraw-summary-row"><span>You will receive</span><strong id="exchangeCashPreview">0.00 BDT</strong></div></div>
+                <div class="withdraw-summary"><div class="withdraw-summary-row"><span>After 3% VAT</span><strong id="exchangeCashPreview">0.00 BDT</strong></div></div>
                 <button type="button" class="primary-button" style="margin-top:14px;" onclick="submitExchange()">🔄 Request Exchange</button>
             </div>
         </div>
@@ -2989,7 +2990,7 @@
             <div class="wallet-card">
 
                 <div class="wallet-label">
-                    Task / Earned Balance Available for Withdrawal
+                    Main Balance Available for BDT Withdrawal
                 </div>
 
                 <div
@@ -3177,40 +3178,6 @@
 
 
         <!-- ====================================================
-             TASKCOIN TRANSFER
-        ===================================================== -->
-
-        <div class="section">
-
-            <div class="section-header">
-                <div>
-                    <div class="section-title">💸 Send TaskCoins</div>
-                    <div style="margin-top:4px;font-size:11px;color:#6b7280;">
-                        Send TaskCoins to another TaskCoin Telegram user
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <label for="transferReceiverId" style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">Receiver Telegram ID</label>
-                <input id="transferReceiverId" type="number" inputmode="numeric" placeholder="Enter receiver Telegram ID" style="width:100%;padding:12px;border:1px solid #dbe3ef;border-radius:10px;box-sizing:border-box;">
-
-                <label for="transferAmount" style="display:block;font-size:12px;font-weight:700;margin:12px 0 6px;">Amount (TaskCoins)</label>
-                <input id="transferAmount" type="number" inputmode="decimal" min="1" step="0.01" placeholder="Enter amount" style="width:100%;padding:12px;border:1px solid #dbe3ef;border-radius:10px;box-sizing:border-box;">
-
-                <button type="button" class="primary-button" style="margin-top:14px;" onclick="sendTaskCoins()">
-                    Send TaskCoins
-                </button>
-
-                <div style="margin-top:8px;font-size:11px;color:#64748b;line-height:1.5;">
-                    Only your TaskCoin / task balance is used. Deposit and VIP balances are not affected.
-                </div>
-            </div>
-
-        </div>
-
-
-        <!-- ====================================================
              WITHDRAW SHORTCUT
         ===================================================== -->
 
@@ -3222,14 +3189,6 @@
                 onclick="openPage('withdrawPage')"
             >
                 💸 Go to Withdraw
-            </button>
-            <button
-                type="button"
-                class="secondary-button"
-                style="margin-top:8px;width:100%;"
-                onclick="openPage('paymentProofPage'); loadPublicPaymentProof();"
-            >
-                ✅ View Public Payment Proof
             </button>
 
         </div>
@@ -3273,7 +3232,7 @@
                             color:#6b7280;
                         "
                     >
-                        Withdraw your available TaskCoins
+                        Withdraw your available Main Balance (BDT)
                     </div>
 
                 </div>
@@ -3299,7 +3258,7 @@
                 </div>
 
                 <div class="wallet-balance-sub">
-                    TaskCoins
+                    BDT
                 </div>
 
             </div>
@@ -3322,14 +3281,7 @@
 
                 <div class="form-group">
 
-                    <div class="form-group">
-                        <label class="form-label" for="withdrawSource">Withdraw From</label>
-                        <select id="withdrawSource" class="form-select" onchange="updateWithdrawalRules()">
-                            <option value="task">Main / TaskCoin Balance</option>
-                            <option value="deposit">Deposit Balance</option>
-                        </select>
-                        <div class="form-help" id="withdrawRuleText">Minimum 1000 TaskCoins; maximum 30000.</div>
-                    </div>
+                    <div class="form-help" id="withdrawRuleText">Withdrawal is available only from Main Balance in BDT. Limit: ৳500–৳25,000.</div>
 
 
                     <label
@@ -3416,13 +3368,14 @@
                         id="withdrawAmount"
                         class="form-input"
                         placeholder="Enter amount"
-                        min="1000"
+                        min="500"
+                        max="25000"
                         step="1"
                     >
 
 
                     <div class="form-help" id="withdrawAmountHelp">
-                        Minimum withdrawal: 1000 TaskCoins
+                        Minimum withdrawal: ৳500 BDT · Maximum: ৳25,000 BDT
                     </div>
 
                 </div>
@@ -3458,7 +3411,7 @@
                         </span>
 
                         <strong class="withdraw-summary-value">
-                            100
+                            ৳500
                         </strong>
 
                     </div>
@@ -3565,34 +3518,6 @@
     </div>
 
 </section>
-
-<!-- ========================================================
-     TASKCOIN — PUBLIC PAYMENT PROOF
-     Privacy-safe successful withdrawal history
-======================================================== -->
-<section class="page" id="paymentProofPage">
-    <div class="container">
-        <div class="section">
-            <div class="section-header">
-                <div>
-                    <div class="section-title">✅ Payment Proof</div>
-                    <div style="margin-top:4px;font-size:11px;color:#6b7280;">
-                        Successfully processed withdrawals published for transparency.
-                    </div>
-                </div>
-            </div>
-            <div class="card" style="margin-bottom:12px;">
-                <div style="font-size:12px;line-height:1.6;color:#334155;">
-                    Completed payments are shown here after they are approved and processed by the administrator.
-                    Personal Telegram IDs and full payment account details are hidden.
-                </div>
-            </div>
-            <div id="publicPaymentStats" class="card" style="margin-bottom:12px;font-size:13px;">Loading payment proof…</div>
-            <div id="publicPaymentProofList"></div>
-        </div>
-    </div>
-</section>
-
 <!-- =========================================================
      PART 9 — REFERRAL PAGE
      ========================================================= -->
@@ -4005,6 +3930,8 @@ const appState = {
 
     balance: 0,
 
+    mainBalance: 0,
+
     totalEarned: 0,
 
     referrals: 0,
@@ -4320,6 +4247,8 @@ function applyUserData(user) {
             user.deposit_balance || 0
         );
 
+    appState.mainBalance = Number(user.main_balance || 0);
+
     appState.premiumIncomeBalance =
         Number(user.premium_income_balance || 0);
 
@@ -4445,18 +4374,11 @@ function updateBalanceUI() {
 
 
     if (withdrawBalance) {
-
-        withdrawBalance.textContent =
-            balance;
-
+        withdrawBalance.textContent = appState.mainBalance.toFixed(2);
     }
 
-
     if (withdrawAvailable) {
-
-        withdrawAvailable.textContent =
-            balance;
-
+        withdrawAvailable.textContent = appState.mainBalance.toFixed(2);
     }
 
 
@@ -5343,13 +5265,6 @@ async function loadReferrals() {
                 item
             ) => {
 
-                const status =
-                    String(item.status || "pending").toLowerCase();
-
-                if (status !== "approved") {
-                    return total;
-                }
-
                 return total +
                     Number(
                         item.reward || 0
@@ -5507,222 +5422,30 @@ async function copyReferralLink() {
 }
 
 
-/* =========================================================
-   TASKCOIN TRANSFER
-   ========================================================= */
-
-async function sendTaskCoins() {
-
-    if (!appState.telegramUser) {
-        showToast("Telegram user not detected.");
-        return;
-    }
-
-    const receiverInput = document.getElementById("transferReceiverId");
-    const amountInput = document.getElementById("transferAmount");
-
-    const receiverId = Number(receiverInput?.value);
-    const amount = Number(amountInput?.value);
-    const senderId = Number(appState.telegramUser.id);
-
-    if (!Number.isSafeInteger(receiverId) || receiverId <= 0) {
-        showToast("Enter a valid receiver Telegram ID.");
-        return;
-    }
-
-    if (receiverId === senderId) {
-        showToast("You cannot send TaskCoins to yourself.");
-        return;
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-        showToast("Enter a valid TaskCoin amount.");
-        return;
-    }
-
-    if (amount > Number(appState.balance || 0)) {
-        showToast("Insufficient TaskCoin balance.");
-        return;
-    }
-
-    const button = document.querySelector("button[onclick=\"sendTaskCoins()\"]");
-    if (button) button.disabled = true;
-
-    try {
-        const result = await apiRequest("/api/taskcoin/transfer", {
-            method: "POST",
-            timeout: 10000,
-            body: {
-                sender_id: senderId,
-                receiver_id: receiverId,
-                amount: amount
-            }
-        });
-
-        if (!result) return;
-
-        if (result.success) {
-            showToast(result.message || "TaskCoins sent successfully.");
-            if (receiverInput) receiverInput.value = "";
-            if (amountInput) amountInput.value = "";
-            await loadUserData();
-            await loadReferrals();
-        } else {
-            showToast(result.message || "TaskCoin transfer failed.");
-        }
-    } catch (error) {
-        console.error("TaskCoin transfer error:", error);
-        showToast("TaskCoin transfer failed. Please try again.");
-    } finally {
-        if (button) button.disabled = false;
-    }
-}
-
-
-async function loadDepositSettings() {
-    const box = document.getElementById("depositPaymentInstruction");
-    if (!box) return;
-    try {
-        const data = await apiRequest("/api/deposit/settings");
-        window.depositSettings = {};
-        (data?.settings || []).forEach(x => {
-            window.depositSettings[String(x.method || '').toLowerCase()] = x;
-        });
-        updateDepositInstruction();
-    } catch (e) {
-        console.error("Deposit settings load failed", e);
-    }
-}
-
-function updateDepositInstruction() {
-    const key = String(window.selectedDepositMethod || '').toLowerCase();
-    const setting = (window.depositSettings || {})[key];
-    const box = document.getElementById("depositPaymentInstruction");
-    const label = document.getElementById("depositWalletLabel");
-    const addr = document.getElementById("depositWalletAddress");
-    const network = document.getElementById("depositNetworkText");
-    const instruction = document.getElementById("depositInstructionType");
-    if (!box || !label || !addr || !network || !instruction) return;
-    if (!key || !setting || !setting.is_active || !setting.wallet_address) {
-        box.style.display = "none";
-        return;
-    }
-    box.style.display = "block";
-    const name = key === 'bkash' ? 'bKash' : key === 'nagad' ? 'Nagad' : 'USDT';
-    label.textContent = key === 'usdt' ? 'Send USDT to this wallet address:' : `Send payment to this ${name} number:`;
-    addr.textContent = setting.wallet_address;
-    instruction.textContent = `Payment method: ${setting.instruction_type || (key === 'usdt' ? 'Send USDT' : 'Send Money')}`;
-    network.textContent = key === 'usdt'
-        ? 'Network: TRON (TRC20). Do not use ERC20/BEP20.'
-        : 'After payment, enter your sender number below. Transaction ID / Hash is optional.';
-}
-
 async function submitDeposit() {
-    if (!appState.telegramUser) {
-        showToast("Telegram user not detected.");
-        return;
-    }
-
-    const method = String(window.selectedDepositMethod || '').toLowerCase();
-    const amount = Number(document.getElementById("depositAmount")?.value);
-    const account_number = (document.getElementById("depositPayerNumber")?.value || "").trim();
-    const transaction_id = (document.getElementById("depositTransactionId")?.value || "").trim();
-
-    if (!method) {
-        showToast("Select bKash, Nagad or USDT.");
-        return;
-    }
-    if (!Number.isFinite(amount) || amount < 500 || amount > 25000) {
-        showToast("Deposit amount must be between ৳500 and ৳25,000.");
-        return;
-    }
-    if (!account_number) {
-        showToast(method === 'usdt' ? 'Enter the sender USDT TRC20 wallet address.' : 'Enter the payment sender number.');
-        return;
-    }
-    if (!transaction_id) {
-        showToast("Enter the transaction ID / hash.");
-        return;
-    }
-
-    const result = await apiRequest("/api/deposit", {
-        method: "POST",
-        body: {
-            telegram_id: appState.telegramUser.id,
-            method,
-            amount,
-            account_number,
-            transaction_id
-        }
-    });
-
-    if (result?.success) {
-        showToast("Deposit submitted. Waiting for admin approval.");
-        const payer = document.getElementById("depositPayerNumber");
-        const tx = document.getElementById("depositTransactionId");
-        if (payer) payer.value = "";
-        if (tx) tx.value = "";
-        loadDeposits();
-    } else if (result?.message) {
-        showToast(result.message);
-    }
+    if (!appState.telegramUser) { showToast("Telegram user not detected."); return; }
+    const method=document.querySelector(".payment-method.active")?.dataset?.method || window.selectedDepositMethod || "";
+    const amount=Number(document.getElementById("depositAmount")?.value);
+    const transaction_id=(document.getElementById("depositTransactionId")?.value || "").trim();
+    if (!method) { showToast("Select bKash, Nagad or USDT."); return; }
+    if (!Number.isFinite(amount) || amount<=0) { showToast("Enter a valid deposit amount."); return; }
+    if (!transaction_id) { showToast("Enter the transaction ID."); return; }
+    const result=await apiRequest("/api/deposit",{method:"POST",body:{telegram_id:appState.telegramUser.id,method,amount,transaction_id}});
+    if (result?.success) { showToast("Deposit submitted. Waiting for admin approval."); document.getElementById("depositTransactionId").value=""; loadDeposits(); }
 }
-
 async function loadDeposits() {
     if (!appState.telegramUser) return;
-    const data = await apiRequest("/api/deposits?telegram_id=" + encodeURIComponent(appState.telegramUser.id));
-    const box = document.getElementById("depositHistory");
-    if (!box) return;
-    const rows = Array.isArray(data?.deposits) ? data.deposits : [];
-    box.innerHTML = rows.length ? rows.map(x => `
-        <div class="card" style="margin-top:8px;font-size:12px;">
-            <b>${escapeHtml(x.method || "")}</b> — ৳${Number(x.amount || 0).toFixed(2)}<br>
-            Sender: ${escapeHtml(x.account_number || "—")}<br>
-            TX: ${escapeHtml(x.transaction_id || "—")}<br>
-            Status: ${escapeHtml(x.status || "")}
-        </div>`).join("") : "";
+    const data=await apiRequest("/api/deposits?telegram_id="+encodeURIComponent(appState.telegramUser.id));
+    const box=document.getElementById("depositHistory"); if(!box) return;
+    const rows=Array.isArray(data?.deposits)?data.deposits:[];
+    box.innerHTML=rows.length ? rows.map(x=>`<div class="card" style="margin-top:8px;font-size:12px;"><b>${escapeHtml(x.method||"")}</b> — ${Number(x.amount||0).toFixed(2)}<br>TX: ${escapeHtml(x.transaction_id||"")}<br>Status: ${escapeHtml(x.status||"")}</div>`).join("") : "";
 }
-
-window.selectedDepositMethod = "";
-document.addEventListener("click", e => {
-    const b = e.target.closest(".payment-method");
-    if (!b) return;
-    document.querySelectorAll(".payment-method").forEach(x => x.classList.remove("active"));
-    b.classList.add("active");
-    window.selectedDepositMethod = String(b.dataset.method || b.textContent || "").trim().toLowerCase();
-    updateDepositInstruction();
-});
+window.selectedDepositMethod="";
+document.addEventListener("click",e=>{const b=e.target.closest(".payment-method"); if(!b)return; document.querySelectorAll(".payment-method").forEach(x=>x.classList.remove("active")); b.classList.add("active"); window.selectedDepositMethod=(b.textContent||"").trim();});
 
 /* =========================================================
    LOAD WITHDRAWALS
    ========================================================= */
-
-
-
-async function loadPublicPaymentProof() {
-    const stats = document.getElementById("publicPaymentStats");
-    const list = document.getElementById("publicPaymentProofList");
-    if (!stats || !list) return;
-    try {
-        const data = await apiRequest("/api/public/withdrawals?limit=50");
-        if (!data?.success) throw new Error("Failed");
-        const payments = Array.isArray(data.payments) ? data.payments : [];
-        stats.innerHTML = `<b>Successful payments:</b> ${payments.length}`;
-        list.innerHTML = payments.length ? payments.map(x => {
-            const dt = x.processed_at ? new Date(x.processed_at).toLocaleString() : "—";
-            return `<div class="card" style="margin-bottom:8px;font-size:12px;">
-                <div style="display:flex;justify-content:space-between;gap:10px;">
-                    <div><b>Withdrawal #${Number(x.id)}</b><br><span style="color:#64748b;">${escapeHtml(x.method || "Payment")} • ${escapeHtml(x.account_masked || "")}</span></div>
-                    <div style="text-align:right;"><b>৳${Number(x.amount || 0).toFixed(2)}</b><br><span style="color:#16a34a;font-weight:700;">PAID</span></div>
-                </div>
-                <div style="margin-top:6px;color:#64748b;">${escapeHtml(dt)}</div>
-            </div>`;
-        }).join("") : `<div class="card"><div class="empty-state"><div class="empty-title">No completed payments published yet</div><div class="empty-text">Payment proof will appear here after successful processing.</div></div></div>`;
-    } catch (e) {
-        stats.textContent = "Payment proof is temporarily unavailable.";
-        list.innerHTML = "";
-    }
-}
 
 async function loadWithdrawals() {
 
@@ -5999,26 +5722,19 @@ function getWithdrawalStatusClass(
    ========================================================= */
 
 function updateWithdrawalRules() {
-    const source = document.getElementById("withdrawSource")?.value || "task";
-    const help = document.getElementById("withdrawRuleText");
-    const amountHelp = document.getElementById("withdrawAmountHelp");
-    const amount = document.getElementById("withdrawAmount");
-    if (source === "deposit") {
-        if (help) help.textContent = "Minimum 1500 BDT from Deposit Balance; maximum 30000.";
-        if (amountHelp) amountHelp.textContent = "Minimum withdrawal: 1500 BDT";
-        if (amount) amount.min = "1500";
-    } else {
-        if (help) help.textContent = "Minimum 1000 TaskCoins from Main / TaskCoin Balance; maximum 30000.";
-        if (amountHelp) amountHelp.textContent = "Minimum withdrawal: 1000 TaskCoins";
-        if (amount) amount.min = "1000";
-    }
+    const help=document.getElementById("withdrawRuleText");
+    const amountHelp=document.getElementById("withdrawAmountHelp");
+    const amount=document.getElementById("withdrawAmount");
+    if(help) help.textContent="Withdrawal is available only from Main Balance in BDT. Limit: ৳500–৳25,000.";
+    if(amountHelp) amountHelp.textContent="Minimum withdrawal: ৳500 BDT · Maximum: ৳25,000 BDT";
+    if(amount){amount.min="500";amount.max="25000";}
 }
 
 async function submitExchange() {
     if (!appState.telegramUser) { showToast("Telegram user not detected."); return; }
     const input = document.getElementById("exchangeCoinAmount");
     const coins = Number(input?.value);
-    if (!Number.isFinite(coins) || coins < 1500 || coins % 1500 !== 0) { showToast("Exchange amount must be a multiple of 1500 TaskCoins."); return; }
+    if (!Number.isFinite(coins) || coins < 1500 || coins % 1500 !== 0) { showToast("Exchange amount must be a multiple of 1500 TaskCoins. 3% VAT applies."); return; }
     if (coins > appState.balance) { showToast("Insufficient TaskCoin balance."); return; }
     const result = await apiRequest("/api/exchange", {method:"POST", body:{telegram_id:appState.telegramUser.id, coin_amount:coins}});
     if (!result) return;
@@ -6040,7 +5756,7 @@ async function loadExchangeHistory() {
 document.addEventListener("input", function(e) {
     if (e.target && e.target.id === "exchangeCoinAmount") {
         const n=Number(e.target.value||0), el=document.getElementById("exchangeCashPreview");
-        if (el) el.textContent=(Number.isFinite(n)?n/15:0).toFixed(2)+" BDT";
+        if (el) { const gross=Number.isFinite(n)?n/15:0; el.textContent=(gross*0.97).toFixed(2)+" BDT"; }
     }
 });
 
@@ -6076,8 +5792,7 @@ async function submitWithdraw() {
             )?.value
         );
 
-    const source = document.getElementById("withdrawSource")?.value || "task";
-    const minimum = source === "deposit" ? 1500 : 1000;
+    const minimum = 500;
 
 
     /* Validate method */
@@ -6108,18 +5823,15 @@ async function submitWithdraw() {
 
     if (
     !Number.isFinite(amount) ||
-    amount < minimum ||
-    amount > 30000
+    amount < 500 ||
+    amount > 25000
 ) {
-    showToast(
-        source === "deposit" ? "Deposit Balance withdrawal must be between 1500 and 30000 BDT." : "Main / TaskCoin withdrawal must be between 1000 and 30000 TaskCoins."
-    );
+    showToast("BDT withdrawal must be between ৳500 and ৳25,000.");
     return;
 }
 
-    /* Balance check */
-
-    const available = source === "deposit" ? appState.depositBalance : appState.balance;
+    /* Main BDT Balance check */
+    const available = appState.mainBalance;
 
     if (
         amount >
@@ -6174,10 +5886,7 @@ async function submitWithdraw() {
                         account,
 
                     amount:
-                        amount,
-
-                    source:
-                        source
+                        amount
 
                 }
             }
@@ -6274,27 +5983,7 @@ async function submitWithdraw() {
    OPEN PAGE
    ========================================================= */
 
-async function openPage(pageId) {
-
-    // Show the requested Monetag In-App Interstitial on EVERY app-page navigation.
-    // This does not replace or remove any existing task/reward ads.
-    try {
-        const monetag = await waitForMonetag(5000);
-        if (typeof monetag === "function") {
-            await monetag({
-                type: 'inApp',
-                inAppSettings: {
-                    frequency: 2,
-                    capping: 0.1,
-                    interval: 30,
-                    timeout: 5,
-                    everyPage: false
-                }
-            });
-        }
-    } catch (error) {
-        console.warn("In-app interstitial unavailable:", error);
-    }
+function openPage(pageId) {
 
     const pages =
         document.querySelectorAll(
@@ -6327,11 +6016,6 @@ async function openPage(pageId) {
 
     }
 
-
-    if (pageId === "depositPage") {
-        loadDepositSettings();
-        loadDeposits();
-    }
 
     /* Bottom navigation */
 
@@ -6712,10 +6396,16 @@ window.refreshAppData =
   refreshAppData;
                   
 </script>
-<script>document.addEventListener("DOMContentLoaded", () => { loadPublicPaymentProof(); });</script>
 
+</div>
+
+
+<!-- TaskCoin main-balance BDT exchange rules -->
+<div id="main-balance-exchange-info" style="display:none">
+  <strong>Main Balance → BDT</strong>
+  <div>Exchange fee: 5%</div>
+  <div>Withdrawal range: ৳500 – ৳25,000</div>
 </div>
 
 </body>
 </html>
-
