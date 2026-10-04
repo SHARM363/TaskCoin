@@ -1967,7 +1967,7 @@ def update_deposit_payment_setting(method, wallet_address, instruction_type='Sen
 def create_deposit(telegram_id, method, amount, transaction_id, account_number=None):
     try: amount=float(amount)
     except (ValueError,TypeError): return {"success":False,"message":"Invalid deposit amount."}
-    if amount < 500 or amount > 25000: return {"success":False,"message":"Deposit amount must be between 500 and 25000 BDT."}
+    if amount < 250 or amount > 25000: return {"success":False,"message":"Deposit amount must be between 250 and 25000 BDT."}
     method_key=str(method or '').strip().lower()
     methods={"bkash":"bKash","nagad":"Nagad","usdt":"USDT"}
     if method_key not in methods: return {"success":False,"message":"Invalid deposit method."}
@@ -2258,6 +2258,30 @@ def get_public_withdrawal_proofs(limit=50):
                 'account_masked': masked,
             })
         return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_public_withdrawal_stats():
+    """Return aggregate statistics for successfully approved withdrawals."""
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT
+                COUNT(*) AS approved_payments_count,
+                COUNT(DISTINCT telegram_id) AS unique_users_count,
+                COALESCE(SUM(amount), 0) AS total_paid
+            FROM withdrawals
+            WHERE status = 'approved';
+        """)
+        row = cur.fetchone() or {}
+        return {
+            'approved_payments_count': int(row.get('approved_payments_count') or 0),
+            'unique_users_count': int(row.get('unique_users_count') or 0),
+            'total_paid': float(row.get('total_paid') or 0),
+        }
     finally:
         cur.close()
         conn.close()
