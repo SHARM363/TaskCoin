@@ -2,8 +2,7 @@ import os
 import json
 import time
 import threading
-from datetime import datetime
-from zoneinfo import ZoneInfo
+import html
 from urllib import request as urlrequest
 from urllib import parse as urlparse
 
@@ -30,15 +29,13 @@ ADMIN_IDS = {
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
 
-# Public channel used for transparent, anonymized withdrawal payment proofs.
-# The admin bot must be an administrator of this public channel with
-# permission to post/manage messages.
+# Public channel used for successful withdrawal payment proofs.
+# You can override this in Render with PAYMENT_PROOF_CHANNEL.
 PAYMENT_PROOF_CHANNEL = os.getenv(
     "PAYMENT_PROOF_CHANNEL",
     "@TaskCoinPaymentProof",
 ).strip()
 
-DHAKA_TZ = ZoneInfo("Asia/Dhaka")
 _stop = False
 
 
@@ -95,58 +92,60 @@ def notify_admins(text, reply_markup=None):
         send_message(admin_id, text, reply_markup)
 
 
-def _mask_account(value):
-    """Hide the user payment account from the public channel."""
+def _money(value):
+    try:
+        return f"{float(value):,.2f}"
+    except Exception:
+        return str(value)
+
+
+def _mask_payment_account(value):
+    """Mask a payout account before publishing it publicly."""
     raw = str(value or "").strip()
     if not raw:
-        return "Hidden"
+        return "Not shown"
     if len(raw) <= 4:
         return "****"
-    return "*" * max(4, len(raw) - 4) + raw[-4:]
+    return "****" + raw[-4:]
 
 
-def _publish_withdrawal_proof(row):
-    """Publish one anonymized successful withdrawal to the public proof channel.
-
-    This is deliberately called only after the database has successfully
-    changed the withdrawal to ``approved``. A channel-post failure must not
-    undo the financial database transaction; it is reported to the admin.
-    """
+def publish_withdrawal_payment_proof(withdrawal):
+    """Publish an anonymized successful withdrawal proof to the public channel."""
     if not PAYMENT_PROOF_CHANNEL:
         return {
             "ok": False,
             "description": "PAYMENT_PROOF_CHANNEL is empty",
         }
 
-    method = str(row.get("method") or "Payment").strip()
-    amount = _money(row.get("amount"))
-    withdrawal_id = row.get("id")
-    account = _mask_account(row.get("account_number"))
-    source = str(row.get("source") or "task").strip()
-    date_text = datetime.now(DHAKA_TZ).strftime("%d %B %Y")
+    method = html.escape(str(withdrawal.get("method") or "Unknown"))
+    amount = _money(withdrawal.get("amount"))
+    account = html.escape(
+        _mask_payment_account(withdrawal.get("account_number"))
+    )
+    withdrawal_id = html.escape(str(withdrawal.get("id") or ""))
+    processed_at = withdrawal.get("processed_at")
+    if processed_at:
+        processed_text = html.escape(str(processed_at))
+    else:
+        processed_text = "Just now"
 
     text = (
         "✅ <b>TaskCoin Payment Successful</b>\n\n"
         f"🧾 Withdrawal: <b>#{withdrawal_id}</b>\n"
         f"💰 Amount: <b>৳{amount}</b>\n"
         f"💳 Method: <b>{method}</b>\n"
-        f"🔐 Account: <code>{account}</code>\n"
-        f"📅 Date: <b>{date_text}</b>\n"
-        f"📌 Type: <b>{source.title()} Balance</b>\n"
-        "\n"
-        "🎉 <b>Payment has been successfully processed.</b>\n"
-        "\n"
-        "ℹ️ Personal Telegram ID and full payment account details are hidden for privacy."
+        f"📱 Account: <code>{account}</code>\n"
+        f"📅 Processed: <code>{processed_text}</code>\n\n"
+        "✅ <b>Status: Successfully Paid</b>"
     )
 
-    return send_message(PAYMENT_PROOF_CHANNEL, text)
-
-
-def _money(value):
-    try:
-        return f"{float(value):,.2f}"
-    except Exception:
-        return str(value)
+    result = send_message(PAYMENT_PROOF_CHANNEL, text)
+    if not result.get("ok"):
+        print(
+            "Payment proof channel post failed:",
+            result.get("description", "Unknown Telegram API error"),
+        )
+    return result
 
 
 def main_menu():
@@ -315,11 +314,7 @@ def send_list(chat_id, kind):
                 "inline_keyboard": [
                     [
                         {
-                            "text": (
-                                "✅ Approve / Paid"
-                                if kind == "withdrawal"
-                                else "✅ Approve"
-                            ),
+                            "text": "✅ Approve",
                             "callback_data": f"approve:{callback_data}",
                         },
                         {
@@ -600,35 +595,10 @@ def handle_callback(cb):
                 text,
             )
 
-        # A withdrawal marked approved is treated as paid. Publish an
-        # anonymized proof only for successful withdrawal approvals.
+        # Publish only successful withdrawal approvals. Rejections and
+        # deposits/exchanges are intentionally never posted here.
         if kind == "withdrawal" and status == "approved" and row:
-            proof_result = _publish_withdrawal_proof(row)
-            if proof_result.get("ok"):
-                send_message(
-                    chat_id,
-                    (
-                        f"📢 <b>Payment proof published.</b>\n"
-                        f"Withdrawal #{item_id} is now visible in "
-                        f"{PAYMENT_PROOF_CHANNEL}."
-                    ),
-                    main_menu(),
-                )
-            else:
-                error_text = proof_result.get(
-                    "description",
-                    "Unknown Telegram error",
-                )
-                send_message(
-                    chat_id,
-                    (
-                        f"⚠️ <b>Withdrawal #{item_id} was approved, "
-                        "but the public payment proof could not be posted.</b>\n\n"
-                        f"Channel: <code>{PAYMENT_PROOF_CHANNEL}</code>\n"
-                        f"Reason: <code>{error_text}</code>"
-                    ),
-                    main_menu(),
-                )
+            publish_withdrawal_payment_proof(row)
 
     except ValueError:
         answer_callback(
