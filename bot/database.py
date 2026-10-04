@@ -403,6 +403,12 @@ def init_db():
             );
         """)
 
+        # Referral moderation fields (safe migration for existing databases).
+        cur.execute("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending';")
+        cur.execute("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP NULL;")
+        cur.execute("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS approved_by BIGINT NULL;")
+        cur.execute("UPDATE referrals SET status='pending' WHERE status IS NULL OR TRIM(status)='';")
+
         # ----------------------------------------------------
         # ADMINS
         # ----------------------------------------------------
@@ -827,9 +833,34 @@ def create_or_update_user(
         referral_code = "TC" + str(telegram_id)
         cur.execute("SELECT * FROM users WHERE telegram_id = %s FOR UPDATE;", (telegram_id,))
         existing = cur.fetchone()
+
         if existing:
-            cur.execute("""UPDATE users SET username=%s, first_name=%s, last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;""", (username, first_name, telegram_id))
+            cur.execute("""
+                UPDATE users
+                SET username=%s, first_name=%s, last_active=CURRENT_TIMESTAMP
+                WHERE telegram_id=%s RETURNING *;
+            """, (username, first_name, telegram_id))
             user = cur.fetchone()
+
+            # Existing user opened a referral link: create the missing pending
+            # request, but NEVER pay the bonus automatically.
+            if referrer_id and not user.get('referred_by'):
+                try:
+                    candidate = int(referrer_id)
+                except (TypeError, ValueError):
+                    candidate = None
+                if candidate and candidate != int(telegram_id):
+                    cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (candidate,))
+                    referrer = cur.fetchone()
+                    if referrer:
+                        cur.execute("SELECT id FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;", (telegram_id,))
+                        if not cur.fetchone():
+                            cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s;", (candidate, telegram_id))
+                            cur.execute("""
+                                INSERT INTO referrals(referrer_id,referred_id,reward,status)
+                                VALUES(%s,%s,%s,'pending') RETURNING *;
+                            """, (candidate, telegram_id, REFERRAL_REWARD))
+
             conn.commit()
             return user
 
@@ -840,23 +871,30 @@ def create_or_update_user(
         user = cur.fetchone()
 
         if referrer_id:
-            try: referrer_id = int(referrer_id)
-            except (TypeError, ValueError): referrer_id = None
-            if referrer_id and referrer_id != telegram_id:
-                cur.execute("SELECT telegram_id, referred_by FROM users WHERE telegram_id=%s FOR UPDATE;", (referrer_id,))
+            try:
+                candidate = int(referrer_id)
+            except (TypeError, ValueError):
+                candidate = None
+            if candidate and candidate != int(telegram_id):
+                cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (candidate,))
                 referrer = cur.fetchone()
                 if referrer:
-                    cur.execute("SELECT 1 FROM referrals WHERE referred_id=%s LIMIT 1;", (telegram_id,))
+                    cur.execute("SELECT id FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;", (telegram_id,))
                     if not cur.fetchone():
-                        cur.execute("INSERT INTO referrals(referrer_id,referred_id,reward) VALUES(%s,%s,%s) RETURNING *;", (referrer_id, telegram_id, REFERRAL_REWARD))
-                        cur.execute("UPDATE users SET referral_count=COALESCE(referral_count,0)+1, task_balance=COALESCE(task_balance,0)+%s, balance=COALESCE(task_balance,0)+%s, total_earned=COALESCE(total_earned,0)+%s WHERE telegram_id=%s;", (REFERRAL_REWARD, REFERRAL_REWARD, REFERRAL_REWARD, referrer_id))
-                        cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s;", (referrer_id, telegram_id))
+                        cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s;", (candidate, telegram_id))
+                        cur.execute("""
+                            INSERT INTO referrals(referrer_id,referred_id,reward,status)
+                            VALUES(%s,%s,%s,'pending') RETURNING *;
+                        """, (candidate, telegram_id, REFERRAL_REWARD))
+
         conn.commit()
         return user
     except Exception:
-        conn.rollback(); raise
+        conn.rollback()
+        raise
     finally:
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
 
 
 def get_user(telegram_id):
@@ -1906,22 +1944,153 @@ def update_withdrawal_status(
 # ============================================================
 
 def create_referral(referrer_id, referred_id, reward=500):
-    if referrer_id == referred_id: return {"success":False,"message":"Self referral is not allowed."}
-    try: reward=float(reward)
-    except: reward=500
-    if reward <= 0: reward=500
+    """Create a pending referral. Bonus is paid only after admin approval."""
+    try:
+        referrer_id = int(referrer_id)
+        referred_id = int(referred_id)
+        reward = round(float(reward), 2)
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Invalid referral IDs or reward."}
+
+    if referrer_id == referred_id:
+        return {"success": False, "message": "Self referral is not allowed."}
+    if reward <= 0:
+        reward = 500
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (referrer_id,))
+        if not cur.fetchone():
+            conn.rollback()
+            return {"success": False, "message": "Referrer not found."}
+        cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (referred_id,))
+        if not cur.fetchone():
+            conn.rollback()
+            return {"success": False, "message": "Referred user not found."}
+        cur.execute("SELECT * FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;", (referred_id,))
+        existing = cur.fetchone()
+        if existing:
+            conn.rollback()
+            return {"success": False, "message": "This user has already been referred.", "referral": existing}
+
+        cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s AND referred_by IS NULL;", (referrer_id, referred_id))
+        cur.execute("""
+            INSERT INTO referrals(referrer_id,referred_id,reward,status)
+            VALUES(%s,%s,%s,'pending') RETURNING *;
+        """, (referrer_id, referred_id, reward))
+        referral = cur.fetchone()
+        conn.commit()
+        return {"success": True, "message": "Referral created and is pending admin approval.", "referral": referral, "reward": reward}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_user_referrals(telegram_id):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT 1 FROM referrals WHERE referred_id=%s LIMIT 1;",(referred_id,))
-        if cur.fetchone(): conn.rollback(); return {"success":False,"message":"This user has already been referred."}
-        cur.execute("SELECT 1 FROM users WHERE telegram_id=%s;",(referrer_id,))
-        if not cur.fetchone(): conn.rollback(); return {"success":False,"message":"Referrer not found."}
-        cur.execute("INSERT INTO referrals(referrer_id,referred_id,reward) VALUES(%s,%s,%s) RETURNING *;",(referrer_id,referred_id,reward)); referral=cur.fetchone()
-        cur.execute("UPDATE users SET referral_count=COALESCE(referral_count,0)+1,task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(task_balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s WHERE telegram_id=%s;",(reward,reward,reward,referrer_id))
-        cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s AND referred_by IS NULL;",(referrer_id,referred_id))
-        conn.commit(); return {"success":True,"referral":referral,"reward":reward}
-    except Exception: conn.rollback(); raise
-    finally: cur.close(); conn.close()
+        cur.execute("""
+            SELECT r.*, COALESCE(NULLIF(TRIM(r.status),''),'pending') AS status,
+                   u.username, u.first_name
+            FROM referrals r
+            LEFT JOIN users u ON u.telegram_id=r.referred_id
+            WHERE r.referrer_id=%s ORDER BY r.id DESC;
+        """, (telegram_id,))
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+
+def get_referral_requests(status='pending'):
+    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        params=[]
+        where=''
+        if status and status != 'all':
+            where="WHERE COALESCE(NULLIF(TRIM(r.status),''),'pending')=%s"
+            params.append(status)
+        cur.execute(f"""
+            SELECT r.*,
+                   ru.username AS referrer_username, ru.first_name AS referrer_first_name,
+                   uu.username AS referred_username, uu.first_name AS referred_first_name
+            FROM referrals r
+            LEFT JOIN users ru ON ru.telegram_id=r.referrer_id
+            LEFT JOIN users uu ON uu.telegram_id=r.referred_id
+            {where}
+            ORDER BY r.id DESC;
+        """, tuple(params))
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+
+def process_referral_request(referral_id, status, amount=500, admin_id=None):
+    status = str(status or '').strip().lower()
+    if status not in ('approved','rejected'):
+        return {'success':False,'message':'Status must be approved or rejected.'}
+    try:
+        referral_id=int(referral_id)
+        amount=round(float(amount),2)
+    except (TypeError,ValueError):
+        return {'success':False,'message':'Invalid referral request or bonus amount.'}
+    if status == 'approved' and amount <= 0:
+        return {'success':False,'message':'Bonus amount must be greater than 0.'}
+
+    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM referrals WHERE id=%s FOR UPDATE;", (referral_id,))
+        r=cur.fetchone()
+        if not r:
+            conn.rollback(); return {'success':False,'message':'Referral request not found.'}
+        current=str(r.get('status') or 'pending').lower()
+        if current != 'pending':
+            conn.rollback(); return {'success':False,'message':f'Referral request is already {current}.','duplicate':True}
+
+        if status == 'rejected':
+            cur.execute("UPDATE referrals SET status='rejected', approved_at=CURRENT_TIMESTAMP, approved_by=%s WHERE id=%s RETURNING *;", (admin_id,referral_id))
+            row=cur.fetchone(); conn.commit()
+            return {'success':True,'message':'Referral request rejected.','referral':row}
+
+        cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (r['referrer_id'],))
+        if not cur.fetchone():
+            conn.rollback(); return {'success':False,'message':'Referrer user not found.'}
+        cur.execute("""
+            UPDATE users
+            SET referral_count=COALESCE(referral_count,0)+1,
+                task_balance=COALESCE(task_balance,0)+%s,
+                balance=COALESCE(balance,0)+%s,
+                total_earned=COALESCE(total_earned,0)+%s
+            WHERE telegram_id=%s RETURNING *;
+        """, (amount,amount,amount,r['referrer_id']))
+        referrer=cur.fetchone()
+        cur.execute("UPDATE referrals SET status='approved', reward=%s, approved_at=CURRENT_TIMESTAMP, approved_by=%s WHERE id=%s RETURNING *;", (amount,admin_id,referral_id))
+        row=cur.fetchone()
+        conn.commit()
+        return {'success':True,'message':'Referral approved and bonus credited.','referral':row,'reward':amount,'referrer':referrer}
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        cur.close(); conn.close()
+
+
+def admin_give_referral_bonus(referrer_id,referred_id,amount,admin_id=None):
+    try:
+        referrer_id=int(referrer_id); referred_id=int(referred_id); amount=float(amount)
+    except (TypeError,ValueError):
+        return {'success':False,'message':'Invalid referral IDs or bonus amount.'}
+    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute('SELECT id FROM referrals WHERE referrer_id=%s AND referred_id=%s FOR UPDATE;', (referrer_id,referred_id))
+        row=cur.fetchone()
+    finally:
+        cur.close(); conn.close()
+    if not row:
+        return {'success':False,'message':'Referral relationship not found.'}
+    return process_referral_request(row['id'],'approved',amount,admin_id)
 
 
 def get_lucky_spin_config():
