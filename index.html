@@ -3126,6 +3126,15 @@
             </button>
 
 
+            <button
+                class="wallet-action"
+                type="button"
+                onclick="openPage('charactersPage'); loadCharactersPage();"
+            >
+                🧑‍🚀 Characters
+            </button>
+
+
         </div>
 
 
@@ -3247,6 +3256,31 @@
     </div>
 
 </section>
+<!-- ========================================================
+     TASKCOIN — CHARACTER MARKET
+======================================================== -->
+<section class="page" id="charactersPage">
+    <div class="container">
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">🧑‍🚀 TaskCoin Characters</div>
+                    <div style="margin-top:4px;font-size:11px;color:#64748b;">Main Balance দিয়ে কিনুন, নিজের Character অন্য User-এর কাছে Marketplace-এ বিক্রি করুন।</div>
+                </div>
+            </div>
+            <div id="characterList" style="display:grid;gap:12px;"></div>
+        </div>
+        <div class="section">
+            <div class="section-title">🛍️ Character Marketplace</div>
+            <div id="characterMarketList" style="display:grid;gap:12px;margin-top:10px;"></div>
+        </div>
+        <div class="section">
+            <div class="section-title">🎒 My Characters</div>
+            <div id="myCharacterList" style="display:grid;gap:12px;margin-top:10px;"></div>
+        </div>
+    </div>
+</section>
+
 <!-- ========================================================
      TASKCOIN — PART 8
      WITHDRAW PAGE + WITHDRAWAL HISTORY
@@ -6201,6 +6235,85 @@ async function showNavigationAdIfNeeded(targetPageId) {
 }
 
 /* =========================================================
+   CHARACTER MARKET
+   ========================================================= */
+async function loadCharactersPage() {
+    const uid = appState.telegramUser?.id;
+    if (!uid) { await loadTelegramProfile(); }
+    if (!appState.telegramUser?.id) { showToast("Telegram user not detected."); return; }
+    const [chars, market, mine] = await Promise.all([
+        apiRequest("/api/characters"),
+        apiRequest("/api/characters/market"),
+        apiRequest(`/api/characters/user/${encodeURIComponent(appState.telegramUser.id)}`)
+    ]);
+    renderCharacters(chars?.characters || []);
+    renderCharacterMarket(market?.listings || []);
+    renderMyCharacters(mine?.characters || []);
+}
+
+function renderCharacters(characters) {
+    const el=document.getElementById("characterList"); if(!el) return;
+    if(!characters.length){ el.innerHTML='<div class="card">No characters available.</div>'; return; }
+    el.innerHTML=characters.filter(c=>c.is_active).map(c=>`<div class="card" style="border-radius:18px;">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+            <div><div style="font-weight:900;font-size:17px;">🧑‍🚀 ${escapeHtml(c.name||c.code)}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:3px;">${escapeHtml(c.code)} • ${escapeHtml(c.rarity||'')}</div></div>
+            <div style="font-weight:900;color:#b7791f;">৳${Number(c.current_price||0).toLocaleString()}</div>
+        </div>
+        <div style="font-size:12px;color:#475569;margin-top:8px;">${escapeHtml(c.description||'')}</div>
+        <div style="margin-top:8px;font-size:12px;"><b>${escapeHtml(c.ability_name||'Ability')}</b> • +${Number(c.boost_percent||0)}% boost</div>
+        <button class="primary-button" style="margin-top:10px;" onclick="buyCharacter(${Number(c.id)})">Buy Character</button>
+    </div>`).join('');
+}
+
+function renderCharacterMarket(listings) {
+    const el=document.getElementById("characterMarketList"); if(!el) return;
+    if(!listings.length){ el.innerHTML='<div class="card" style="font-size:12px;color:#64748b;">No active marketplace listings.</div>'; return; }
+    el.innerHTML=listings.map(l=>`<div class="card" style="border-radius:18px;">
+        <div style="font-weight:900;">${escapeHtml(l.name||l.code)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;">${escapeHtml(l.code)} • ${escapeHtml(l.rarity||'')} • Seller: ${escapeHtml(String(l.seller_id))}</div>
+        <div style="font-size:20px;font-weight:900;margin-top:8px;">৳${Number(l.asking_price||0).toLocaleString()}</div>
+        <button class="primary-button" style="margin-top:10px;" onclick="buyCharacterListing(${Number(l.id)})">Buy from User</button>
+    </div>`).join('');
+}
+
+function renderMyCharacters(items) {
+    const el=document.getElementById("myCharacterList"); if(!el) return;
+    if(!items.length){ el.innerHTML='<div class="card" style="font-size:12px;color:#64748b;">You do not own any character yet.</div>'; return; }
+    el.innerHTML=items.map(o=>`<div class="card" style="border-radius:18px;">
+        <div style="font-weight:900;">${escapeHtml(o.name||o.code)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;">${escapeHtml(o.code||'')} • Purchase ৳${Number(o.purchase_price||0).toLocaleString()}</div>
+        <div style="font-size:12px;margin-top:7px;">${escapeHtml(o.ability_name||'Ability')} • +${Number(o.boost_percent||0)}%</div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+            <input id="charSellPrice_${Number(o.id)}" class="form-input" type="number" min="1" step="1" placeholder="Sale price">
+            <button class="secondary-button" style="width:auto;" onclick="listCharacterForSale(${Number(o.id)})">List</button>
+        </div>
+    </div>`).join('');
+}
+
+async function buyCharacter(characterId){
+    const uid=appState.telegramUser?.id; if(!uid) return;
+    const result=await apiRequest("/api/characters/buy",{method:"POST",body:{telegram_id:uid,character_id:Number(characterId)}});
+    if(!result?.success){showToast(result?.message||"Character purchase failed.");return;}
+    showToast(result.message||"Character purchased."); await refreshAppData(); await loadCharactersPage();
+}
+
+async function listCharacterForSale(ownershipId){
+    const uid=appState.telegramUser?.id; const input=document.getElementById(`charSellPrice_${Number(ownershipId)}`);
+    const price=Number(input?.value||0); if(!uid||price<=0){showToast("Valid sale price দিন।");return;}
+    const result=await apiRequest("/api/characters/market/list",{method:"POST",body:{telegram_id:uid,ownership_id:Number(ownershipId),asking_price:price}});
+    if(!result?.success){showToast(result?.message||"Listing failed.");return;}
+    showToast("Character marketplace-এ list হয়েছে।"); await loadCharactersPage();
+}
+
+async function buyCharacterListing(listingId){
+    const uid=appState.telegramUser?.id; if(!uid) return;
+    const result=await apiRequest("/api/characters/market/buy",{method:"POST",body:{telegram_id:uid,listing_id:Number(listingId)}});
+    if(!result?.success){showToast(result?.message||"Marketplace purchase failed.");return;}
+    showToast(result.message||"Character purchased."); await refreshAppData(); await loadCharactersPage();
+}
+
+/* =========================================================
    OPEN PAGE
    ========================================================= */
 
@@ -6259,7 +6372,10 @@ function openPage(pageId) {
             "navWithdraw",
 
         referralPage:
-            "navReferral"
+            "navReferral",
+
+        charactersPage:
+            "navWallet"
 
     };
 
@@ -6621,6 +6737,11 @@ window.copyReferralLink =
 
 window.refreshAppData = 
   refreshAppData;
+
+window.loadCharactersPage = loadCharactersPage;
+window.buyCharacter = buyCharacter;
+window.listCharacterForSale = listCharacterForSale;
+window.buyCharacterListing = buyCharacterListing;
                   
 </script>
 
