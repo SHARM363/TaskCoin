@@ -203,6 +203,7 @@
         #withdrawPage { background: linear-gradient(180deg,#f0f7ff 0%,#f8fbff 100%); }
         #referralPage { background: linear-gradient(180deg,#f5f0ff 0%,#fbf9ff 100%); }
         #depositPage { background: linear-gradient(180deg,#eefaf4 0%,#f9fffc 100%); }
+        #paymentProofPage { background: linear-gradient(180deg,#eefaf8 0%,#f8fffd 48%,#ffffff 100%); }
 
     
 /* =========================================================
@@ -3599,40 +3600,52 @@
         </div>
 
 
-
-<!-- ====================================================
-     SUCCESSFUL WITHDRAWAL PAYMENT HISTORY / PROOF
-===================================================== -->
-<section class="page-section" id="publicWithdrawalHistorySection" style="margin-top:12px;">
-    <div class="section">
-        <div class="section-header">
-            <div>
-                <div class="section-title">💸 Successful Withdrawal History</div>
-                <div class="section-link">Approved payments made to users</div>
-            </div>
-        </div>
-        <div class="wallet-stats" style="margin-top:10px;">
-            <div class="wallet-stat">
-                <div class="wallet-stat-value" id="publicWithdrawUserCount">0</div>
-                <div class="wallet-stat-label">Users Paid</div>
-            </div>
-            <div class="wallet-stat">
-                <div class="wallet-stat-value" id="publicWithdrawPaymentCount">0</div>
-                <div class="wallet-stat-label">Successful Payments</div>
-            </div>
-        </div>
-        <div class="withdraw-summary" style="margin-top:10px;">
-            <div class="withdraw-summary-row">
-                <span class="withdraw-summary-label">Total Paid</span>
-                <strong class="withdraw-summary-value" id="publicWithdrawTotalPaid">৳0.00</strong>
-            </div>
-        </div>
-        <div id="publicWithdrawalHistory" style="margin-top:10px;"></div>
     </div>
+
 </section>
 
-    </div>
+<!-- =========================================================
+     PUBLIC PAYMENT PROOF PAGE
+     Login-free, database-backed proof of successful payouts.
+     ========================================================= -->
+<section class="page" id="paymentProofPage">
+    <div class="container">
 
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">✅ Payment Proof</div>
+                    <div class="section-link">Verified successful withdrawal payments</div>
+                </div>
+            </div>
+
+            <div class="form-help" style="margin-top:10px;line-height:1.6;">
+                This public page shows real withdrawal payments that were approved by the administrator.
+                Account details are masked for user privacy.
+            </div>
+
+            <div class="wallet-stats" style="margin-top:14px;">
+                <div class="wallet-stat">
+                    <div class="wallet-stat-value" id="publicWithdrawUserCount">0</div>
+                    <div class="wallet-stat-label">Users Paid</div>
+                </div>
+                <div class="wallet-stat">
+                    <div class="wallet-stat-value" id="publicWithdrawPaymentCount">0</div>
+                    <div class="wallet-stat-label">Successful Payments</div>
+                </div>
+            </div>
+
+            <div class="withdraw-summary" style="margin-top:10px;">
+                <div class="withdraw-summary-row">
+                    <span class="withdraw-summary-label">Total Paid</span>
+                    <strong class="withdraw-summary-value" id="publicWithdrawTotalPaid">৳0.00</strong>
+                </div>
+            </div>
+
+            <div id="publicWithdrawalHistory" style="margin-top:12px;"></div>
+        </div>
+
+    </div>
 </section>
 
 <!-- =========================================================
@@ -5725,7 +5738,7 @@ async function loadPublicWithdrawalHistory() {
                 <div><b>${escapeHtml(x.method || "Payment")}</b><br><span style="color:#6b7280;">${escapeHtml(x.account_masked || "")}</span></div>
                 <div style="text-align:right;"><b>৳${Number(x.amount || 0).toFixed(2)}</b><br><span class="status-success">Paid</span></div>
             </div>
-            <div style="margin-top:5px;color:#6b7280;font-size:11px;">${escapeHtml(date)}</div>
+            <div style="margin-top:5px;color:#6b7280;font-size:11px;">Payment ID: #${escapeHtml(x.id)} · ${escapeHtml(date)}</div>
         </div>`;
     }).join("") : `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-title">No Successful Withdrawals Yet</div><div class="empty-text">Approved payments will appear here.</div></div>`;
 }
@@ -6584,6 +6597,21 @@ async function startTaskCoin() {
         }
 
         loadTelegramProfile();
+
+        const publicPaymentProof =
+            new URLSearchParams(window.location.search).get("page") === "payment-proof";
+
+        if (publicPaymentProof) {
+            openPage("paymentProofPage");
+            const bottomNav = document.getElementById("bottomNav");
+            const backButton = document.getElementById("pageBackButton");
+            if (bottomNav) bottomNav.style.display = "none";
+            if (backButton) backButton.style.display = "none";
+            hideAppLoading();
+            await loadPublicWithdrawalHistory();
+            return;
+        }
+
         openPage("homePage");
         hideAppLoading();
 
