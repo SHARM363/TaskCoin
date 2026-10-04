@@ -74,6 +74,13 @@ from database import (
 
 app = Flask(__name__)
 
+# TaskCoin Characters / Character Marketplace
+try:
+    from character_api import character_bp
+    app.register_blueprint(character_bp)
+except Exception as exc:
+    print("Character API registration failed:", exc)
+
 # Start the private Telegram Admin Bot in the same Render service.
 # Configure TELEGRAM_ADMIN_BOT_TOKEN and ADMIN_TELEGRAM_IDS in Render.
 try:
