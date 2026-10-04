@@ -2879,15 +2879,26 @@
 
                 </div>
 
+                <div id="depositPaymentDetails" class="deposit-info" style="margin-top:12px;display:none;">
+                    <div style="font-weight:700;margin-bottom:6px;">Payment Number / Wallet</div>
+                    <div id="depositPaymentAddress" style="font-size:16px;font-weight:800;word-break:break-all;"></div>
+                    <div id="depositPaymentInstruction" style="margin-top:5px;"></div>
+                    <div id="depositPaymentNetwork" style="margin-top:3px;"></div>
+                </div>
 
                 <div class="deposit-info">
-                    Deposit requests are pending until approved by the Telegram Admin Bot.
+                    Send the exact deposit amount to the admin number/wallet shown above, then submit the transaction ID.
                 </div>
 
 
                 <div style="margin-top:12px;">
+                    <label class="deposit-amount-label">Sender Number / Wallet Address</label>
+                    <input id="depositSenderNumber" class="deposit-amount-input" type="text" placeholder="Number used to send the payment" autocomplete="off">
+                </div>
+
+                <div style="margin-top:12px;">
                     <label class="deposit-amount-label">Transaction ID</label>
-                    <input id="depositTransactionId" class="deposit-amount-input" type="text" placeholder="Enter transaction ID">
+                    <input id="depositTransactionId" class="deposit-amount-input" type="text" placeholder="Enter transaction ID" autocomplete="off">
                 </div>
                 <button type="button" class="primary-button" style="margin-top:14px;" onclick="submitDeposit()">Deposit Submit</button>
                 <div id="depositHistory" style="margin-top:14px;"></div>
@@ -5469,16 +5480,48 @@ async function copyReferralLink() {
 }
 
 
+async function loadDepositPaymentSettings() {
+    const details=document.getElementById("depositPaymentDetails");
+    const address=document.getElementById("depositPaymentAddress");
+    const instruction=document.getElementById("depositPaymentInstruction");
+    const network=document.getElementById("depositPaymentNetwork");
+    if (!details || !address) return;
+    try {
+        const data=await apiRequest("/api/deposit/settings");
+        const settings=Array.isArray(data?.settings)?data.settings:[];
+        const method=(document.querySelector(".payment-method.active")?.dataset?.method || window.selectedDepositMethod || "").toLowerCase();
+        const setting=settings.find(x=>String(x.method||"").toLowerCase()===method);
+        if (!setting || !setting.wallet_address) {
+            details.style.display="none";
+            return;
+        }
+        address.textContent=setting.wallet_address;
+        instruction.textContent=setting.instruction_type ? String(setting.instruction_type) : "Send Money";
+        network.textContent=setting.network ? `Network: ${setting.network}` : "";
+        details.style.display="block";
+    } catch (error) {
+        console.error("Deposit payment settings error:", error);
+        details.style.display="none";
+    }
+}
+
 async function submitDeposit() {
     if (!appState.telegramUser) { showToast("Telegram user not detected."); return; }
     const method=document.querySelector(".payment-method.active")?.dataset?.method || window.selectedDepositMethod || "";
     const amount=Number(document.getElementById("depositAmount")?.value);
+    const account_number=(document.getElementById("depositSenderNumber")?.value || "").trim();
     const transaction_id=(document.getElementById("depositTransactionId")?.value || "").trim();
     if (!method) { showToast("Select bKash, Nagad or USDT."); return; }
-    if (!Number.isFinite(amount) || amount<=0) { showToast("Enter a valid deposit amount."); return; }
+    if (!Number.isFinite(amount) || amount < 500 || amount > 25000) { showToast("Deposit amount must be between 500 and 25000 BDT."); return; }
+    if (!account_number) { showToast("Enter the number/wallet used to send the payment."); return; }
     if (!transaction_id) { showToast("Enter the transaction ID."); return; }
-    const result=await apiRequest("/api/deposit",{method:"POST",body:{telegram_id:appState.telegramUser.id,method,amount,transaction_id}});
-    if (result?.success) { showToast("Deposit submitted. Waiting for admin approval."); document.getElementById("depositTransactionId").value=""; loadDeposits(); }
+    const result=await apiRequest("/api/deposit",{method:"POST",body:{telegram_id:appState.telegramUser.id,method,amount,account_number,transaction_id}});
+    if (result?.success) {
+        showToast(result.message || "Deposit submitted. Waiting for admin approval.");
+        document.getElementById("depositSenderNumber").value="";
+        document.getElementById("depositTransactionId").value="";
+        loadDeposits();
+    } else { showToast(result?.message || "Deposit could not be submitted."); }
 }
 function updateTransferPreview() {
     const amount = Number(document.getElementById("transferAmount")?.value || 0);
@@ -5542,7 +5585,9 @@ async function loadDeposits() {
     box.innerHTML=rows.length ? rows.map(x=>`<div class="card" style="margin-top:8px;font-size:12px;"><b>${escapeHtml(x.method||"")}</b> — ${Number(x.amount||0).toFixed(2)}<br>TX: ${escapeHtml(x.transaction_id||"")}<br>Status: ${escapeHtml(x.status||"")}</div>`).join("") : "";
 }
 window.selectedDepositMethod="";
-document.addEventListener("click",e=>{const b=e.target.closest(".payment-method"); if(!b)return; document.querySelectorAll(".payment-method").forEach(x=>x.classList.remove("active")); b.classList.add("active"); window.selectedDepositMethod=(b.textContent||"").trim();});
+document.addEventListener("click",e=>{const b=e.target.closest(".payment-method"); if(!b)return; document.querySelectorAll(".payment-method").forEach(x=>x.classList.remove("active")); b.classList.add("active"); window.selectedDepositMethod=b.dataset.method || ""; loadDepositPaymentSettings();});
+
+loadDepositPaymentSettings();
 
 /* =========================================================
    LOAD WITHDRAWALS
