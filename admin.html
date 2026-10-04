@@ -591,6 +591,14 @@
 
             <button
                 class="nav-tab"
+                data-section="characters"
+                onclick="showSection('characters', this); loadCharacterAdmin();"
+            >
+                🧑‍🚀 Characters
+            </button>
+
+            <button
+                class="nav-tab"
                 data-section="withdrawals"
                 onclick="showSection('withdrawals', this)"
             >
@@ -1222,6 +1230,25 @@
             </div>
         </section>
 
+        <section id="charactersSection" class="section">
+            <div class="page-title">🧑‍🚀 Character Management</div>
+            <div class="page-subtitle">Admin controls price, boost, supply, active/trading status and market pressure for all 10 characters.</div>
+            <div id="characterAdminAlert" class="alert"></div>
+            <div class="card">
+                <div class="card-title">⚙️ Character Settings</div>
+                <div class="table-wrapper">
+                    <table style="min-width:1350px;">
+                        <thead><tr><th>ID</th><th>Character</th><th>Rarity</th><th>Base Price</th><th>Boost %</th><th>Supply</th><th>Seller Pressure</th><th>External Pressure</th><th>Multiplier</th><th>Active</th><th>Trading</th><th>Save</th></tr></thead>
+                        <tbody id="characterAdminTableBody"><tr><td colspan="12" class="loading">Loading characters...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">📈 Character Trade History</div>
+                <div class="table-wrapper"><table style="min-width:900px;"><thead><tr><th>Character</th><th>Seller</th><th>Buyer</th><th>Price</th><th>Type</th><th>Time</th></tr></thead><tbody id="characterTradesTableBody"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody></table></div>
+            </div>
+        </section>
+
         <section
             id="withdrawalsSection"
             class="section"
@@ -1627,6 +1654,54 @@ async function adminLogout() {
 
 
 // ================================
+// CHARACTER MANAGEMENT
+// ================================
+async function loadCharacterAdmin() {
+    const body=document.getElementById("characterAdminTableBody");
+    const tradesBody=document.getElementById("characterTradesTableBody");
+    try {
+        const [data,trades]=await Promise.all([
+            apiRequest("/api/characters/admin/config"),
+            apiRequest("/api/characters/admin/trades")
+        ]);
+        const chars=data.characters||[];
+        body.innerHTML=chars.map(c=>`<tr>
+            <td>${Number(c.id)}</td>
+            <td><b>${escapeHtml(c.name||c.code)}</b><br><small>${escapeHtml(c.code)}</small></td>
+            <td><input id="charRarity_${c.id}" value="${escapeHtml(c.rarity||'')}" style="width:95px"></td>
+            <td><input id="charBase_${c.id}" type="number" step="0.01" value="${Number(c.base_price||0)}" style="width:105px"></td>
+            <td><input id="charBoost_${c.id}" type="number" step="0.01" value="${Number(c.boost_percent||0)}" style="width:85px"></td>
+            <td><input id="charSupply_${c.id}" type="number" value="${Number(c.max_supply||0)}" style="width:90px"></td>
+            <td><input id="charSeller_${c.id}" type="number" step="0.01" value="${Number(c.seller_pressure||0)}" style="width:100px"></td>
+            <td><input id="charExternal_${c.id}" type="number" step="0.01" value="${Number(c.external_pressure||0)}" style="width:100px"></td>
+            <td><input id="charMult_${c.id}" type="number" step="0.0001" value="${Number(c.market_multiplier||1)}" style="width:100px"></td>
+            <td><input id="charActive_${c.id}" type="checkbox" ${c.is_active?'checked':''}></td>
+            <td><input id="charTrading_${c.id}" type="checkbox" ${c.trading_enabled?'checked':''}></td>
+            <td><button class="action-button green" onclick="saveCharacterAdmin(${Number(c.id)})">Save</button></td>
+        </tr>`).join('') || '<tr><td colspan="12">No characters.</td></tr>';
+        tradesBody.innerHTML=(trades.trades||[]).map(t=>`<tr><td>${escapeHtml(t.name||t.code||'')}</td><td>${escapeHtml(String(t.seller_id))}</td><td>${escapeHtml(String(t.buyer_id??'—'))}</td><td>৳${Number(t.price||0).toLocaleString()}</td><td>${escapeHtml(t.trade_type||'')}</td><td>${escapeHtml(String(t.created_at||''))}</td></tr>`).join('') || '<tr><td colspan="6">No trades.</td></tr>';
+    } catch(e) {
+        if(body) body.innerHTML=`<tr><td colspan="12" class="loading">${escapeHtml(e.message||'Failed to load characters.')}</td></tr>`;
+    }
+}
+
+async function saveCharacterAdmin(id) {
+    const payload={
+        rarity:document.getElementById(`charRarity_${id}`).value,
+        base_price:Number(document.getElementById(`charBase_${id}`).value),
+        boost_percent:Number(document.getElementById(`charBoost_${id}`).value),
+        max_supply:Number(document.getElementById(`charSupply_${id}`).value),
+        seller_pressure:Number(document.getElementById(`charSeller_${id}`).value),
+        external_pressure:Number(document.getElementById(`charExternal_${id}`).value),
+        market_multiplier:Number(document.getElementById(`charMult_${id}`).value),
+        is_active:document.getElementById(`charActive_${id}`).checked,
+        trading_enabled:document.getElementById(`charTrading_${id}`).checked
+    };
+    try { const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)}); if(!data.success) throw new Error(data.message||'Save failed.'); showAlert('characterAdminAlert',`Character ${id} updated successfully.`,'success'); await loadCharacterAdmin(); }
+    catch(e){ showAlert('characterAdminAlert',e.message||'Character update failed.','error'); }
+}
+
+// ================================
 // SECTION NAVIGATION
 // ================================
 
@@ -1695,6 +1770,12 @@ function showSection(
     if (sectionName === "withdrawals") {
 
         loadWithdrawals();
+
+    }
+
+    if (sectionName === "characters") {
+
+        loadCharacterAdmin();
 
     }
 
