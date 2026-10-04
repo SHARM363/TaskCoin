@@ -204,7 +204,31 @@
         #referralPage { background: linear-gradient(180deg,#f5f0ff 0%,#fbf9ff 100%); }
         #depositPage { background: linear-gradient(180deg,#eefaf4 0%,#f9fffc 100%); }
 
-    </style>
+    
+/* =========================================================
+   TASKCOIN CHARACTER — ORIGINAL MINI APP UI
+   ========================================================= */
+.character-hub-btn{
+  width:100%;padding:16px;border:0;border-radius:18px;
+  background:linear-gradient(135deg,#10233f,#1f4d73);color:#fff;
+  box-shadow:0 10px 24px rgba(15,35,63,.16);cursor:pointer;text-align:left;
+}
+.character-hub-btn .title{font-size:17px;font-weight:800}.character-hub-btn .sub{margin-top:5px;font-size:12px;opacity:.78}
+.character-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.character-card{border-radius:20px;padding:15px;color:#fff;min-height:210px;position:relative;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.12);cursor:pointer}
+.character-card:active{transform:scale(.985)}
+.character-card .code{font-size:10px;opacity:.7;letter-spacing:.8px}.character-card .name{font-size:17px;font-weight:800;margin-top:5px}
+.character-card .rarity{display:inline-block;margin-top:8px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.14);font-size:10px}
+.character-card .price{font-size:20px;font-weight:900;margin-top:20px}.character-card .meta{font-size:11px;opacity:.82;margin-top:5px}
+.character-detail{border-radius:24px;padding:20px;color:#fff;min-height:270px;box-shadow:0 14px 34px rgba(0,0,0,.16)}
+.character-detail .big-icon{font-size:54px}.character-detail .big-name{font-size:27px;font-weight:900;margin-top:8px}.character-detail .description{font-size:13px;opacity:.82;margin-top:8px;line-height:1.55}
+.character-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.character-stat{padding:12px;border-radius:15px;background:rgba(255,255,255,.09)}.character-stat b{display:block;font-size:16px}.character-stat span{font-size:10px;opacity:.72}
+.character-action{width:100%;border:0;border-radius:15px;padding:14px;font-weight:800;cursor:pointer;margin-top:10px}
+.character-back{border:0;background:transparent;font-size:13px;font-weight:700;padding:8px 0;cursor:pointer}
+@media(max-width:380px){.character-grid{grid-template-columns:1fr}}
+
+</style>
 
 
 <style id="taskcoin-main-css">
@@ -2197,6 +2221,16 @@
 
 
                 <!-- ============================================
+                     ALL ITEMS / CHARACTER
+                ============================================= -->
+                <div class="section" style="margin-top:16px;">
+                    <button class="character-hub-btn" type="button" onclick="openPage('allItemsPage')">
+                        <div class="title">সব</div>
+                        <div class="sub">Character, Skill, VIP, Premium ও ভবিষ্যতের সব Item এক জায়গায়</div>
+                    </button>
+                </div>
+
+                <!-- ============================================
                      QUICK ACTIONS
                 ============================================= -->
 
@@ -3126,15 +3160,6 @@
             </button>
 
 
-            <button
-                class="wallet-action"
-                type="button"
-                onclick="openPage('charactersPage'); loadCharactersPage();"
-            >
-                🧑‍🚀 Characters
-            </button>
-
-
         </div>
 
 
@@ -3256,31 +3281,6 @@
     </div>
 
 </section>
-<!-- ========================================================
-     TASKCOIN — CHARACTER MARKET
-======================================================== -->
-<section class="page" id="charactersPage">
-    <div class="container">
-        <div class="section">
-            <div class="section-header">
-                <div>
-                    <div class="section-title">🧑‍🚀 TaskCoin Characters</div>
-                    <div style="margin-top:4px;font-size:11px;color:#64748b;">Main Balance দিয়ে কিনুন, নিজের Character অন্য User-এর কাছে Marketplace-এ বিক্রি করুন।</div>
-                </div>
-            </div>
-            <div id="characterList" style="display:grid;gap:12px;"></div>
-        </div>
-        <div class="section">
-            <div class="section-title">🛍️ Character Marketplace</div>
-            <div id="characterMarketList" style="display:grid;gap:12px;margin-top:10px;"></div>
-        </div>
-        <div class="section">
-            <div class="section-title">🎒 My Characters</div>
-            <div id="myCharacterList" style="display:grid;gap:12px;margin-top:10px;"></div>
-        </div>
-    </div>
-</section>
-
 <!-- ========================================================
      TASKCOIN — PART 8
      WITHDRAW PAGE + WITHDRAWAL HISTORY
@@ -3901,6 +3901,55 @@
 <!-- =========================================================
      PART 10 — BOTTOM NAVIGATION
      ========================================================= -->
+
+<!-- =========================================================
+     ALL ITEMS PAGE
+     ========================================================= -->
+<section class="page" id="allItemsPage">
+  <header class="app-header"><div class="header-inner">
+    <div><div class="header-title">সব</div><div class="header-subtitle">TaskCoin Items</div></div>
+    <button class="header-profile" type="button" onclick="openPage('homePage')">✕</button>
+  </div></header>
+  <div class="container">
+    <div class="section">
+      <div class="section-header"><div><div class="section-title">All Items</div><div style="margin-top:4px;font-size:11px;color:#6b7280;">নতুন Item ভবিষ্যতে এখানেই যোগ করা যাবে</div></div></div>
+      <button class="quick-action" type="button" style="width:100%;margin-top:10px;" onclick="openPage('characterListPage');loadCharacters();">
+        <div class="quick-action-icon">🪙</div><div class="quick-action-title">Character</div><div class="quick-action-text">Character 1–10 দেখুন ও কিনুন</div>
+      </button>
+      <button class="quick-action" type="button" style="width:100%;margin-top:10px;" onclick="showToast('Skill section coming soon.');">
+        <div class="quick-action-icon">⚡</div><div class="quick-action-title">Skill</div><div class="quick-action-text">Character Skill & boosts</div>
+      </button>
+      <button class="quick-action" type="button" style="width:100%;margin-top:10px;" onclick="openPage('premiumPage');">
+        <div class="quick-action-icon">💎</div><div class="quick-action-title">VIP / Premium Membership</div><div class="quick-action-text">Existing Premium system</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     CHARACTER LIST PAGE
+     ========================================================= -->
+<section class="page" id="characterListPage">
+  <header class="app-header"><div class="header-inner">
+    <div><div class="header-title">Character</div><div class="header-subtitle">Admin controlled market</div></div>
+    <button class="header-profile" type="button" onclick="openPage('allItemsPage')">‹</button>
+  </div></header>
+  <div class="container">
+    <div id="characterListStatus" style="font-size:12px;color:#6b7280;margin-bottom:12px;">Loading characters…</div>
+    <div id="characterGrid" class="character-grid"></div>
+  </div>
+</section>
+
+<!-- =========================================================
+     CHARACTER DETAIL PAGE
+     ========================================================= -->
+<section class="page" id="characterDetailPage">
+  <header class="app-header"><div class="header-inner">
+    <div><div class="header-title">Character Details</div><div class="header-subtitle">TaskCoin original character</div></div>
+    <button class="header-profile" type="button" onclick="openPage('characterListPage')">‹</button>
+  </div></header>
+  <div class="container" id="characterDetailContainer"></div>
+</section>
 
 <nav class="bottom-nav" id="bottomNav">
 
@@ -6235,85 +6284,6 @@ async function showNavigationAdIfNeeded(targetPageId) {
 }
 
 /* =========================================================
-   CHARACTER MARKET
-   ========================================================= */
-async function loadCharactersPage() {
-    const uid = appState.telegramUser?.id;
-    if (!uid) { await loadTelegramProfile(); }
-    if (!appState.telegramUser?.id) { showToast("Telegram user not detected."); return; }
-    const [chars, market, mine] = await Promise.all([
-        apiRequest("/api/characters"),
-        apiRequest("/api/characters/market"),
-        apiRequest(`/api/characters/user/${encodeURIComponent(appState.telegramUser.id)}`)
-    ]);
-    renderCharacters(chars?.characters || []);
-    renderCharacterMarket(market?.listings || []);
-    renderMyCharacters(mine?.characters || []);
-}
-
-function renderCharacters(characters) {
-    const el=document.getElementById("characterList"); if(!el) return;
-    if(!characters.length){ el.innerHTML='<div class="card">No characters available.</div>'; return; }
-    el.innerHTML=characters.filter(c=>c.is_active).map(c=>`<div class="card" style="border-radius:18px;">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
-            <div><div style="font-weight:900;font-size:17px;">🧑‍🚀 ${escapeHtml(c.name||c.code)}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:3px;">${escapeHtml(c.code)} • ${escapeHtml(c.rarity||'')}</div></div>
-            <div style="font-weight:900;color:#b7791f;">৳${Number(c.current_price||0).toLocaleString()}</div>
-        </div>
-        <div style="font-size:12px;color:#475569;margin-top:8px;">${escapeHtml(c.description||'')}</div>
-        <div style="margin-top:8px;font-size:12px;"><b>${escapeHtml(c.ability_name||'Ability')}</b> • +${Number(c.boost_percent||0)}% boost</div>
-        <button class="primary-button" style="margin-top:10px;" onclick="buyCharacter(${Number(c.id)})">Buy Character</button>
-    </div>`).join('');
-}
-
-function renderCharacterMarket(listings) {
-    const el=document.getElementById("characterMarketList"); if(!el) return;
-    if(!listings.length){ el.innerHTML='<div class="card" style="font-size:12px;color:#64748b;">No active marketplace listings.</div>'; return; }
-    el.innerHTML=listings.map(l=>`<div class="card" style="border-radius:18px;">
-        <div style="font-weight:900;">${escapeHtml(l.name||l.code)}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px;">${escapeHtml(l.code)} • ${escapeHtml(l.rarity||'')} • Seller: ${escapeHtml(String(l.seller_id))}</div>
-        <div style="font-size:20px;font-weight:900;margin-top:8px;">৳${Number(l.asking_price||0).toLocaleString()}</div>
-        <button class="primary-button" style="margin-top:10px;" onclick="buyCharacterListing(${Number(l.id)})">Buy from User</button>
-    </div>`).join('');
-}
-
-function renderMyCharacters(items) {
-    const el=document.getElementById("myCharacterList"); if(!el) return;
-    if(!items.length){ el.innerHTML='<div class="card" style="font-size:12px;color:#64748b;">You do not own any character yet.</div>'; return; }
-    el.innerHTML=items.map(o=>`<div class="card" style="border-radius:18px;">
-        <div style="font-weight:900;">${escapeHtml(o.name||o.code)}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px;">${escapeHtml(o.code||'')} • Purchase ৳${Number(o.purchase_price||0).toLocaleString()}</div>
-        <div style="font-size:12px;margin-top:7px;">${escapeHtml(o.ability_name||'Ability')} • +${Number(o.boost_percent||0)}%</div>
-        <div style="display:flex;gap:8px;margin-top:10px;">
-            <input id="charSellPrice_${Number(o.id)}" class="form-input" type="number" min="1" step="1" placeholder="Sale price">
-            <button class="secondary-button" style="width:auto;" onclick="listCharacterForSale(${Number(o.id)})">List</button>
-        </div>
-    </div>`).join('');
-}
-
-async function buyCharacter(characterId){
-    const uid=appState.telegramUser?.id; if(!uid) return;
-    const result=await apiRequest("/api/characters/buy",{method:"POST",body:{telegram_id:uid,character_id:Number(characterId)}});
-    if(!result?.success){showToast(result?.message||"Character purchase failed.");return;}
-    showToast(result.message||"Character purchased."); await refreshAppData(); await loadCharactersPage();
-}
-
-async function listCharacterForSale(ownershipId){
-    const uid=appState.telegramUser?.id; const input=document.getElementById(`charSellPrice_${Number(ownershipId)}`);
-    const price=Number(input?.value||0); if(!uid||price<=0){showToast("Valid sale price দিন।");return;}
-    const result=await apiRequest("/api/characters/market/list",{method:"POST",body:{telegram_id:uid,ownership_id:Number(ownershipId),asking_price:price}});
-    if(!result?.success){showToast(result?.message||"Listing failed.");return;}
-    showToast("Character marketplace-এ list হয়েছে।"); await loadCharactersPage();
-}
-
-async function buyCharacterListing(listingId){
-    const uid=appState.telegramUser?.id; if(!uid) return;
-    const result=await apiRequest("/api/characters/market/buy",{method:"POST",body:{telegram_id:uid,listing_id:Number(listingId)}});
-    if(!result?.success){showToast(result?.message||"Marketplace purchase failed.");return;}
-    showToast(result.message||"Character purchased."); await refreshAppData(); await loadCharactersPage();
-}
-
-/* =========================================================
    OPEN PAGE
    ========================================================= */
 
@@ -6372,10 +6342,7 @@ function openPage(pageId) {
             "navWithdraw",
 
         referralPage:
-            "navReferral",
-
-        charactersPage:
-            "navWallet"
+            "navReferral"
 
     };
 
@@ -6693,6 +6660,101 @@ setInterval(
     },
     60000
 );
+/* =========================================================
+   CHARACTER UI — isolated from existing Task/Wallet/Monetag logic
+   ========================================================= */
+const CHARACTER_BG = [
+  'linear-gradient(145deg,#13263d,#315b7d)',
+  'linear-gradient(145deg,#163b46,#2e7a78)',
+  'linear-gradient(145deg,#30224f,#6b4e96)',
+  'linear-gradient(145deg,#193b5b,#286b91)',
+  'linear-gradient(145deg,#4b3315,#9a6b25)',
+  'linear-gradient(145deg,#173f55,#367f9e)',
+  'linear-gradient(145deg,#24324d,#526c9b)',
+  'linear-gradient(145deg,#3a263e,#79506e)',
+  'linear-gradient(145deg,#162d43,#3e708e)',
+  'linear-gradient(145deg,#392711,#a97831)'
+];
+
+async function loadCharacters(){
+  const status=document.getElementById('characterListStatus');
+  const grid=document.getElementById('characterGrid');
+  if(!grid)return;
+  status.textContent='Loading characters…';
+  try{
+    const res=await fetch('/api/characters',{headers:{'Accept':'application/json'}});
+    const data=await res.json();
+    if(!res.ok||!data.success)throw new Error(data.message||'Failed to load characters');
+    const chars=Array.isArray(data.characters)?data.characters:[];
+    grid.innerHTML=chars.map((c,i)=>`
+      <article class="character-card" style="background:${CHARACTER_BG[i%CHARACTER_BG.length]}" onclick="openCharacterDetail(${Number(c.id)})">
+        <div class="code">${escapeHtml(c.code||('TC-'+String(c.id).padStart(3,'0')))}</div>
+        <div class="name">${escapeHtml(c.name||'Character')}</div>
+        <span class="rarity">${escapeHtml(c.rarity||'—')}</span>
+        <div class="price">৳${Number(c.current_price||c.base_price||0).toLocaleString('en-BD')}</div>
+        <div class="meta">Boost +${Number(c.boost_percent||0)}% • Sold ${Number(c.sold_count||0)} / ${Number(c.max_supply||0)}</div>
+      </article>`).join('');
+    status.textContent=`${chars.length}টি Character`;
+  }catch(e){
+    console.error('Character load error:',e);
+    status.textContent='Character load failed. Please try again.';
+  }
+}
+
+async function openCharacterDetail(id){
+  openPage('characterDetailPage');
+  const box=document.getElementById('characterDetailContainer');
+  box.innerHTML='<div style="padding:20px;text-align:center;color:#6b7280;">Loading…</div>';
+  try{
+    const res=await fetch('/api/characters/'+encodeURIComponent(id));
+    const data=await res.json();
+    if(!res.ok||!data.success)throw new Error(data.message||'Character not found');
+    const c=data.character;
+    const bg=CHARACTER_BG[(Number(c.id)-1)%CHARACTER_BG.length];
+    const supply=Number(c.max_supply||0); const sold=Number(c.sold_count||0);
+    box.innerHTML=`
+      <button class="character-back" type="button" onclick="openPage('characterListPage')">‹ সব Character</button>
+      <div class="character-detail" style="background:${bg}">
+        <div class="big-icon">🪙</div>
+        <div class="big-name">${escapeHtml(c.name||'Character')}</div>
+        <div class="rarity" style="display:inline-block;margin-top:7px;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.14);font-size:10px;">${escapeHtml(c.rarity||'—')}</div>
+        <div class="description">${escapeHtml(c.description||'')}</div>
+        <div class="character-stat-grid">
+          <div class="character-stat"><b>৳${Number(c.current_price||0).toLocaleString('en-BD')}</b><span>Current Price</span></div>
+          <div class="character-stat"><b>+${Number(c.boost_percent||0)}%</b><span>Boost</span></div>
+          <div class="character-stat"><b>${sold.toLocaleString()} / ${supply.toLocaleString()}</b><span>Sold / Supply</span></div>
+          <div class="character-stat"><b>${c.is_active?'Active':'Inactive'}</b><span>Status</span></div>
+        </div>
+        <div style="margin-top:14px;font-size:12px;opacity:.9;"><b>Skill:</b> ${escapeHtml(c.ability_name||'—')}</div>
+        <div style="margin-top:5px;font-size:11px;opacity:.75;line-height:1.45;">${escapeHtml(c.ability_description||'')}</div>
+      </div>
+      <button class="character-action" type="button" onclick="buyCharacter(${Number(c.id)},${Number(c.current_price||0)})" ${(!c.is_active||!c.trading_enabled||sold>=supply)?'disabled':''}>
+        ${sold>=supply?'Sold Out':(!c.is_active?'Inactive':'Buy Character')}
+      </button>`;
+  }catch(e){
+    console.error('Character detail error:',e);
+    box.innerHTML='<div style="padding:20px;color:#b91c1c;">Character information could not be loaded.</div>';
+  }
+}
+
+async function buyCharacter(characterId){
+  const telegramId=appState?.telegramUser?.id;
+  if(!telegramId){showToast('Telegram user not available.');return;}
+  if(!confirm('এই Characterটি Main Balance থেকে কিনতে চান?'))return;
+  try{
+    const res=await fetch('/api/characters/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegram_id:telegramId,character_id:characterId})});
+    const data=await res.json();
+    if(!res.ok||!data.success){showToast(data.message||'Purchase failed.');return;}
+    showToast(data.message||'Character purchased successfully.');
+    if(typeof refreshAppData==='function')await refreshAppData();
+    await openCharacterDetail(characterId);
+  }catch(e){console.error('Character purchase error:',e);showToast('Character purchase failed.');}
+}
+
+function escapeHtml(value){
+  return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
 /*
 =============================================================================
   INITIALIZE
@@ -6737,11 +6799,6 @@ window.copyReferralLink =
 
 window.refreshAppData = 
   refreshAppData;
-
-window.loadCharactersPage = loadCharactersPage;
-window.buyCharacter = buyCharacter;
-window.listCharacterForSale = listCharacterForSale;
-window.buyCharacterListing = buyCharacterListing;
                   
 </script>
 
