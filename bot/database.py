@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_DOWN
+EXCHANGE_FEE_PERCENT = 3
 import os
 import hashlib
 import secrets
@@ -214,6 +216,16 @@ def init_db():
             );
         """)
 
+        # Task audience migration:
+        # NULL = all users (keeps existing tasks working),
+        # 0 = non-VIP users only,
+        # 1..10 = exact active VIP level only.
+        cur.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_vip_level INTEGER DEFAULT NULL;")
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tasks_target_vip_level
+            ON tasks(target_vip_level);
+        """)
+
         # ----------------------------------------------------
         # TASK COMPLETIONS
         # ----------------------------------------------------
@@ -278,7 +290,6 @@ def init_db():
         # ----------------------------------------------------
         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS task_balance NUMERIC(20,2) DEFAULT 0;")
         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deposit_balance NUMERIC(20,2) DEFAULT 0;")
-        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS main_balance NUMERIC(20,2) DEFAULT 0;")
         cur.execute("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'task';")
         cur.execute("UPDATE users SET task_balance=COALESCE(balance,0) WHERE task_balance IS NULL OR task_balance=0;")
         cur.execute("UPDATE users SET balance=COALESCE(task_balance,0) WHERE balance IS NULL;")
@@ -300,30 +311,30 @@ def init_db():
             );
         """)
         cur.execute("""
-            ALTER TABLE deposits ADD COLUMN IF NOT EXISTS payment_number TEXT;
+            CREATE INDEX IF NOT EXISTS idx_deposits_user
+            ON deposits(telegram_id);
         """)
+        cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS account_number TEXT;")
+        # ----------------------------------------------------
+        # DEPOSIT PAYMENT SETTINGS (ADMIN CONTROLLED)
+        # ----------------------------------------------------
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS deposit_methods (
-                id SERIAL PRIMARY KEY,
-                method_key TEXT NOT NULL UNIQUE,
-                method_name TEXT NOT NULL UNIQUE,
-                wallet_value TEXT NOT NULL DEFAULT '',
+            CREATE TABLE IF NOT EXISTS deposit_payment_settings (
+                method TEXT PRIMARY KEY,
+                wallet_address TEXT NOT NULL DEFAULT '',
+                instruction_type TEXT NOT NULL DEFAULT 'Send Money',
+                network TEXT NOT NULL DEFAULT '',
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         cur.execute("""
-            INSERT INTO deposit_methods(method_key, method_name, wallet_value)
+            INSERT INTO deposit_payment_settings(method,wallet_address,instruction_type,network,is_active)
             VALUES
-                ('bkash','bKash',''),
-                ('nagad','Nagad',''),
-                ('rocket','Rocket',''),
-                ('usdt','USDT','')
-            ON CONFLICT (method_key) DO NOTHING;
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_deposits_user
-            ON deposits(telegram_id);
+                ('bkash','','Send Money','',TRUE),
+                ('nagad','','Send Money','',TRUE),
+                ('usdt','','Send USDT','TRON (TRC20)',TRUE)
+            ON CONFLICT (method) DO NOTHING;
         """)
 
         # ----------------------------------------------------
@@ -403,11 +414,16 @@ def init_db():
             );
         """)
 
-        # Referral moderation fields (safe migration for existing databases).
-        cur.execute("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending';")
-        cur.execute("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP NULL;")
-        cur.execute("ALTER TABLE referrals ADD COLUMN IF NOT EXISTS approved_by BIGINT NULL;")
-        cur.execute("UPDATE referrals SET status='pending' WHERE status IS NULL OR TRIM(status)='';")
+        cur.execute("""ALTER TABLE referrals ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';""")
+        cur.execute("""ALTER TABLE referrals ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;""")
+        cur.execute("""ALTER TABLE referrals ADD COLUMN IF NOT EXISTS approved_by INTEGER;""")
+        # Keep pending referrals pending until an admin explicitly approves them.
+        # Only normalize missing/blank status values; never auto-approve a referral.
+        cur.execute("""
+            UPDATE referrals
+            SET status='pending'
+            WHERE status IS NULL OR status='';
+        """)
 
         # ----------------------------------------------------
         # ADMINS
@@ -510,6 +526,64 @@ def init_db():
             ADD COLUMN IF NOT EXISTS
             referral_count INTEGER
             DEFAULT 0;
+        """)
+
+        # One account per IP address. This is used to prevent duplicate referral
+        # accounts/bonuses from the same network address.
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+            signup_ip TEXT;
+        """)
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique
+            ON users(signup_ip)
+            WHERE signup_ip IS NOT NULL AND signup_ip <> '';
+        """)
+
+        # Admin-issued referral bonus ledger. One manual admin award per referral.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS admin_referral_bonus_awards (
+                id SERIAL PRIMARY KEY,
+                referral_id INTEGER UNIQUE NOT NULL,
+                referrer_id BIGINT NOT NULL,
+                referred_id BIGINT NOT NULL,
+                amount NUMERIC(20,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # TaskCoin user-to-user transfer ledger.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS taskcoin_transfers (
+                id BIGSERIAL PRIMARY KEY,
+                sender_id BIGINT NOT NULL,
+                receiver_id BIGINT NOT NULL,
+                amount NUMERIC(20,2) NOT NULL CHECK (amount > 0),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_taskcoin_transfers_sender
+            ON taskcoin_transfers(sender_id);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_taskcoin_transfers_receiver
+            ON taskcoin_transfers(receiver_id);
+        """)
+
+        # Lifetime 5% commission ledger for approved referred-user deposits.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS referral_deposit_commissions (
+                id SERIAL PRIMARY KEY,
+                deposit_id INTEGER UNIQUE NOT NULL,
+                referrer_id BIGINT NOT NULL,
+                referred_id BIGINT NOT NULL,
+                deposit_amount NUMERIC(20,2) NOT NULL,
+                commission_rate NUMERIC(8,4) NOT NULL DEFAULT 5,
+                commission_amount NUMERIC(20,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
 
         cur.execute("""
@@ -673,7 +747,6 @@ def init_db():
                 duration_days INTEGER NOT NULL,
                 price NUMERIC(20,2) NOT NULL,
                 bonus_website_tasks INTEGER NOT NULL DEFAULT 0,
-                daily_lucky_spins INTEGER NOT NULL DEFAULT 1,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -702,38 +775,30 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_premium_memberships_status
             ON premium_memberships(status);
         """)
-        cur.execute("ALTER TABLE premium_plans ADD COLUMN IF NOT EXISTS daily_lucky_spins INTEGER NOT NULL DEFAULT 1;")
-        # Seed the final VIP catalog once. After the catalog version is recorded,
-        # Admin Panel edits are preserved across restarts.
-        cur.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
+        # Seed the fixed VIP catalog. Prices/bonus counts remain editable later from Admin.
         premium_seed = [
-            (1, 7, 150, 5, 1),
-            (2, 7, 300, 8, 1),
-            (3, 7, 600, 12, 1),
-            (4, 7, 900, 18, 1),
-            (5, 30, 1450, 24, 1),
-            (6, 30, 1899, 29, 3),
-            (7, 30, 2344, 35, 3),
-            (8, 30, 2899, 42, 3),
-            (9, 30, 3466, 48, 3),
-            (10, 30, 4599, 50, 3),
+            (1, 7, 150, 5),
+            (2, 7, 300, 8),
+            (3, 7, 600, 12),
+            (4, 7, 900, 18),
+            (5, 30, 1450, 24),
+            (6, 30, 1899, 29),
+            (7, 30, 2344, 35),
+            (8, 30, 2899, 42),
+            (9, 30, 3466, 48),
+            (10, 30, 4599, 50),
         ]
-        for level, days, price, bonus, spins in premium_seed:
+        for level, days, price, bonus in premium_seed:
             cur.execute("""
-                INSERT INTO premium_plans(level,duration_days,price,bonus_website_tasks,daily_lucky_spins)
-                VALUES(%s,%s,%s,%s,%s)
+                INSERT INTO premium_plans(level,duration_days,price,bonus_website_tasks)
+                VALUES(%s,%s,%s,%s)
                 ON CONFLICT(level) DO NOTHING;
-            """, (level, days, price, bonus, spins))
-        cur.execute("SELECT value FROM app_settings WHERE key='vip_catalog_version' LIMIT 1;")
-        vip_version = cur.fetchone()
-        if not vip_version:
-            for level, days, price, bonus, spins in premium_seed:
-                cur.execute("""
-                    UPDATE premium_plans
-                    SET duration_days=%s, price=%s, bonus_website_tasks=%s, daily_lucky_spins=%s, updated_at=CURRENT_TIMESTAMP
-                    WHERE level=%s;
-                """, (days, price, bonus, spins, level))
-            cur.execute("INSERT INTO app_settings(key,value) VALUES('vip_catalog_version','2');")
+            """, (level, days, price, bonus))
+
+        # Correct the two old default bonus values once, but never overwrite
+        # a value that the admin has already customized.
+        cur.execute("UPDATE premium_plans SET bonus_website_tasks=48 WHERE level=9 AND bonus_website_tasks=57;")
+        cur.execute("UPDATE premium_plans SET bonus_website_tasks=50 WHERE level=10 AND bonus_website_tasks=80;")
 
         # ----------------------------------------------------
         # INDEXES
@@ -803,6 +868,30 @@ def init_db():
                 password_hash
             ))
 
+        # Safe legacy referral repair:
+        # If an old user's account already contains a trusted `referred_by`
+        # value but no referral row exists, create ONLY a pending request.
+        # No balance, task balance, referral count, or earnings are changed.
+        # Existing referral rows are never modified here.
+        cur.execute("""
+            INSERT INTO referrals (referrer_id,referred_id,reward,status)
+            SELECT
+                referred.referred_by,
+                referred.telegram_id,
+                500,
+                'pending'
+            FROM users AS referred
+            INNER JOIN users AS referrer
+                ON referrer.telegram_id = referred.referred_by
+            WHERE referred.referred_by IS NOT NULL
+              AND referred.referred_by <> referred.telegram_id
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM referrals AS r
+                  WHERE r.referred_id = referred.telegram_id
+              );
+        """)
+
         conn.commit()
 
     except Exception:
@@ -824,7 +913,8 @@ def create_or_update_user(
     telegram_id,
     username=None,
     first_name=None,
-    referrer_id=None
+    referrer_id=None,
+    signup_ip=None
 ):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -833,68 +923,129 @@ def create_or_update_user(
         referral_code = "TC" + str(telegram_id)
         cur.execute("SELECT * FROM users WHERE telegram_id = %s FOR UPDATE;", (telegram_id,))
         existing = cur.fetchone()
-
         if existing:
             cur.execute("""
                 UPDATE users
-                SET username=%s, first_name=%s, last_active=CURRENT_TIMESTAMP
-                WHERE telegram_id=%s RETURNING *;
-            """, (username, first_name, telegram_id))
+                SET username=%s,
+                    first_name=%s,
+                    signup_ip=CASE
+                        WHEN signup_ip IS NULL OR signup_ip='' THEN %s
+                        ELSE signup_ip
+                    END,
+                    last_active=CURRENT_TIMESTAMP
+                WHERE telegram_id=%s
+                RETURNING *;
+            """, (username, first_name, signup_ip, telegram_id))
             user = cur.fetchone()
 
-            # Existing user opened a referral link: create the missing pending
-            # request, but NEVER pay the bonus automatically.
-            if referrer_id and not user.get('referred_by'):
+            # If an existing account arrives through a valid referral link,
+            # restore/create the referral request only when this account has
+            # never had a referral relationship before. This does NOT pay
+            # any bonus; the Admin must approve the pending request.
+            if referrer_id and not user.get("referred_by"):
                 try:
-                    candidate = int(referrer_id)
+                    candidate_referrer = int(referrer_id)
                 except (TypeError, ValueError):
-                    candidate = None
-                if candidate and candidate != int(telegram_id):
-                    cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (candidate,))
+                    candidate_referrer = None
+
+                if candidate_referrer and candidate_referrer != int(telegram_id):
+                    cur.execute(
+                        "SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;",
+                        (candidate_referrer,)
+                    )
                     referrer = cur.fetchone()
+
                     if referrer:
-                        cur.execute("SELECT id FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;", (telegram_id,))
-                        if not cur.fetchone():
-                            cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s;", (candidate, telegram_id))
-                            cur.execute("""
-                                INSERT INTO referrals(referrer_id,referred_id,reward,status)
-                                VALUES(%s,%s,%s,'pending') RETURNING *;
-                            """, (candidate, telegram_id, REFERRAL_REWARD))
+                        cur.execute(
+                            "SELECT id FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;",
+                            (telegram_id,)
+                        )
+                        existing_referral = cur.fetchone()
+
+                        if not existing_referral:
+                            cur.execute(
+                                """
+                                UPDATE users
+                                SET referred_by=%s
+                                WHERE telegram_id=%s
+                                  AND referred_by IS NULL;
+                                """,
+                                (candidate_referrer, telegram_id)
+                            )
+                            cur.execute(
+                                """
+                                INSERT INTO referrals
+                                    (referrer_id,referred_id,reward,status)
+                                VALUES
+                                    (%s,%s,%s,'pending')
+                                RETURNING *;
+                                """,
+                                (candidate_referrer, telegram_id, REFERRAL_REWARD)
+                            )
+                            user["referred_by"] = candidate_referrer
 
             conn.commit()
             return user
 
+        if signup_ip:
+            cur.execute("SELECT telegram_id FROM users WHERE signup_ip=%s LIMIT 1 FOR UPDATE;", (signup_ip,))
+            ip_user = cur.fetchone()
+            if ip_user and int(ip_user["telegram_id"]) != int(telegram_id):
+                conn.rollback()
+                raise ValueError("Only one TaskCoin account is allowed from the same IP address.")
+
         cur.execute("""
-            INSERT INTO users (telegram_id, username, first_name, referral_code, last_active)
-            VALUES (%s,%s,%s,%s,CURRENT_TIMESTAMP) RETURNING *;
-        """, (telegram_id, username, first_name, referral_code))
+            INSERT INTO users (telegram_id, username, first_name, referral_code, signup_ip, last_active)
+            VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP) RETURNING *;
+        """, (telegram_id, username, first_name, referral_code, signup_ip))
         user = cur.fetchone()
 
         if referrer_id:
             try:
-                candidate = int(referrer_id)
+                referrer_id = int(referrer_id)
             except (TypeError, ValueError):
-                candidate = None
-            if candidate and candidate != int(telegram_id):
-                cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (candidate,))
-                referrer = cur.fetchone()
-                if referrer:
-                    cur.execute("SELECT id FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;", (telegram_id,))
-                    if not cur.fetchone():
-                        cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s;", (candidate, telegram_id))
-                        cur.execute("""
-                            INSERT INTO referrals(referrer_id,referred_id,reward,status)
-                            VALUES(%s,%s,%s,'pending') RETURNING *;
-                        """, (candidate, telegram_id, REFERRAL_REWARD))
+                referrer_id = None
 
+            if referrer_id and referrer_id != telegram_id:
+                cur.execute(
+                    "SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;",
+                    (referrer_id,)
+                )
+                referrer = cur.fetchone()
+
+                if referrer:
+                    cur.execute(
+                        "SELECT id FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;",
+                        (telegram_id,)
+                    )
+                    existing_referral = cur.fetchone()
+
+                    if not existing_referral:
+                        # Save the relationship, but DO NOT credit the bonus yet.
+                        # Admin approval will credit the referrer atomically.
+                        cur.execute(
+                            """
+                            UPDATE users
+                            SET referred_by=%s
+                            WHERE telegram_id=%s
+                              AND referred_by IS NULL;
+                            """,
+                            (referrer_id, telegram_id)
+                        )
+                        cur.execute(
+                            """
+                            INSERT INTO referrals (referrer_id,referred_id,reward,status)
+                            VALUES (%s,%s,%s,'pending')
+                            RETURNING *;
+                            """,
+                            (referrer_id, telegram_id, REFERRAL_REWARD)
+                        )
         conn.commit()
         return user
     except Exception:
-        conn.rollback()
-        raise
+        conn.rollback(); raise
     finally:
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
 
 
 def get_user(telegram_id):
@@ -974,6 +1125,73 @@ def get_active_tasks():
         conn.close()
 
 
+def get_active_tasks_for_user(telegram_id):
+    """Return only tasks the user's current VIP status is allowed to see.
+
+    target_vip_level semantics:
+      NULL -> all users (backward-compatible/general task)
+      0    -> non-VIP users only
+      1-10 -> exact active VIP level only
+    """
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT *
+            FROM tasks t
+            WHERE t.is_active = TRUE
+              AND (
+                    t.target_vip_level IS NULL
+                    OR (t.target_vip_level = 0 AND NOT EXISTS (
+                        SELECT 1
+                        FROM premium_memberships pm
+                        WHERE pm.telegram_id = %s
+                          AND pm.status = 'active'
+                          AND pm.expires_at > CURRENT_TIMESTAMP
+                    ))
+                    OR (t.target_vip_level BETWEEN 1 AND 10 AND EXISTS (
+                        SELECT 1
+                        FROM premium_memberships pm
+                        JOIN premium_plans pp ON pp.id = pm.plan_id
+                        WHERE pm.telegram_id = %s
+                          AND pm.status = 'active'
+                          AND pm.expires_at > CURRENT_TIMESTAMP
+                          AND pp.level = t.target_vip_level
+                    ))
+              )
+            ORDER BY t.id DESC;
+        """, (telegram_id, telegram_id))
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def task_allowed_for_user(cur, telegram_id, task):
+    """Authoritative server-side task audience check."""
+    target = task.get('target_vip_level')
+    if target is None:
+        return True
+    target = int(target)
+
+    cur.execute("""
+        SELECT pp.level
+        FROM premium_memberships pm
+        JOIN premium_plans pp ON pp.id = pm.plan_id
+        WHERE pm.telegram_id = %s
+          AND pm.status = 'active'
+          AND pm.expires_at > CURRENT_TIMESTAMP
+        ORDER BY pm.expires_at DESC
+        LIMIT 1;
+    """, (telegram_id,))
+    membership = cur.fetchone()
+    active_level = int(membership['level']) if membership else None
+
+    if target == 0:
+        return active_level is None
+    return active_level == target
+
+
 def get_all_tasks():
 
     conn = get_connection()
@@ -1006,7 +1224,8 @@ def create_task(
     task_url="",
     reward=0,
     duration=20,
-    is_active=True
+    is_active=True,
+    target_vip_level=None
 ):
 
     conn = get_connection()
@@ -1026,9 +1245,11 @@ def create_task(
                 task_url,
                 reward,
                 duration,
-                is_active
+                is_active,
+                target_vip_level
             )
             VALUES (
+                %s,
                 %s,
                 %s,
                 %s,
@@ -1047,7 +1268,8 @@ def create_task(
             task_url,
             reward,
             duration,
-            is_active
+            is_active,
+            target_vip_level
         ))
 
         task = cur.fetchone()
@@ -1076,7 +1298,8 @@ def update_task(
     task_url=None,
     reward=None,
     duration=None,
-    is_active=None
+    is_active=None,
+    target_vip_level=None
 ):
 
     conn = get_connection()
@@ -1115,6 +1338,12 @@ def update_task(
                 is_active =
                     COALESCE(%s, is_active),
 
+                target_vip_level =
+                    CASE
+                        WHEN %s::INTEGER IS NULL THEN target_vip_level
+                        ELSE %s::INTEGER
+                    END,
+
                 updated_at =
                     CURRENT_TIMESTAMP
 
@@ -1130,6 +1359,8 @@ def update_task(
             reward,
             duration,
             is_active,
+            target_vip_level,
+            target_vip_level,
             task_id
         ))
 
@@ -1356,9 +1587,17 @@ def claim_task_reward(telegram_id, task_id):
         if not user: conn.rollback(); return {"success":False,"message":"User not found."}
         cur.execute("SELECT * FROM tasks WHERE id=%s AND is_active=TRUE FOR UPDATE;",(task_id,)); task=cur.fetchone()
         if not task: conn.rollback(); return {"success":False,"message":"Task not found or inactive."}
+        if not task_allowed_for_user(cur, telegram_id, task):
+            target = task.get('target_vip_level')
+            if target == 0:
+                msg = "This task is available to Non-VIP users only."
+            else:
+                msg = f"This task is reserved for VIP Level {int(target)}."
+            conn.rollback(); return {"success":False,"message":msg}
         platform=str(task.get('platform') or '').strip().lower()
         is_social=platform in PREMIUM_SOCIAL_PLATFORMS
         is_website=platform in ('website','webview','web view','web-view','site')
+        is_webview=platform in ('webview','web view','web-view')
         if is_social:
             # Five Social tasks per day: one completion per social platform.
             cur.execute("SELECT 1 FROM task_completions tc JOIN tasks t ON t.id=tc.task_id WHERE tc.telegram_id=%s AND tc.completed_date=CURRENT_DATE AND lower(trim(coalesce(t.platform,'')))=%s LIMIT 1;",(telegram_id,platform))
@@ -1367,10 +1606,9 @@ def claim_task_reward(telegram_id, task_id):
         elif is_website:
             cur.execute("SELECT COUNT(*) AS total FROM task_completions tc JOIN tasks t ON t.id=tc.task_id WHERE tc.telegram_id=%s AND tc.completed_date=CURRENT_DATE AND lower(trim(coalesce(t.platform,''))) IN ('website','webview','web view','web-view','site');",(telegram_id,))
             website_count=int(cur.fetchone()['total'] or 0)
-            website_limit=6
-            cur.execute("SELECT pp.bonus_website_tasks FROM premium_memberships pm JOIN premium_plans pp ON pp.id=pm.plan_id WHERE pm.telegram_id=%s AND pm.status='active' AND pm.expires_at>CURRENT_TIMESTAMP ORDER BY pm.expires_at DESC LIMIT 1;",(telegram_id,))
+            cur.execute("SELECT 1 FROM premium_memberships pm WHERE pm.telegram_id=%s AND pm.status='active' AND pm.expires_at>CURRENT_TIMESTAMP LIMIT 1;",(telegram_id,))
             pmrow=cur.fetchone()
-            if pmrow: website_limit += int(pmrow['bonus_website_tasks'] or 0)
+            website_limit=20 if pmrow else 7
             if website_count >= website_limit:
                 conn.rollback(); return {"success":False,"message":f'Website daily limit of {website_limit} tasks reached.'}
         else:
@@ -1442,7 +1680,7 @@ def get_active_premium(telegram_id):
         """, (telegram_id,))
         conn.commit()
         cur.execute("""
-            SELECT pm.*, pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.daily_lucky_spins
+            SELECT pm.*, pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks
             FROM premium_memberships pm
             JOIN premium_plans pp ON pp.id=pm.plan_id
             WHERE pm.telegram_id=%s AND pm.status='active'
@@ -1450,6 +1688,29 @@ def get_active_premium(telegram_id):
             ORDER BY pm.expires_at DESC LIMIT 1;
         """, (telegram_id,))
         return cur.fetchone()
+    finally:
+        cur.close(); conn.close()
+
+
+def get_user_premium_memberships(telegram_id):
+    """Return all non-rejected VIP memberships for the user, expiring old ones first."""
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            UPDATE premium_memberships
+            SET status='expired'
+            WHERE telegram_id=%s AND status='active'
+              AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP;
+        """, (telegram_id,))
+        conn.commit()
+        cur.execute("""
+            SELECT pm.*, pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.is_active AS plan_is_active
+            FROM premium_memberships pm
+            JOIN premium_plans pp ON pp.id=pm.plan_id
+            WHERE pm.telegram_id=%s AND pm.status IN ('pending','active','expired')
+            ORDER BY pp.level ASC, pm.requested_at DESC;
+        """, (telegram_id,))
+        return cur.fetchall()
     finally:
         cur.close(); conn.close()
 
@@ -1464,15 +1725,19 @@ def purchase_premium(telegram_id, level):
         cur.execute("SELECT * FROM premium_plans WHERE level=%s AND is_active=TRUE FOR UPDATE", (level,))
         plan = cur.fetchone()
         if not plan:
-            conn.rollback(); return {'success':False,'message':'Premium plan not found.'}
+            conn.rollback(); return {'success':False,'message':'Premium plan not found or disabled by admin.'}
+
+        # A user may own different VIP levels. Only block another purchase of
+        # the same level while that level is pending/active.
         cur.execute("""
             SELECT pm.id FROM premium_memberships pm
-            WHERE pm.telegram_id=%s AND pm.status IN ('pending','active')
+            WHERE pm.telegram_id=%s AND pm.plan_id=%s
+              AND pm.status IN ('pending','active')
               AND (pm.status='pending' OR pm.expires_at > CURRENT_TIMESTAMP)
             LIMIT 1 FOR UPDATE;
-        """, (telegram_id,))
+        """, (telegram_id, plan['id']))
         if cur.fetchone():
-            conn.rollback(); return {'success':False,'message':'You already have a pending or active Premium membership.'}
+            conn.rollback(); return {'success':False,'message':f'VIP Level {level} is already pending or active.'}
         price=float(plan['price'] or 0)
         deposit=float(user['deposit_balance'] or 0)
         if deposit < price:
@@ -1492,34 +1757,12 @@ def purchase_premium(telegram_id, level):
         cur.close(); conn.close()
 
 
-def get_all_premium_memberships():
-    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cur.execute("""
-            UPDATE premium_memberships
-            SET status='expired'
-            WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP;
-        """)
-        conn.commit()
-        cur.execute("""
-            SELECT pm.*, u.username, u.first_name, u.deposit_balance,
-                   pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.daily_lucky_spins
-            FROM premium_memberships pm
-            JOIN users u ON u.telegram_id=pm.telegram_id
-            JOIN premium_plans pp ON pp.id=pm.plan_id
-            ORDER BY pm.id DESC;
-        """)
-        return cur.fetchall()
-    finally:
-        cur.close(); conn.close()
-
-
 def get_premium_membership_requests(status='pending'):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT pm.*, u.username, u.first_name, u.deposit_balance,
-                   pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks, pp.daily_lucky_spins
+                   pp.level, pp.duration_days, pp.price, pp.bonus_website_tasks
             FROM premium_memberships pm
             JOIN users u ON u.telegram_id=pm.telegram_id
             JOIN premium_plans pp ON pp.id=pm.plan_id
@@ -1573,8 +1816,8 @@ def update_premium_membership_status(membership_id, status, reason=None):
 def get_premium_daily_status(telegram_id):
     membership=get_active_premium(telegram_id)
     if not membership:
-        return {'active':False,'level':None,'bonus_website_tasks':0,'daily_lucky_spins':0,'expires_at':None}
-    return {'active':True,'level':int(membership['level']),'bonus_website_tasks':int(membership['bonus_website_tasks'] or 0),'daily_lucky_spins':int(membership.get('daily_lucky_spins') or 0),'expires_at':membership['expires_at']}
+        return {'active':False,'level':None,'bonus_website_tasks':0,'expires_at':None}
+    return {'active':True,'level':int(membership['level']),'bonus_website_tasks':int(membership['bonus_website_tasks'] or 0),'expires_at':membership['expires_at']}
 
 
 def _daily_platform_count(cur, telegram_id, platforms):
@@ -1590,34 +1833,45 @@ def _daily_platform_count(cur, telegram_id, platforms):
 def get_daily_task_limits(telegram_id):
     membership=get_active_premium(telegram_id)
     bonus=int(membership['bonus_website_tasks'] or 0) if membership else 0
-    return {'social':5,'website':6+bonus,'premium_bonus_website':bonus,'premium_active':bool(membership),'premium_level':int(membership['level']) if membership else None}
+    # Website tasks reset automatically at the database's CURRENT_DATE boundary.
+    # Exact product rule: VIP = 20 website tasks/day, Non-VIP = 7/day.
+    website_limit = 20 if membership else 7
+    return {'social':5,'website':website_limit,'premium_bonus_website':bonus,'premium_active':bool(membership),'premium_level':int(membership['level']) if membership else None}
 
 # ============================================================
 # WITHDRAWAL FUNCTIONS
 # ============================================================
 
-def create_withdrawal(telegram_id, method, account_number, amount, source='main'):
-    """BDT-only withdrawal from Main Balance."""
+def create_withdrawal(telegram_id, method, account_number, amount, source='task'):
     try: amount=float(amount)
     except (ValueError, TypeError): return {"success":False,"message":"Invalid withdrawal amount."}
-    if amount < 500: return {"success":False,"message":"Minimum withdrawal is 500 BDT."}
-    if amount > 25000: return {"success":False,"message":"Maximum withdrawal is 25000 BDT."}
+    source=str(source or 'task').strip().lower()
+    if source not in ('task','deposit'): return {"success":False,"message":"Invalid withdrawal source."}
+    # Task/main balance: minimum 1000 TaskCoins. Deposit balance: minimum 1500 BDT.
+    minimum = 1000 if source == 'task' else 1500
+    if amount < minimum: return {"success":False,"message":f"Minimum withdrawal is {minimum} {'TaskCoins' if source=='task' else 'BDT'}."}
+    if amount > 30000: return {"success":False,"message":"Maximum withdrawal is 30000."}
+    method_norm=str(method or '').strip()
     allowed={"bkash":"bKash","nagad":"Nagad","usdt":"USDT"}
-    key=str(method or '').strip().lower()
-    if key not in allowed: return {"success":False,"message":"Invalid withdrawal method."}
+    method_key=method_norm.lower()
+    if method_key not in allowed: return {"success":False,"message":"Invalid withdrawal method."}
     if not account_number: return {"success":False,"message":"Account number or wallet address is required."}
-    if key=='usdt' and not (str(account_number).startswith('T') and len(str(account_number))==34): return {"success":False,"message":"Invalid USDT TRC20 wallet address."}
+    if method_key == 'usdt' and not (str(account_number).startswith('T') and len(str(account_number))==34): return {"success":False,"message":"Invalid USDT TRC20 wallet address."}
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;",(telegram_id,)); user=cur.fetchone()
         if not user: conn.rollback(); return {"success":False,"message":"User not found."}
         cur.execute("SELECT 1 FROM withdrawals WHERE telegram_id=%s AND (created_at AT TIME ZONE 'Asia/Dhaka')::date=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date LIMIT 1;",(telegram_id,))
         if cur.fetchone(): conn.rollback(); return {"success":False,"message":"You can withdraw only once per day."}
-        current=float(user.get('main_balance') or 0)
-        if current < amount: conn.rollback(); return {"success":False,"message":"Insufficient Main Balance."}
-        cur.execute("UPDATE users SET main_balance=COALESCE(main_balance,0)-%s,total_withdrawn=COALESCE(total_withdrawn,0)+%s WHERE telegram_id=%s;",(amount,amount,telegram_id))
-        cur.execute("INSERT INTO withdrawals(telegram_id,method,account_number,amount,status,source) VALUES(%s,%s,%s,%s,'pending','main') RETURNING *;",(telegram_id,allowed[key],account_number,amount))
-        row=cur.fetchone(); conn.commit(); return {"success":True,"withdrawal":row}
+        field = 'task_balance' if source == 'task' else 'deposit_balance'
+        current=float(user[field] or 0)
+        if current < amount: conn.rollback(); return {"success":False,"message":"Insufficient balance."}
+        if source == 'task':
+            cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(task_balance,0)-%s,total_withdrawn=total_withdrawn+%s WHERE telegram_id=%s;",(amount,amount,amount,telegram_id))
+        else:
+            cur.execute("UPDATE users SET deposit_balance=COALESCE(deposit_balance,0)-%s,total_withdrawn=total_withdrawn+%s WHERE telegram_id=%s;",(amount,amount,telegram_id))
+        cur.execute("""INSERT INTO withdrawals(telegram_id,method,account_number,amount,status,source) VALUES(%s,%s,%s,%s,'pending',%s) RETURNING *;""",(telegram_id,allowed[method_key],account_number,amount,source))
+        withdrawal=cur.fetchone(); conn.commit(); return {"success":True,"withdrawal":withdrawal}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
 
@@ -1628,17 +1882,22 @@ def create_withdrawal(telegram_id, method, account_number, amount, source='main'
 
 def create_exchange_request(telegram_id, coin_amount):
     try: coin_amount=float(coin_amount)
-    except (ValueError,TypeError): return {"success":False,"message":"Invalid TaskCoin amount."}
+    except (ValueError, TypeError): return {"success":False,"message":"Invalid TaskCoin amount."}
     if coin_amount < 1500: return {"success":False,"message":"Minimum exchange is 1500 TaskCoins."}
     if coin_amount % 1500 != 0: return {"success":False,"message":"TaskCoins must be exchanged in multiples of 1500."}
-    gross=coin_amount/15.0; fee=round(gross*0.03,2); net=round(gross-fee,2)
+    cash_amount=coin_amount/15.0
+    from decimal import Decimal, ROUND_DOWN
+    gross_cash=Decimal(str(cash_amount)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    fee_cash=(gross_cash*Decimal(str(EXCHANGE_FEE_PERCENT))/Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    net_cash=(gross_cash-fee_cash).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;",(telegram_id,)); user=cur.fetchone()
         if not user: conn.rollback(); return {"success":False,"message":"User not found."}
-        if float(user['task_balance'] or 0)<coin_amount: conn.rollback(); return {"success":False,"message":"Insufficient TaskCoin balance."}
-        cur.execute("INSERT INTO coin_exchanges(telegram_id,coin_amount,cash_amount,status) VALUES(%s,%s,%s,'pending') RETURNING *;",(telegram_id,coin_amount,net))
-        row=cur.fetchone(); conn.commit(); return {"success":True,"message":f"Exchange request sent. 3% VAT applied; {net:,.2f} BDT will be added to Main Balance after approval.","exchange":row,"gross_bdt":gross,"fee_percent":3,"fee_bdt":fee}
+        balance=float(user['task_balance'] or 0)
+        if balance < coin_amount: conn.rollback(); return {"success":False,"message":"Insufficient TaskCoin balance."}
+        cur.execute("INSERT INTO coin_exchanges(telegram_id,coin_amount,cash_amount,status) VALUES(%s,%s,%s,'pending') RETURNING *;",(telegram_id,coin_amount,float(net_cash)))
+        row=cur.fetchone(); conn.commit(); return {"success":True,"message":"Exchange request sent to admin for approval.","exchange":row}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
 
@@ -1660,59 +1919,71 @@ def update_exchange_status(exchange_id,status):
     try:
         cur.execute("SELECT * FROM coin_exchanges WHERE id=%s FOR UPDATE;",(exchange_id,)); ex=cur.fetchone()
         if not ex: conn.rollback(); return {"success":False,"message":"Exchange request not found."}
-        if ex['status']!='pending': conn.rollback(); return {"success":False,"message":"Exchange request already processed."}
-        if status=='approved':
+        if ex['status'] != 'pending': conn.rollback(); return {"success":False,"message":"Exchange request already processed."}
+        if status == 'approved':
             cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;",(ex['telegram_id'],)); user=cur.fetchone()
             if not user: conn.rollback(); return {"success":False,"message":"User not found."}
-            if float(user['task_balance'] or 0)<float(ex['coin_amount']): conn.rollback(); return {"success":False,"message":"User no longer has enough TaskCoins for this exchange."}
-            cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(balance,0)-%s,main_balance=COALESCE(main_balance,0)+%s WHERE telegram_id=%s;",(ex['coin_amount'],ex['coin_amount'],ex['cash_amount'],ex['telegram_id']))
+            if float(user['task_balance'] or 0) < float(ex['coin_amount']): conn.rollback(); return {"success":False,"message":"User no longer has enough TaskCoins for this exchange."}
+            cur.execute("UPDATE users SET task_balance=task_balance-%s,balance=task_balance-%s,deposit_balance=COALESCE(deposit_balance,0)+%s WHERE telegram_id=%s RETURNING *;",(ex['coin_amount'],ex['coin_amount'],ex['cash_amount'],ex['telegram_id']))
+            gross_cash = Decimal(str(ex['coin_amount'])) / Decimal('15')
+            fee_cash = (gross_cash * Decimal(str(EXCHANGE_FEE_PERCENT)) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+            cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;", (OWNER_TELEGRAM_ID,))
+            owner = cur.fetchone()
+            if not owner:
+                conn.rollback()
+                return {"success":False,"message":"Owner account not found. Register Telegram ID 8746453103 first."}
+            cur.execute("UPDATE users SET deposit_balance=COALESCE(deposit_balance,0)+%s WHERE telegram_id=%s;", (fee_cash, OWNER_TELEGRAM_ID))
             cur.execute("INSERT INTO admin_coin_ledger(exchange_id,telegram_id,coin_amount) VALUES(%s,%s,%s);",(exchange_id,ex['telegram_id'],ex['coin_amount']))
         cur.execute("UPDATE coin_exchanges SET status=%s,processed_at=CURRENT_TIMESTAMP WHERE id=%s RETURNING *;",(status,exchange_id)); row=cur.fetchone(); conn.commit(); return {"success":True,"exchange":row}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
 
-def get_deposit_methods(active_only=True):
+def get_deposit_payment_settings(active_only=True):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
-        if active_only:
-            cur.execute("SELECT * FROM deposit_methods WHERE is_active=TRUE ORDER BY id ASC;")
-        else:
-            cur.execute("SELECT * FROM deposit_methods ORDER BY id ASC;")
-        return cur.fetchall()
+        sql="SELECT * FROM deposit_payment_settings"
+        if active_only: sql += " WHERE is_active=TRUE"
+        sql += " ORDER BY CASE method WHEN 'bkash' THEN 1 WHEN 'nagad' THEN 2 WHEN 'usdt' THEN 3 ELSE 9 END"
+        cur.execute(sql); return cur.fetchall()
     finally: cur.close(); conn.close()
 
-def update_deposit_method(method_key, wallet_value, is_active=True):
-    key=str(method_key or '').strip().lower()
-    value=str(wallet_value or '').strip()
-    if key not in ('bkash','nagad','rocket','usdt'):
-        return {"success":False,"message":"Invalid deposit method."}
+def update_deposit_payment_setting(method, wallet_address, instruction_type='Send Money', network='', is_active=True):
+    method=str(method or '').strip().lower()
+    if method not in ('bkash','nagad','usdt'): return {'success':False,'message':'Invalid payment method.'}
+    wallet_address=str(wallet_address or '').strip()
+    if not wallet_address: return {'success':False,'message':'Wallet/account number is required.'}
+    instruction_type=str(instruction_type or 'Send Money').strip()[:80]
+    network='TRON (TRC20)' if method=='usdt' else ''
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("""UPDATE deposit_methods SET wallet_value=%s,is_active=%s,updated_at=CURRENT_TIMESTAMP WHERE method_key=%s RETURNING *;""",(value,bool(is_active),key))
-        row=cur.fetchone()
-        if not row:
-            conn.rollback(); return {"success":False,"message":"Deposit method not found."}
-        conn.commit(); return {"success":True,"method":row}
+        cur.execute("""INSERT INTO deposit_payment_settings(method,wallet_address,instruction_type,network,is_active,updated_at)
+                      VALUES(%s,%s,%s,%s,%s,CURRENT_TIMESTAMP)
+                      ON CONFLICT(method) DO UPDATE SET wallet_address=EXCLUDED.wallet_address,instruction_type=EXCLUDED.instruction_type,network=EXCLUDED.network,is_active=EXCLUDED.is_active,updated_at=CURRENT_TIMESTAMP
+                      RETURNING *;""",(method,wallet_address,instruction_type,network,bool(is_active)))
+        row=cur.fetchone(); conn.commit(); return {'success':True,'setting':row}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
 
-def create_deposit(telegram_id, method, amount, transaction_id, payment_number=None):
+def create_deposit(telegram_id, method, amount, transaction_id, account_number=None):
     try: amount=float(amount)
     except (ValueError,TypeError): return {"success":False,"message":"Invalid deposit amount."}
-    if amount < 500 or amount > 25000:
-        return {"success":False,"message":"Deposit amount must be between 500 and 25000 BDT."}
+    if amount < 500 or amount > 25000: return {"success":False,"message":"Deposit amount must be between 500 and 25000 BDT."}
     method_key=str(method or '').strip().lower()
-    methods={"bkash":"bKash","nagad":"Nagad","rocket":"Rocket","usdt":"USDT"}
+    methods={"bkash":"bKash","nagad":"Nagad","usdt":"USDT"}
     if method_key not in methods: return {"success":False,"message":"Invalid deposit method."}
     tx=str(transaction_id or '').strip()
-    if not tx: return {"success":False,"message":"Transaction ID is required."}
-    payer=str(payment_number or '').strip()
-    if not payer: return {"success":False,"message":"Payment number is required."}
+    account=str(account_number or '').strip()
+    if not account: return {"success":False,"message":"Payment sender number or wallet address is required."}
+    if not tx: return {"success":False,"message":"Transaction ID / hash is required."}
+    if method_key=='usdt' and not (account.startswith('T') and len(account)==34): return {"success":False,"message":"Enter a valid USDT TRC20 sender wallet address."}
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cur.execute("SELECT wallet_address,is_active FROM deposit_payment_settings WHERE method=%s;",(method_key,)); setting=cur.fetchone()
+        if not setting or not setting['is_active'] or not setting['wallet_address']:
+            conn.rollback(); return {"success":False,"message":f'{methods[method_key]} deposit is currently unavailable. Admin has not configured the payment wallet.'}
         cur.execute("SELECT 1 FROM deposits WHERE transaction_id=%s LIMIT 1;",(tx,))
         if cur.fetchone(): conn.rollback(); return {"success":False,"message":"This transaction ID has already been submitted."}
-        cur.execute("""INSERT INTO deposits(telegram_id,method,account_number,payment_number,amount,transaction_id,status) VALUES(%s,%s,%s,%s,%s,%s,'pending') RETURNING *;""",(telegram_id,methods[method_key],payer,payer,amount,tx))
+        cur.execute("""INSERT INTO deposits(telegram_id,method,account_number,amount,transaction_id,status) VALUES(%s,%s,%s,%s,%s,'pending') RETURNING *;""",(telegram_id,methods[method_key],account,amount,tx))
         row=cur.fetchone(); conn.commit(); return {"success":True,"message":"Deposit submitted. Wait for admin approval.","deposit":row}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
@@ -1761,6 +2032,13 @@ def start_task(telegram_id,task_id):
     try:
         cur.execute("SELECT * FROM tasks WHERE id=%s AND is_active=TRUE FOR UPDATE;",(task_id,)); task=cur.fetchone()
         if not task: conn.rollback(); return {"success":False,"message":"Task not found or inactive."}
+        if not task_allowed_for_user(cur, telegram_id, task):
+            target = task.get('target_vip_level')
+            if target == 0:
+                msg = "This task is available to Non-VIP users only."
+            else:
+                msg = f"This task is reserved for VIP Level {int(target)}."
+            conn.rollback(); return {"success":False,"message":msg}
         cur.execute("SELECT available_at FROM task_cooldowns WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id)); cd=cur.fetchone()
         if cd and cd['available_at'] > __import__('datetime').datetime.now(__import__('datetime').timezone.utc).replace(tzinfo=None):
             conn.rollback(); return {"success":False,"message":"Please wait 10 seconds before starting again.","available_at":cd['available_at'].isoformat()}
@@ -1883,6 +2161,15 @@ def update_withdrawal_status(
                     "Withdrawal already processed."
             }
 
+        if status == "approved":
+            if withdrawal["source"] == "task":
+                cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;", (OWNER_TELEGRAM_ID,))
+                owner = cur.fetchone()
+                if not owner:
+                    conn.rollback()
+                    return {"success": False, "message": "Owner account not found. Register Telegram ID 8746453103 first."}
+                cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s;", (withdrawal["amount"],withdrawal["amount"],OWNER_TELEGRAM_ID))
+
         if status == "rejected":
 
             cur.execute("""
@@ -1891,11 +2178,9 @@ def update_withdrawal_status(
                     task_balance = CASE WHEN %s = 'task' THEN COALESCE(task_balance,0) + %s ELSE task_balance END,
                     balance = CASE WHEN %s = 'task' THEN COALESCE(task_balance,0) + %s ELSE balance END,
                     deposit_balance = CASE WHEN %s = 'deposit' THEN COALESCE(deposit_balance,0) + %s ELSE deposit_balance END,
-                    main_balance = CASE WHEN %s = 'main' THEN COALESCE(main_balance,0) + %s ELSE main_balance END,
                     total_withdrawn = GREATEST(0, total_withdrawn - %s)
                 WHERE telegram_id = %s;
             """, (
-                withdrawal["source"], withdrawal["amount"],
                 withdrawal["source"], withdrawal["amount"],
                 withdrawal["source"], withdrawal["amount"],
                 withdrawal["source"], withdrawal["amount"],
@@ -1940,6 +2225,45 @@ def update_withdrawal_status(
 
 
 # ============================================================
+# PUBLIC WITHDRAWAL PROOF
+# ============================================================
+def get_public_withdrawal_proofs(limit=50):
+    """Return anonymized, successfully approved withdrawals for public proof."""
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id, method, amount, processed_at, account_number
+            FROM withdrawals
+            WHERE status = 'approved'
+              AND processed_at IS NOT NULL
+            ORDER BY processed_at DESC, id DESC
+            LIMIT %s;
+        """, (int(limit),))
+        rows = cur.fetchall()
+        result = []
+        for row in rows:
+            account = str(row.get('account_number') or '')
+            if len(account) >= 8:
+                masked = account[:3] + '****' + account[-3:]
+            elif account:
+                masked = '****'
+            else:
+                masked = ''
+            result.append({
+                'id': row['id'],
+                'method': row['method'],
+                'amount': float(row['amount'] or 0),
+                'processed_at': row['processed_at'].isoformat() if row['processed_at'] else None,
+                'account_masked': masked,
+            })
+        return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ============================================================
 # REFERRAL FUNCTIONS
 # ============================================================
 
@@ -1955,7 +2279,7 @@ def create_referral(referrer_id, referred_id, reward=500):
     if referrer_id == referred_id:
         return {"success": False, "message": "Self referral is not allowed."}
     if reward <= 0:
-        reward = 500
+        return {"success": False, "message": "Referral reward must be greater than 0."}
 
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -1964,21 +2288,27 @@ def create_referral(referrer_id, referred_id, reward=500):
         if not cur.fetchone():
             conn.rollback()
             return {"success": False, "message": "Referrer not found."}
+
         cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (referred_id,))
         if not cur.fetchone():
             conn.rollback()
             return {"success": False, "message": "Referred user not found."}
+
         cur.execute("SELECT * FROM referrals WHERE referred_id=%s LIMIT 1 FOR UPDATE;", (referred_id,))
         existing = cur.fetchone()
         if existing:
             conn.rollback()
             return {"success": False, "message": "This user has already been referred.", "referral": existing}
 
-        cur.execute("UPDATE users SET referred_by=%s WHERE telegram_id=%s AND referred_by IS NULL;", (referrer_id, referred_id))
-        cur.execute("""
-            INSERT INTO referrals(referrer_id,referred_id,reward,status)
-            VALUES(%s,%s,%s,'pending') RETURNING *;
-        """, (referrer_id, referred_id, reward))
+        cur.execute(
+            "UPDATE users SET referred_by=%s WHERE telegram_id=%s AND referred_by IS NULL;",
+            (referrer_id, referred_id)
+        )
+        cur.execute(
+            """INSERT INTO referrals(referrer_id,referred_id,reward,status)
+               VALUES(%s,%s,%s,'pending') RETURNING *;""",
+            (referrer_id, referred_id, reward)
+        )
         referral = cur.fetchone()
         conn.commit()
         return {"success": True, "message": "Referral created and is pending admin approval.", "referral": referral, "reward": reward}
@@ -1990,106 +2320,14 @@ def create_referral(referrer_id, referred_id, reward=500):
         conn.close()
 
 
-def get_user_referrals(telegram_id):
-    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cur.execute("""
-            SELECT r.*, COALESCE(NULLIF(TRIM(r.status),''),'pending') AS status,
-                   u.username, u.first_name
-            FROM referrals r
-            LEFT JOIN users u ON u.telegram_id=r.referred_id
-            WHERE r.referrer_id=%s ORDER BY r.id DESC;
-        """, (telegram_id,))
-        return cur.fetchall()
-    finally:
-        cur.close(); conn.close()
-
-
-def get_referral_requests(status='pending'):
-    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        params=[]
-        where=''
-        if status and status != 'all':
-            where="WHERE COALESCE(NULLIF(TRIM(r.status),''),'pending')=%s"
-            params.append(status)
-        cur.execute(f"""
-            SELECT r.*,
-                   ru.username AS referrer_username, ru.first_name AS referrer_first_name,
-                   uu.username AS referred_username, uu.first_name AS referred_first_name
-            FROM referrals r
-            LEFT JOIN users ru ON ru.telegram_id=r.referrer_id
-            LEFT JOIN users uu ON uu.telegram_id=r.referred_id
-            {where}
-            ORDER BY r.id DESC;
-        """, tuple(params))
-        return cur.fetchall()
-    finally:
-        cur.close(); conn.close()
-
-
-def process_referral_request(referral_id, status, amount=500, admin_id=None):
-    status = str(status or '').strip().lower()
-    if status not in ('approved','rejected'):
-        return {'success':False,'message':'Status must be approved or rejected.'}
-    try:
-        referral_id=int(referral_id)
-        amount=round(float(amount),2)
-    except (TypeError,ValueError):
-        return {'success':False,'message':'Invalid referral request or bonus amount.'}
-    if status == 'approved' and amount <= 0:
-        return {'success':False,'message':'Bonus amount must be greater than 0.'}
-
-    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cur.execute("SELECT * FROM referrals WHERE id=%s FOR UPDATE;", (referral_id,))
-        r=cur.fetchone()
-        if not r:
-            conn.rollback(); return {'success':False,'message':'Referral request not found.'}
-        current=str(r.get('status') or 'pending').lower()
-        if current != 'pending':
-            conn.rollback(); return {'success':False,'message':f'Referral request is already {current}.','duplicate':True}
-
-        if status == 'rejected':
-            cur.execute("UPDATE referrals SET status='rejected', approved_at=CURRENT_TIMESTAMP, approved_by=%s WHERE id=%s RETURNING *;", (admin_id,referral_id))
-            row=cur.fetchone(); conn.commit()
-            return {'success':True,'message':'Referral request rejected.','referral':row}
-
-        cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (r['referrer_id'],))
-        if not cur.fetchone():
-            conn.rollback(); return {'success':False,'message':'Referrer user not found.'}
-        cur.execute("""
-            UPDATE users
-            SET referral_count=COALESCE(referral_count,0)+1,
-                task_balance=COALESCE(task_balance,0)+%s,
-                balance=COALESCE(balance,0)+%s,
-                total_earned=COALESCE(total_earned,0)+%s
-            WHERE telegram_id=%s RETURNING *;
-        """, (amount,amount,amount,r['referrer_id']))
-        referrer=cur.fetchone()
-        cur.execute("UPDATE referrals SET status='approved', reward=%s, approved_at=CURRENT_TIMESTAMP, approved_by=%s WHERE id=%s RETURNING *;", (amount,admin_id,referral_id))
-        row=cur.fetchone()
-        conn.commit()
-        return {'success':True,'message':'Referral approved and bonus credited.','referral':row,'reward':amount,'referrer':referrer}
-    except Exception:
-        conn.rollback(); raise
-    finally:
-        cur.close(); conn.close()
-
-
 def admin_give_referral_bonus(referrer_id,referred_id,amount,admin_id=None):
-    try:
-        referrer_id=int(referrer_id); referred_id=int(referred_id); amount=float(amount)
-    except (TypeError,ValueError):
-        return {'success':False,'message':'Invalid referral IDs or bonus amount.'}
+    try: referrer_id=int(referrer_id); referred_id=int(referred_id); amount=float(amount)
+    except (TypeError,ValueError): return {'success':False,'message':'Invalid referral IDs or bonus amount.'}
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute('SELECT id FROM referrals WHERE referrer_id=%s AND referred_id=%s FOR UPDATE;', (referrer_id,referred_id))
-        row=cur.fetchone()
-    finally:
-        cur.close(); conn.close()
-    if not row:
-        return {'success':False,'message':'Referral relationship not found.'}
+        cur.execute('SELECT id FROM referrals WHERE referrer_id=%s AND referred_id=%s FOR UPDATE;',(referrer_id,referred_id)); row=cur.fetchone()
+    finally: cur.close(); conn.close()
+    if not row: return {'success':False,'message':'Referral relationship not found.'}
     return process_referral_request(row['id'],'approved',amount,admin_id)
 
 
@@ -2114,7 +2352,7 @@ def lucky_spin(telegram_id):
             conn.rollback(); return {'success':False,'message':'VIP Membership required. Please upgrade your VIP.'}
         level=int(membership['level'])
         wheel='vip_1_5' if level<=5 else 'vip_6_10'
-        daily_limit=int(membership.get('daily_lucky_spins') or (1 if level<=5 else 3))
+        daily_limit=1 if level<=5 else 3
         cur.execute("SELECT COUNT(*) AS c FROM lucky_spin_records WHERE telegram_id=%s AND wheel_group=%s AND created_at::date=CURRENT_DATE;", (telegram_id,wheel))
         used=int(cur.fetchone()['c'] or 0)
         if used>=daily_limit:
@@ -2199,39 +2437,205 @@ def credit_referral_deposit_commission(deposit_id):
     finally: cur.close(); conn.close()
 
 
-def get_user_referrals(
-    telegram_id
-):
+def get_user_referrals(telegram_id):
+    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT r.id,r.referrer_id,r.referred_id,r.reward,COALESCE(NULLIF(TRIM(r.status),''),'pending') AS status,
+                   r.created_at,r.approved_at,u.username,u.first_name,
+                   COALESCE(a.amount,0) AS bonus_earned,
+                   COALESCE(c.lifetime_commission,0) AS lifetime_commission
+            FROM referrals r
+            LEFT JOIN users u ON u.telegram_id=r.referred_id
+            LEFT JOIN admin_referral_bonus_awards a ON a.referral_id=r.id
+            LEFT JOIN (
+                SELECT referrer_id,referred_id,SUM(commission_amount) AS lifetime_commission
+                FROM referral_deposit_commissions GROUP BY referrer_id,referred_id
+            ) c ON c.referrer_id=r.referrer_id AND c.referred_id=r.referred_id
+            WHERE r.referrer_id=%s ORDER BY r.id DESC;
+        """,(telegram_id,))
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+
+def get_referral_requests(status='pending'):
+    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        params=[]; where=''
+        if status and status!='all': where="WHERE COALESCE(NULLIF(TRIM(r.status),''),'pending')=%s"; params.append(status)
+        cur.execute(f"""
+            SELECT r.*,ru.username AS referrer_username,ru.first_name AS referrer_first_name,
+                   uu.username AS referred_username,uu.first_name AS referred_first_name,
+                   COALESCE(a.amount,0) AS bonus_earned,COALESCE(c.lifetime_commission,0) AS lifetime_commission
+            FROM referrals r
+            LEFT JOIN users ru ON ru.telegram_id=r.referrer_id
+            LEFT JOIN users uu ON uu.telegram_id=r.referred_id
+            LEFT JOIN admin_referral_bonus_awards a ON a.referral_id=r.id
+            LEFT JOIN (SELECT referrer_id,referred_id,SUM(commission_amount) AS lifetime_commission FROM referral_deposit_commissions GROUP BY referrer_id,referred_id) c
+              ON c.referrer_id=r.referrer_id AND c.referred_id=r.referred_id
+            {where} ORDER BY r.id DESC;
+        """,tuple(params))
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+
+def process_referral_request(referral_id, status, amount=500, admin_id=None):
+    """Approve/reject a pending referral; approval credits the referrer exactly once."""
+    status = str(status or '').strip().lower()
+    if status not in ('approved', 'rejected'):
+        return {'success': False, 'message': 'Status must be approved or rejected.'}
+    try:
+        referral_id = int(referral_id)
+        amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        return {'success': False, 'message': 'Invalid referral request or bonus amount.'}
+    if status == 'approved' and amount <= 0:
+        return {'success': False, 'message': 'Bonus amount must be greater than 0.'}
 
     conn = get_connection()
-
-    cur = conn.cursor(
-        cursor_factory=RealDictCursor
-    )
-
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cur.execute('SELECT * FROM referrals WHERE id=%s FOR UPDATE;', (referral_id,))
+        r = cur.fetchone()
+        if not r:
+            conn.rollback()
+            return {'success': False, 'message': 'Referral request not found.'}
 
-        cur.execute("""
-            SELECT
-                r.*,
-                u.username,
-                u.first_name
-            FROM referrals r
-            LEFT JOIN users u
-                ON u.telegram_id =
-                   r.referred_id
-            WHERE r.referrer_id = %s
-            ORDER BY r.id DESC;
-        """, (
-            telegram_id,
-        ))
+        current = str(r.get('status') or 'pending').lower()
+        if current != 'pending':
+            conn.rollback()
+            return {'success': False, 'message': f'Referral request is already {current}.', 'duplicate': True}
 
-        return cur.fetchall()
+        if status == 'rejected':
+            cur.execute(
+                "UPDATE referrals SET status='rejected', approved_at=CURRENT_TIMESTAMP, approved_by=%s WHERE id=%s RETURNING *;",
+                (admin_id, referral_id)
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return {'success': True, 'message': 'Referral request rejected.', 'referral': row}
 
+        # Lock both accounts before changing balances.
+        cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;', (r['referrer_id'],))
+        referrer = cur.fetchone()
+        if not referrer:
+            conn.rollback()
+            return {'success': False, 'message': 'Referrer user not found.'}
+
+        cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;', (r['referred_id'],))
+        referred = cur.fetchone()
+        if not referred:
+            conn.rollback()
+            return {'success': False, 'message': 'Referred user not found.'}
+
+        # The referral relationship is stored on the referred account.
+        if referred.get('referred_by') not in (None, r['referrer_id']):
+            conn.rollback()
+            return {'success': False, 'message': 'Referral owner does not match this account.'}
+
+        # Insert the one-time award record first. The UNIQUE referral_id constraint
+        # makes duplicate admin clicks unable to create a second bonus.
+        cur.execute(
+            """INSERT INTO admin_referral_bonus_awards
+               (referral_id,referrer_id,referred_id,amount)
+               VALUES(%s,%s,%s,%s)
+               ON CONFLICT (referral_id) DO NOTHING
+               RETURNING *;""",
+            (referral_id, r['referrer_id'], r['referred_id'], amount)
+        )
+        award = cur.fetchone()
+        if not award:
+            conn.rollback()
+            return {'success': False, 'message': 'Referral bonus has already been awarded.', 'duplicate': True}
+
+        cur.execute(
+            """UPDATE users
+               SET referral_count=COALESCE(referral_count,0)+1,
+                   task_balance=COALESCE(task_balance,0)+%s,
+                   balance=COALESCE(balance,0)+%s,
+                   total_earned=COALESCE(total_earned,0)+%s,
+                   last_active=CURRENT_TIMESTAMP
+               WHERE telegram_id=%s RETURNING *;""",
+            (amount, amount, amount, r['referrer_id'])
+        )
+        referrer = cur.fetchone()
+
+        cur.execute(
+            """UPDATE referrals
+               SET status='approved', approved_at=CURRENT_TIMESTAMP, approved_by=%s, reward=%s
+               WHERE id=%s RETURNING *;""",
+            (admin_id, amount, referral_id)
+        )
+        approved = cur.fetchone()
+
+        cur.execute(
+            "UPDATE users SET referred_by=%s WHERE telegram_id=%s AND referred_by IS NULL RETURNING *;",
+            (r['referrer_id'], r['referred_id'])
+        )
+        referred = cur.fetchone() or referred
+
+        conn.commit()
+        return {
+            'success': True,
+            'message': f'Referral approved and {amount:,.2f} TaskCoins credited to the referrer.',
+            'referral': approved,
+            'award': award,
+            'referrer': referrer,
+            'referred': referred
+        }
+    except Exception:
+        conn.rollback()
+        raise
     finally:
-
         cur.close()
         conn.close()
+
+
+def transfer_taskcoins(sender_id, receiver_id, amount):
+    """Atomically transfer TaskCoins with 5% VAT credited to the owner account."""
+    try:
+        sender_id = int(sender_id); receiver_id = int(receiver_id); amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        return {'success': False, 'message': 'Invalid sender, receiver or amount.'}
+    if sender_id == receiver_id:
+        return {'success': False, 'message': 'You cannot send TaskCoins to yourself.'}
+    if amount <= 0:
+        return {'success': False, 'message': 'Transfer amount must be greater than 0.'}
+    if sender_id == OWNER_TELEGRAM_ID or receiver_id == OWNER_TELEGRAM_ID:
+        return {'success': False, 'message': 'Owner account cannot be used as a normal transfer participant.'}
+    from decimal import Decimal, ROUND_DOWN
+    gross = Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    fee = (gross * Decimal(str(TRANSFER_FEE_PERCENT)) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    net = (gross - fee).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        locked = {}
+        for uid in sorted((sender_id, receiver_id, OWNER_TELEGRAM_ID)):
+            cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;', (uid,)); row = cur.fetchone()
+            if row: locked[uid] = row
+        if len(locked) != 3:
+            conn.rollback(); return {'success': False, 'message': 'Sender, receiver or owner account was not found.'}
+        sender = locked[sender_id]
+        sender_balance = Decimal(str(sender.get('task_balance') or 0))
+        if sender_balance < gross:
+            conn.rollback(); return {'success': False, 'message': f'Insufficient TaskCoins. Available: {sender_balance:,.2f}'}
+        cur.execute('UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(balance,0)-%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s AND COALESCE(task_balance,0)>=%s RETURNING *;', (gross,gross,sender_id,gross))
+        sender=cur.fetchone()
+        if not sender:
+            conn.rollback(); return {'success':False,'message':'Transfer failed because the sender balance changed. Please try again.'}
+        cur.execute('UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;', (net,net,receiver_id))
+        receiver=cur.fetchone()
+        cur.execute('UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;', (fee,fee,OWNER_TELEGRAM_ID))
+        owner=cur.fetchone()
+        cur.execute('INSERT INTO taskcoin_transfers(sender_id,receiver_id,amount) VALUES(%s,%s,%s) RETURNING *;', (sender_id,receiver_id,gross)); transfer=cur.fetchone()
+        conn.commit()
+        return {'success':True,'message':f'{gross:,.2f} TaskCoins sent. Receiver received {net:,.2f}; 5% VAT {fee:,.2f} credited to owner.','transfer':transfer,'sender':sender,'receiver':receiver,'owner':owner,'gross_amount':float(gross),'fee_amount':float(fee),'receiver_amount':float(net)}
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        cur.close(); conn.close()
+
+
 # ============================================================
 # ADMIN FUNCTIONS
 # ============================================================
@@ -3043,12 +3447,31 @@ def process_monetag_postback(
         """, (reward, reward, reward, telegram_id))
         updated_user = cur.fetchone()
 
+        # Referral reward: credit the referred user's referrer once for this
+        # Monetag event. The ymid uniqueness above prevents repeat payouts.
+        referral_bonus = 0
+        cur.execute("SELECT referred_by FROM users WHERE telegram_id=%s FOR UPDATE;", (telegram_id,))
+        refrow = cur.fetchone()
+        referrer_id = refrow["referred_by"] if refrow else None
+        if referrer_id:
+            referral_bonus = reward
+            cur.execute("""
+                UPDATE users
+                SET task_balance=COALESCE(task_balance,0)+%s,
+                    balance=COALESCE(balance,0)+%s,
+                    total_earned=COALESCE(total_earned,0)+%s,
+                    last_active=CURRENT_TIMESTAMP
+                WHERE telegram_id=%s
+                RETURNING *;
+            """, (referral_bonus, referral_bonus, referral_bonus, referrer_id))
+
         conn.commit()
         return {
             "success": True,
             "credited": True,
             "duplicate": False,
             "reward": reward,
+            "referral_bonus": referral_bonus,
             "postback": postback,
             "user": updated_user
         }
@@ -3062,35 +3485,19 @@ def process_monetag_postback(
 
 
 
-# ============================================================
-# TASKCOIN USER-TO-USER TRANSFER WITH 5% VAT
-# ============================================================
+# ----------------------------------------------------
+# MAIN-BALANCE BDT EXCHANGE (5% FEE)
+# ----------------------------------------------------
+EXCHANGE_FEE_PERCENT = 3
+OWNER_TELEGRAM_ID = 8746453103
+TRANSFER_FEE_PERCENT = 5
 
-def transfer_taskcoins(sender_id, receiver_id, amount):
-    try:
-        sender_id=int(sender_id); receiver_id=int(receiver_id); amount=round(float(amount),2)
-    except (TypeError,ValueError): return {'success':False,'message':'Invalid sender, receiver or amount.'}
-    if sender_id==receiver_id: return {'success':False,'message':'You cannot send TaskCoins to yourself.'}
-    if amount<=0: return {'success':False,'message':'Transfer amount must be greater than 0.'}
-    import os
-    owner_raw=os.getenv('TASKCOIN_OWNER_TELEGRAM_ID','').strip()
-    if not owner_raw:
-        admins=[x.strip() for x in os.getenv('ADMIN_TELEGRAM_IDS','').split(',') if x.strip().isdigit()]
-        owner_raw=admins[0] if admins else ''
-    try: owner_id=int(owner_raw)
-    except (TypeError,ValueError): return {'success':False,'message':'Owner Telegram ID is not configured.'}
-    fee=round(amount*0.05,2); receiver_amount=round(amount-fee,2)
-    conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        for uid in sorted(set([sender_id,receiver_id,owner_id])):
-            cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;',(uid,))
-            if not cur.fetchone(): conn.rollback(); return {'success':False,'message':'Sender, receiver or owner account was not found.'}
-        cur.execute('SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;',(sender_id,)); sender=cur.fetchone()
-        if float(sender['task_balance'] or 0)<amount: conn.rollback(); return {'success':False,'message':f"Insufficient TaskCoins. Available: {float(sender['task_balance'] or 0):,.2f}"}
-        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(balance,0)-%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s;",(amount,amount,sender_id))
-        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s;",(receiver_amount,receiver_amount,receiver_id))
-        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s;",(fee,fee,owner_id))
-        cur.execute("INSERT INTO taskcoin_transfers(sender_id,receiver_id,amount) VALUES(%s,%s,%s) RETURNING *;",(sender_id,receiver_id,amount)); tr=cur.fetchone()
-        conn.commit(); return {'success':True,'message':f'{amount:,.2f} TaskCoins sent. 5% VAT deducted; receiver gets {receiver_amount:,.2f} TaskCoins.','transfer':tr,'fee_percent':5,'fee_amount':fee,'receiver_amount':receiver_amount}
-    except Exception: conn.rollback(); raise
-    finally: cur.close(); conn.close()
+def calculate_exchange_payout(amount):
+    """Return (gross, fee, net) for a main-balance -> BDT exchange."""
+    from decimal import Decimal, ROUND_DOWN
+    gross = Decimal(str(amount or 0))
+    fee = (gross * Decimal(str(EXCHANGE_FEE_PERCENT)) / Decimal("100")).quantize(
+        Decimal("0.01"), rounding=ROUND_DOWN
+    )
+    net = (gross - fee).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    return gross, fee, net
