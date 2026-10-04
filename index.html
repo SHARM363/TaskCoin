@@ -2189,16 +2189,11 @@
                 </div>
 
                 <div class="balance-card" style="margin-top:12px;">
-                    <div class="balance-label">Deposit Balance</div>
+                    <div class="balance-label">Main Balance</div>
                     <div class="balance-amount" id="depositBalanceAmount">0</div>
-                    <div class="balance-coin">Deposit funds • kept separate</div>
+                    <div class="balance-coin">BDT • available for withdrawal</div>
                 </div>
 
-                <div class="balance-card" style="margin-top:12px;">
-                    <div class="balance-label">💎 Premium Income Balance</div>
-                    <div class="balance-amount" id="premiumIncomeBalanceAmount">0</div>
-                    <div class="balance-coin">Premium earnings • kept separate</div>
-                </div>
 
 
                 <!-- ============================================
@@ -2799,7 +2794,7 @@
 
 
                 <div class="deposit-notice">
-                    Send the payment using the payment instructions provided by the admin, then submit the transaction ID. Your Deposit Balance is credited only after admin approval.
+                    Send the payment using the payment instructions provided by the admin, then submit the transaction ID. Minimum deposit is ৳250 BDT. Send the payment using the payment instructions provided by the admin, then submit the transaction ID. Your Deposit Balance is credited only after admin approval.
                 </div>
 
 
@@ -2818,7 +2813,7 @@
                         id="depositAmount"
                         class="deposit-amount-input"
                         placeholder="Enter amount"
-                        min="1"
+                        min="250"
                     >
 
                 </div>
@@ -3045,7 +3040,7 @@
             <div class="wallet-card">
 
                 <div class="wallet-label">
-                    Main Balance Available for BDT Withdrawal
+                    Main Balance
                 </div>
 
                 <div
@@ -3056,7 +3051,7 @@
                 </div>
 
                 <div class="wallet-balance-sub">
-                    TaskCoins
+                    BDT • Available for Withdrawal
                 </div>
 
             </div>
@@ -3573,6 +3568,38 @@
     </div>
 
 </section>
+
+<!-- ====================================================
+     SUCCESSFUL WITHDRAWAL PAYMENT HISTORY / PROOF
+===================================================== -->
+<section class="page-section" id="publicWithdrawalHistorySection" style="margin-top:12px;">
+    <div class="section">
+        <div class="section-header">
+            <div>
+                <div class="section-title">💸 Successful Withdrawal History</div>
+                <div class="section-link">Approved payments made to users</div>
+            </div>
+        </div>
+        <div class="wallet-stats" style="margin-top:10px;">
+            <div class="wallet-stat">
+                <div class="wallet-stat-value" id="publicWithdrawUserCount">0</div>
+                <div class="wallet-stat-label">Users Paid</div>
+            </div>
+            <div class="wallet-stat">
+                <div class="wallet-stat-value" id="publicWithdrawPaymentCount">0</div>
+                <div class="wallet-stat-label">Successful Payments</div>
+            </div>
+        </div>
+        <div class="withdraw-summary" style="margin-top:10px;">
+            <div class="withdraw-summary-row">
+                <span class="withdraw-summary-label">Total Paid</span>
+                <strong class="withdraw-summary-value" id="publicWithdrawTotalPaid">৳0.00</strong>
+            </div>
+        </div>
+        <div id="publicWithdrawalHistory" style="margin-top:10px;"></div>
+    </div>
+</section>
+
 <!-- =========================================================
      PART 9 — REFERRAL PAGE
      ========================================================= -->
@@ -4302,7 +4329,7 @@ function applyUserData(user) {
             user.deposit_balance || 0
         );
 
-    appState.mainBalance = Number(user.main_balance || 0);
+    appState.mainBalance = Number(user.deposit_balance || 0);
 
     appState.premiumIncomeBalance =
         Number(user.premium_income_balance || 0);
@@ -4421,7 +4448,7 @@ function updateBalanceUI() {
     if (walletBalance) {
 
         walletBalance.textContent =
-            balance;
+            appState.mainBalance.toFixed(2);
 
     }
 
@@ -5512,7 +5539,7 @@ async function submitDeposit() {
     const account_number=(document.getElementById("depositSenderNumber")?.value || "").trim();
     const transaction_id=(document.getElementById("depositTransactionId")?.value || "").trim();
     if (!method) { showToast("Select bKash, Nagad or USDT."); return; }
-    if (!Number.isFinite(amount) || amount < 500 || amount > 25000) { showToast("Deposit amount must be between 500 and 25000 BDT."); return; }
+    if (!Number.isFinite(amount) || amount < 250 || amount > 25000) { showToast("Deposit amount must be between 250 and 25000 BDT."); return; }
     if (!account_number) { showToast("Enter the number/wallet used to send the payment."); return; }
     if (!transaction_id) { showToast("Enter the transaction ID."); return; }
     const result=await apiRequest("/api/deposit",{method:"POST",body:{telegram_id:appState.telegramUser.id,method,amount,account_number,transaction_id}});
@@ -5588,6 +5615,36 @@ window.selectedDepositMethod="";
 document.addEventListener("click",e=>{const b=e.target.closest(".payment-method"); if(!b)return; document.querySelectorAll(".payment-method").forEach(x=>x.classList.remove("active")); b.classList.add("active"); window.selectedDepositMethod=b.dataset.method || ""; loadDepositPaymentSettings();});
 
 loadDepositPaymentSettings();
+
+/* =========================================================
+   LOAD SUCCESSFUL WITHDRAWAL PAYMENT HISTORY
+   ========================================================= */
+async function loadPublicWithdrawalHistory() {
+    const data = await apiRequest("/api/public/withdrawals?limit=50");
+    if (!data) return;
+
+    const stats = data.stats || {};
+    const userCount = document.getElementById("publicWithdrawUserCount");
+    const paymentCount = document.getElementById("publicWithdrawPaymentCount");
+    const totalPaid = document.getElementById("publicWithdrawTotalPaid");
+    if (userCount) userCount.textContent = Number(stats.unique_users_count || 0).toLocaleString();
+    if (paymentCount) paymentCount.textContent = Number(stats.approved_payments_count || 0).toLocaleString();
+    if (totalPaid) totalPaid.textContent = "৳" + Number(stats.total_paid || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+    const box = document.getElementById("publicWithdrawalHistory");
+    if (!box) return;
+    const rows = Array.isArray(data.payments) ? data.payments : [];
+    box.innerHTML = rows.length ? rows.map(x => {
+        const date = x.processed_at ? new Date(x.processed_at).toLocaleString() : "";
+        return `<div class="card" style="margin-top:8px;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;">
+                <div><b>${escapeHtml(x.method || "Payment")}</b><br><span style="color:#6b7280;">${escapeHtml(x.account_masked || "")}</span></div>
+                <div style="text-align:right;"><b>৳${Number(x.amount || 0).toFixed(2)}</b><br><span class="status-success">Paid</span></div>
+            </div>
+            <div style="margin-top:5px;color:#6b7280;font-size:11px;">${escapeHtml(date)}</div>
+        </div>`;
+    }).join("") : `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-title">No Successful Withdrawals Yet</div><div class="empty-text">Approved payments will appear here.</div></div>`;
+}
 
 /* =========================================================
    LOAD WITHDRAWALS
@@ -6348,6 +6405,8 @@ async function refreshAppData() {
     await loadReferrals();
 
     await loadWithdrawals();
+
+    await loadPublicWithdrawalHistory();
 
     setupReferralLink();
 
