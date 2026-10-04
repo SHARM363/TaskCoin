@@ -39,6 +39,7 @@ from database import (
     get_all_withdrawals,
     update_withdrawal_status,
     get_public_withdrawal_proofs,
+    get_public_withdrawal_stats,
 
     get_user_referrals,
     get_referral_requests,
@@ -1439,11 +1440,13 @@ def public_withdrawals():
     try:
         rows = get_public_withdrawal_proofs(limit)
         total_paid = round(sum(float(x.get("amount") or 0) for x in rows), 2)
+        stats = get_public_withdrawal_stats()
         return jsonify({
             "success": True,
             "payments": rows,
             "count": len(rows),
             "total_paid_in_list": total_paid,
+            "stats": stats,
             "privacy": "User IDs and full payment account details are not publicly exposed."
         })
     except Exception as e:
