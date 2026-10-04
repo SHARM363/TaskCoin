@@ -1,3 +1,6 @@
+WITHDRAW_MIN = 500
+WITHDRAW_MAX = 25000
+EXCHANGE_FEE_PERCENT = 3
 import os
 
 from flask import Flask, jsonify, request
@@ -94,6 +97,28 @@ CORS(
 # ============================================================
 # BASIC API
 # ============================================================
+
+
+@app.route("/api/exchange/quote", methods=["GET"])
+def exchange_quote():
+    """Quote main-balance BDT exchange with a fixed 3% fee."""
+    try:
+        amount = float(request.args.get("amount", "0"))
+        if amount <= 0:
+            return jsonify({"success": False, "message": "Invalid amount"}), 400
+        fee = round(amount * 0.03, 2)
+        net = round(amount - fee, 2)
+        return jsonify({
+            "success": True,
+            "gross": amount,
+            "fee_percent": 3,
+            "fee": fee,
+            "net_bdt": net,
+            "currency": "BDT",
+            "balance_source": "main"
+        })
+    except Exception:
+        return jsonify({"success": False, "message": "Invalid amount"}), 400
 
 @app.route("/")
 def home():
@@ -1241,7 +1266,6 @@ def api_withdraw():
         "amount"
     )
 
-    source = data.get("source", "task")
 
     if not telegram_id:
 
@@ -1317,7 +1341,7 @@ def api_withdraw():
             method=method,
             account_number=account_number,
             amount=amount,
-            source=source
+            source="main"
         )
         if result.get("success"):
             wd=result.get("withdrawal") or {}
@@ -1325,7 +1349,6 @@ def api_withdraw():
                 "💸 <b>New Withdrawal Request</b>\n"
                 f"ID: <code>{wd.get('id')}</code>\n"
                 f"User: <code>{telegram_id}</code>\n"
-                f"Source: <b>{wd.get('source')}</b>\n"
                 f"Method: {wd.get('method')}\n"
                 f"Account: <code>{wd.get('account_number')}</code>\n"
                 f"Amount: <b>{wd.get('amount')}</b>",
