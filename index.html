@@ -198,6 +198,7 @@
         #premiumPage { background: linear-gradient(180deg,#f4efff 0%,#fbf9ff 100%); }
         #luckySpinPage { background: linear-gradient(180deg,#fff5e8 0%,#fffaf3 100%); }
         #exchangePage { background: linear-gradient(180deg,#eef5ff 0%,#f8fbff 100%); }
+        #transferPage { background: linear-gradient(180deg,#fff7ed 0%,#fffdf8 100%); }
         #walletPage { background: linear-gradient(180deg,#eefaf8 0%,#f8fffd 100%); }
         #withdrawPage { background: linear-gradient(180deg,#f0f7ff 0%,#f8fbff 100%); }
         #referralPage { background: linear-gradient(180deg,#f5f0ff 0%,#fbf9ff 100%); }
@@ -2286,6 +2287,12 @@
                             <div class="quick-action-text">1500 Coins = 100 BDT</div>
                         </button>
 
+                        <button class="quick-action" type="button" onclick="openPage('transferPage')">
+                            <div class="quick-action-icon">📤</div>
+                            <div class="quick-action-title">Transfer</div>
+                            <div class="quick-action-text">Send TaskCoins to a user</div>
+                        </button>
+
                         <button
                             class="quick-action"
                             type="button"
@@ -2970,6 +2977,43 @@
             </div>
         </div>
         <div class="section"><div class="section-title">Exchange History</div><div id="exchangeHistory" style="margin-top:10px;"></div></div>
+    </div>
+</section>
+
+<section class="page" id="transferPage">
+    <div class="container">
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">📤 Transfer TaskCoins</div>
+                    <div class="section-link">Send TaskCoins directly to another TaskCoin user</div>
+                </div>
+            </div>
+            <div class="wallet-card" style="margin-top:12px;">
+                <div class="wallet-label">Available TaskCoins</div>
+                <div class="wallet-balance" id="transferAvailableBalance">0</div>
+                <div class="wallet-balance-sub">Main / TaskCoin Balance</div>
+            </div>
+        </div>
+        <div class="section">
+            <div class="withdraw-card">
+                <div class="form-group">
+                    <label class="form-label" for="transferReceiverId">Receiver Telegram ID</label>
+                    <input type="number" id="transferReceiverId" class="form-input" min="1" step="1" placeholder="Example: 123456789">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="transferAmount">TaskCoins to transfer</label>
+                    <input type="number" id="transferAmount" class="form-input" min="0.01" step="0.01" placeholder="Enter amount">
+                </div>
+                <div class="withdraw-summary" style="margin-top:12px;">
+                    <div class="withdraw-summary-row"><span>Transfer amount</span><strong id="transferGrossPreview">0.00</strong></div>
+                    <div class="withdraw-summary-row"><span>VAT / service fee (5%)</span><strong id="transferVatPreview">0.00</strong></div>
+                    <div class="withdraw-summary-row"><span>Receiver gets</span><strong id="transferNetPreview">0.00</strong></div>
+                </div>
+                <div class="form-help" style="margin-top:10px;">5% VAT/service fee is deducted from the transfer amount and credited to the owner account. Example: 1,000 TaskCoins → receiver gets 950 TaskCoins; 50 TaskCoins VAT.</div>
+                <button type="button" class="primary-button" style="margin-top:14px;" onclick="sendTaskCoins()">📤 Send TaskCoins</button>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -4372,6 +4416,9 @@ function updateBalanceUI() {
 
     if (exchangeTaskBalance) { exchangeTaskBalance.textContent = balance; }
 
+    const transferAvailableBalance = document.getElementById("transferAvailableBalance");
+    if (transferAvailableBalance) transferAvailableBalance.textContent = Number(appState.balance || 0).toFixed(2);
+
 
     if (withdrawBalance) {
         withdrawBalance.textContent = appState.mainBalance.toFixed(2);
@@ -5433,6 +5480,60 @@ async function submitDeposit() {
     const result=await apiRequest("/api/deposit",{method:"POST",body:{telegram_id:appState.telegramUser.id,method,amount,transaction_id}});
     if (result?.success) { showToast("Deposit submitted. Waiting for admin approval."); document.getElementById("depositTransactionId").value=""; loadDeposits(); }
 }
+function updateTransferPreview() {
+    const amount = Number(document.getElementById("transferAmount")?.value || 0);
+    const gross = Number.isFinite(amount) && amount > 0 ? amount : 0;
+    const vat = Math.round(gross * 0.05 * 100) / 100;
+    const net = Math.round((gross - vat) * 100) / 100;
+    const grossEl = document.getElementById("transferGrossPreview");
+    const vatEl = document.getElementById("transferVatPreview");
+    const netEl = document.getElementById("transferNetPreview");
+    if (grossEl) grossEl.textContent = gross.toFixed(2);
+    if (vatEl) vatEl.textContent = vat.toFixed(2);
+    if (netEl) netEl.textContent = net.toFixed(2);
+}
+
+document.addEventListener("input", function(e) {
+    if (e.target && e.target.id === "transferAmount") updateTransferPreview();
+});
+
+async function sendTaskCoins() {
+    if (!appState.telegramUser) { showToast("Telegram user not detected."); return; }
+    const receiverInput = document.getElementById("transferReceiverId");
+    const amountInput = document.getElementById("transferAmount");
+    const receiverId = Number(receiverInput?.value);
+    const amount = Number(amountInput?.value);
+    const senderId = Number(appState.telegramUser.id);
+    if (!Number.isSafeInteger(receiverId) || receiverId <= 0) { showToast("Enter a valid receiver Telegram ID."); return; }
+    if (receiverId === senderId) { showToast("You cannot send TaskCoins to yourself."); return; }
+    if (!Number.isFinite(amount) || amount <= 0) { showToast("Enter a valid TaskCoin amount."); return; }
+    if (amount > Number(appState.balance || 0)) { showToast("Insufficient TaskCoin balance."); return; }
+    const button = document.querySelector('button[onclick="sendTaskCoins()"]');
+    if (button) { button.disabled = true; button.textContent = "Sending..."; }
+    try {
+        const result = await apiRequest("/api/taskcoin/transfer", {
+            method: "POST", timeout: 10000,
+            body: { sender_id: senderId, receiver_id: receiverId, amount: amount }
+        });
+        if (result?.success) {
+            const fee = Number(result.fee_amount ?? (amount * 0.05));
+            const received = Number(result.receiver_amount ?? (amount - fee));
+            showToast(result.message || `${amount.toFixed(2)} TaskCoins sent. 5% VAT: ${fee.toFixed(2)}; receiver gets ${received.toFixed(2)}.`);
+            if (receiverInput) receiverInput.value = "";
+            if (amountInput) amountInput.value = "";
+            updateTransferPreview();
+            await loadUserData();
+        } else {
+            showToast(result?.message || "TaskCoin transfer failed.");
+        }
+    } catch (error) {
+        console.error("TaskCoin transfer error:", error);
+        showToast("TaskCoin transfer failed. Please try again.");
+    } finally {
+        if (button) { button.disabled = false; button.textContent = "📤 Send TaskCoins"; }
+    }
+}
+
 async function loadDeposits() {
     if (!appState.telegramUser) return;
     const data=await apiRequest("/api/deposits?telegram_id="+encodeURIComponent(appState.telegramUser.id));
@@ -5980,10 +6081,32 @@ async function submitWithdraw() {
 
 
 /* =========================================================
+   MONETAG NAVIGATION AD — show when leaving Home for another page
+   ========================================================= */
+let lastOpenedPage = "homePage";
+let navigationAdBusy = false;
+async function showNavigationAdIfNeeded(targetPageId) {
+    if (navigationAdBusy || lastOpenedPage !== "homePage" || targetPageId === "homePage") return;
+    navigationAdBusy = true;
+    try {
+        const showAd = await waitForMonetag(12000);
+        await showAd();
+    } catch (error) {
+        console.warn("Monetag navigation ad skipped:", error);
+    } finally {
+        navigationAdBusy = false;
+    }
+}
+
+/* =========================================================
    OPEN PAGE
    ========================================================= */
 
 function openPage(pageId) {
+
+    showNavigationAdIfNeeded(pageId);
+    const previousPageId = lastOpenedPage;
+    lastOpenedPage = pageId;
 
     const pages =
         document.querySelectorAll(
@@ -6403,7 +6526,7 @@ window.refreshAppData =
 <!-- TaskCoin main-balance BDT exchange rules -->
 <div id="main-balance-exchange-info" style="display:none">
   <strong>Main Balance → BDT</strong>
-  <div>Exchange fee: 5%</div>
+  <div>Exchange fee: 3%</div>
   <div>Withdrawal range: ৳500 – ৳25,000</div>
 </div>
 
