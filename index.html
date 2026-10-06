@@ -3600,83 +3600,41 @@
         </div>
 
 
-    </div>
-
-</section>
-
-<!-- =========================================================
-     SUCCESSFUL PAYMENTS — BACKEND APPROVED WITHDRAWALS
-     ========================================================= -->
-<section class="section" style="margin-top:16px;">
-    <div class="section-header">
-        <div>
-            <div class="section-title">✅ Successful Payments</div>
-            <div class="section-link">Real payments approved by the backend/admin</div>
-        </div>
-    </div>
-    <div class="withdraw-summary" style="margin-top:10px;">
-        <div class="withdraw-summary-row">
-            <span class="withdraw-summary-label">Successful Payments</span>
-            <strong class="withdraw-summary-value" id="withdrawApprovedPaymentCount">0</strong>
-        </div>
-        <div class="withdraw-summary-row">
-            <span class="withdraw-summary-label">Total Paid</span>
-            <strong class="withdraw-summary-value" id="withdrawApprovedTotalPaid">৳0.00</strong>
-        </div>
-    </div>
-    <div id="successfulPaymentHistory" class="withdraw-history" style="margin-top:10px;">
-        <div class="card">
-            <div class="empty-state">
-                <div class="empty-icon">💳</div>
-                <div class="empty-title">Loading Successful Payments...</div>
-                <div class="empty-text">Showing only approved payments from the backend.</div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- =========================================================
-     PUBLIC PAYMENT PROOF PAGE
-     Login-free, database-backed proof of successful payouts.
-     ========================================================= -->
-<section class="page" id="paymentProofPage">
-    <div class="container">
-
-        <div class="section">
+        <!-- =========================================================
+             SUCCESSFUL PAYMENTS — BACKEND APPROVED WITHDRAWALS
+             Shown only under the Withdraw page.
+             ========================================================= -->
+        <div class="section" style="margin-top:16px;">
             <div class="section-header">
                 <div>
-                    <div class="section-title">✅ Payment Proof</div>
-                    <div class="section-link">Verified successful withdrawal payments</div>
+                    <div class="section-title">✅ Successful Payments</div>
+                    <div class="section-link">Real payments approved by the backend/admin</div>
                 </div>
             </div>
-
-            <div class="form-help" style="margin-top:10px;line-height:1.6;">
-                This public page shows real withdrawal payments that were approved by the administrator.
-                Account details are masked for user privacy.
-            </div>
-
-            <div class="wallet-stats" style="margin-top:14px;">
-                <div class="wallet-stat">
-                    <div class="wallet-stat-value" id="publicWithdrawUserCount">0</div>
-                    <div class="wallet-stat-label">Users Paid</div>
-                </div>
-                <div class="wallet-stat">
-                    <div class="wallet-stat-value" id="publicWithdrawPaymentCount">0</div>
-                    <div class="wallet-stat-label">Successful Payments</div>
-                </div>
-            </div>
-
             <div class="withdraw-summary" style="margin-top:10px;">
                 <div class="withdraw-summary-row">
+                    <span class="withdraw-summary-label">Successful Payments</span>
+                    <strong class="withdraw-summary-value" id="withdrawApprovedPaymentCount">0</strong>
+                </div>
+                <div class="withdraw-summary-row">
                     <span class="withdraw-summary-label">Total Paid</span>
-                    <strong class="withdraw-summary-value" id="publicWithdrawTotalPaid">৳0.00</strong>
+                    <strong class="withdraw-summary-value" id="withdrawApprovedTotalPaid">৳0.00</strong>
                 </div>
             </div>
-
-            <div id="publicWithdrawalHistory" style="margin-top:12px;"></div>
+            <div id="successfulPaymentHistory" class="withdraw-history" style="margin-top:10px;">
+                <div class="card">
+                    <div class="empty-state">
+                        <div class="empty-icon">💳</div>
+                        <div class="empty-title">Loading Successful Payments...</div>
+                        <div class="empty-text">Showing only approved payments from the backend.</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
+
     </div>
+
 </section>
 
 <!-- =========================================================
@@ -5774,13 +5732,6 @@ async function loadPublicWithdrawalHistory() {
     if (!data) return;
 
     const stats = data.stats || {};
-    const userCount = document.getElementById("publicWithdrawUserCount");
-    const paymentCount = document.getElementById("publicWithdrawPaymentCount");
-    const totalPaid = document.getElementById("publicWithdrawTotalPaid");
-    if (userCount) userCount.textContent = Number(stats.unique_users_count || 0).toLocaleString();
-    if (paymentCount) paymentCount.textContent = Number(stats.approved_payments_count || 0).toLocaleString();
-    if (totalPaid) totalPaid.textContent = "৳" + Number(stats.total_paid || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-
     const rows = Array.isArray(data.payments) ? data.payments : [];
     const paymentHtml = rows.length ? rows.map(x => {
         const date = x.processed_at ? new Date(x.processed_at).toLocaleString() : "";
@@ -5792,9 +5743,6 @@ async function loadPublicWithdrawalHistory() {
             <div style="margin-top:5px;color:#6b7280;font-size:11px;">Payment ID: #${escapeHtml(x.id)} · ${escapeHtml(date)}</div>
         </div>`;
     }).join("") : `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-title">No Successful Withdrawals Yet</div><div class="empty-text">Approved payments will appear here.</div></div>`;
-
-    const box = document.getElementById("publicWithdrawalHistory");
-    if (box) box.innerHTML = paymentHtml;
 
     const successBox = document.getElementById("successfulPaymentHistory");
     if (successBox) successBox.innerHTML = paymentHtml;
@@ -6662,20 +6610,6 @@ async function startTaskCoin() {
         }
 
         loadTelegramProfile();
-
-        const publicPaymentProof =
-            new URLSearchParams(window.location.search).get("page") === "payment-proof";
-
-        if (publicPaymentProof) {
-            openPage("paymentProofPage");
-            const bottomNav = document.getElementById("bottomNav");
-            const backButton = document.getElementById("pageBackButton");
-            if (bottomNav) bottomNav.style.display = "none";
-            if (backButton) backButton.style.display = "none";
-            hideAppLoading();
-            await loadPublicWithdrawalHistory();
-            return;
-        }
 
         openPage("homePage");
         hideAppLoading();
