@@ -34,6 +34,8 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
      <script src='//libtl.com/sdk.js' data-zone='11915530' data-sdk='show_11915530'></script>
+    <!-- AdsGram Rewarded Ads — separate optional placement -->
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <!-- ========================================================
          GOOGLE FONT
     ========================================================= -->
@@ -2745,6 +2747,26 @@ body{
 
 
                 <!-- ============================================
+                     ADSGRAM OPTIONAL REWARDED AD
+                ============================================= -->
+                <div class="section" style="margin-top:16px;">
+                    <div class="card" style="border:1px solid #dbeafe;background:linear-gradient(145deg,#eff6ff,#ffffff);">
+                        <div style="display:flex;align-items:flex-start;gap:12px;">
+                            <div style="width:44px;height:44px;border-radius:14px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🎁</div>
+                            <div style="flex:1;">
+                                <div style="font-size:16px;font-weight:800;color:#173b70;">Watch Ad & Earn TaskCoins</div>
+                                <div style="margin-top:5px;font-size:12px;color:#64748b;line-height:1.5;">Optional AdsGram rewarded ad. সম্পূর্ণ বিজ্ঞাপন দেখলে 50 TaskCoins পাবেন।</div>
+                            </div>
+                        </div>
+                        <button id="adsgramRewardButton" type="button" class="primary-button" style="width:100%;margin-top:14px;" onclick="showAdsGramRewardAd()">
+                            🎬 Watch Ad & Earn 50 TaskCoins
+                        </button>
+                        <div style="margin-top:7px;font-size:10px;color:#94a3b8;text-align:center;">You can use all other app functions without watching this ad.</div>
+                    </div>
+                </div>
+
+
+                <!-- ============================================
                      RECENT TASKS PREVIEW
                 ============================================= -->
 
@@ -5343,6 +5365,84 @@ async function waitForMonetag(timeout = 20000) {
 }
 
 /* =========================================================
+   ADSGRAM OPTIONAL REWARDED AD
+   Block ID: 52331
+   ========================================================= */
+const ADSGRAM_BLOCK_ID = "52331";
+const ADSGRAM_REWARD = 50;
+let adsgramController = null;
+let adsgramRewardBusy = false;
+
+function getAdsGramController() {
+    if (adsgramController) return adsgramController;
+    if (!window.Adsgram || typeof window.Adsgram.init !== "function") {
+        throw new Error("AdsGram SDK not loaded.");
+    }
+    adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID, debug: false });
+    return adsgramController;
+}
+
+async function showAdsGramRewardAd() {
+    if (adsgramRewardBusy) return;
+    if (!appState.telegramUser?.id) {
+        await loadTelegramProfile();
+    }
+    if (!appState.telegramUser?.id) {
+        showToast("Telegram user not detected. Please reopen the Mini App.");
+        return;
+    }
+
+    const button = document.getElementById("adsgramRewardButton");
+    adsgramRewardBusy = true;
+    if (button) {
+        button.disabled = true;
+        button.textContent = "📺 Loading AdsGram...";
+    }
+
+    try {
+        const controller = getAdsGramController();
+        if (button) button.textContent = "📺 Watching AdsGram Ad...";
+
+        // For Reward format, AdsGram resolves this promise after the user
+        // watches the rewarded ad to the end.
+        await controller.show();
+
+        if (button) button.textContent = "⏳ Crediting Reward...";
+
+        const result = await apiRequest("/api/adsgram/reward", {
+            method: "POST",
+            body: {
+                telegram_id: appState.telegramUser.id,
+                block_id: ADSGRAM_BLOCK_ID
+            }
+        });
+
+        if (!result || result.success === false) {
+            showToast(result?.message || "AdsGram reward could not be credited.");
+            return;
+        }
+
+        if (result.user) {
+            applyUserData(result.user);
+        } else {
+            await loadUserData();
+        }
+
+        if (typeof updateBalanceUI === "function") updateBalanceUI();
+        showToast(result.message || `AdsGram Reward: +${ADSGRAM_REWARD} TaskCoins`);
+    } catch (error) {
+        console.error("AdsGram reward error:", error);
+        showToast("AdsGram বিজ্ঞাপন সম্পূর্ণ হয়নি বা এখন কোনো বিজ্ঞাপন পাওয়া যায়নি।");
+    } finally {
+        adsgramRewardBusy = false;
+        if (button) {
+            button.disabled = false;
+            button.textContent = `🎬 Watch Ad & Earn ${ADSGRAM_REWARD} TaskCoins`;
+        }
+    }
+}
+
+/* =========================================================
    CLAIM TASK
    ========================================================= */
 async function claimTask(taskId) {
@@ -7164,6 +7264,9 @@ window.copyReferralLink =
 
 window.refreshAppData = 
   refreshAppData;
+
+window.showAdsGramRewardAd =
+  showAdsGramRewardAd;
                   
 </script>
 
