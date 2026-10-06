@@ -257,6 +257,33 @@ def init_db():
             );
         """)
 
+        # Social-media tasks are lifetime-one-time tasks. Existing social
+        # completions are migrated so old users can never reclaim them.
+        cur.execute("ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS lifetime_once BOOLEAN NOT NULL DEFAULT FALSE;")
+        cur.execute("""
+            UPDATE task_completions tc
+            SET lifetime_once=TRUE
+            FROM tasks t
+            WHERE tc.task_id=t.id
+              AND lower(trim(coalesce(t.platform,''))) IN ('facebook','tiktok','youtube','telegram','instagram');
+        """)
+        # Remove duplicate historical social completions before adding the
+        # lifetime uniqueness constraint. Keep the newest completion.
+        cur.execute("""
+            DELETE FROM task_completions a
+            USING task_completions b
+            WHERE a.lifetime_once=TRUE
+              AND b.lifetime_once=TRUE
+              AND a.telegram_id=b.telegram_id
+              AND a.task_id=b.task_id
+              AND a.id < b.id;
+        """)
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_task_completions_social_lifetime
+            ON task_completions(telegram_id, task_id)
+            WHERE lifetime_once=TRUE;
+        """)
+
         # ----------------------------------------------------
         # WITHDRAWALS
         # ----------------------------------------------------
@@ -1138,7 +1165,18 @@ def get_active_tasks_for_user(telegram_id):
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT *
+            SELECT t.*,
+                   CASE
+                       WHEN lower(trim(coalesce(t.platform,''))) IN ('facebook','tiktok','youtube','telegram','instagram')
+                       THEN EXISTS (
+                           SELECT 1
+                           FROM task_completions tc
+                           WHERE tc.telegram_id=%s
+                             AND tc.task_id=t.id
+                             AND tc.lifetime_once=TRUE
+                       )
+                       ELSE FALSE
+                   END AS completed_ever
             FROM tasks t
             WHERE t.is_active = TRUE
               AND (
@@ -1161,7 +1199,7 @@ def get_active_tasks_for_user(telegram_id):
                     ))
               )
             ORDER BY t.id DESC;
-        """, (telegram_id, telegram_id))
+        """, (telegram_id, telegram_id, telegram_id))
         return cur.fetchall()
     finally:
         cur.close()
@@ -1606,10 +1644,16 @@ def claim_task_reward(telegram_id, task_id):
         is_website=platform in ('website','webview','web view','web-view','site')
         is_webview=platform in ('webview','web view','web-view')
         if is_social:
-            # Five Social tasks per day: one completion per social platform.
-            cur.execute("SELECT 1 FROM task_completions tc JOIN tasks t ON t.id=tc.task_id WHERE tc.telegram_id=%s AND tc.completed_date=CURRENT_DATE AND lower(trim(coalesce(t.platform,'')))=%s LIMIT 1;",(telegram_id,platform))
+            # Social-media tasks are lifetime-one-time: once a user claims a
+            # specific social task, that user can never claim that task again.
+            cur.execute("""
+                SELECT 1 FROM task_completions
+                WHERE telegram_id=%s AND task_id=%s AND lifetime_once=TRUE
+                LIMIT 1;
+            """, (telegram_id, task_id))
             if cur.fetchone():
-                conn.rollback(); return {"success":False,"message":f'{platform.title()} task limit reached for today.'}
+                conn.rollback()
+                return {"success":False,"message":"This social-media task has already been claimed. You cannot claim it again."}
         elif is_website:
             cur.execute("SELECT COUNT(*) AS total FROM task_completions tc JOIN tasks t ON t.id=tc.task_id WHERE tc.telegram_id=%s AND tc.completed_date=CURRENT_DATE AND lower(trim(coalesce(t.platform,''))) IN ('website','webview','web view','web-view','site');",(telegram_id,))
             website_count=int(cur.fetchone()['total'] or 0)
@@ -1631,12 +1675,35 @@ def claim_task_reward(telegram_id, task_id):
         # than the ad. Non-ad tasks keep the original duration requirement.
         if not is_webview and elapsed < required:
             conn.rollback(); return {"success":False,"message":f"Please complete the task for at least {required} seconds.","remaining":max(0,required-int(elapsed))}
+        platform=str(task.get('platform') or '').strip().lower()
+        is_social=platform in PREMIUM_SOCIAL_PLATFORMS
+        if is_social:
+            cur.execute("""
+                SELECT 1 FROM task_completions
+                WHERE telegram_id=%s AND task_id=%s AND lifetime_once=TRUE
+                LIMIT 1;
+            """, (telegram_id, task_id))
+            if cur.fetchone():
+                conn.rollback()
+                return {"success":False,"message":"This social-media task has already been claimed. It can only be claimed once per user."}
         cur.execute("SELECT available_at FROM task_cooldowns WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id)); cd=cur.fetchone()
         if cd:
             cur.execute("SELECT EXTRACT(EPOCH FROM (%s-CURRENT_TIMESTAMP)) AS seconds;",(cd['available_at'],)); remain=float(cur.fetchone()['seconds'] or 0)
             if remain>0: conn.rollback(); return {"success":False,"message":"Please wait before starting this task again.","cooldown":int(remain)+1}
         reward=float(task['reward'] or 0)
-        cur.execute("INSERT INTO task_completions(telegram_id,task_id,reward,completed_date) VALUES(%s,%s,%s,CURRENT_DATE) RETURNING *;",(telegram_id,task_id,reward)); completion=cur.fetchone()
+        if is_social:
+            cur.execute("""
+                INSERT INTO task_completions(telegram_id,task_id,reward,completed_date,lifetime_once)
+                VALUES(%s,%s,%s,CURRENT_DATE,TRUE)
+                ON CONFLICT DO NOTHING
+                RETURNING *;
+            """, (telegram_id,task_id,reward))
+            completion=cur.fetchone()
+            if not completion:
+                conn.rollback()
+                return {"success":False,"message":"This social-media task has already been claimed. You cannot claim it again."}
+        else:
+            cur.execute("INSERT INTO task_completions(telegram_id,task_id,reward,completed_date,lifetime_once) VALUES(%s,%s,%s,CURRENT_DATE,FALSE) RETURNING *;",(telegram_id,task_id,reward)); completion=cur.fetchone()
         cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(task_balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s,completed_tasks=COALESCE(completed_tasks,0)+1,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING *;",(reward,reward,reward,telegram_id)); updated=cur.fetchone()
         if not updated: raise RuntimeError('User disappeared while claiming task.')
         # 10-second cooldown after a successful reward.
