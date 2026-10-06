@@ -2099,7 +2099,15 @@ def _is_cpagrip_task(task):
         return False
     platform = str(task.get('platform') or '').strip().lower()
     url = str(task.get('task_url') or '').strip().lower()
-    return platform in {'cpagrip', 'cpa grip'} or 'tundrafile.com/' in url or 'cpagrip.com/' in url
+    # CPAGrip can be reached either directly (TundraFile/CPAGrip) or
+    # through the TaskCoin Google Sites landing page. The exact landing-page
+    # match prevents unrelated Google Sites tasks from becoming CPAGrip tasks.
+    return (
+        platform in {'cpagrip', 'cpa grip'}
+        or 'tundrafile.com/' in url
+        or 'cpagrip.com/' in url
+        or url.startswith('https://sites.google.com/view/taskcoin-offer')
+    )
 
 
 def start_task(telegram_id,task_id):
