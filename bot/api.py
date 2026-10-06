@@ -1812,6 +1812,73 @@ def api_referrals():
             "error": str(e)
         }), 500
 # ============================================================
+# CPAGRIP LANDING-PAGE TRACKING BRIDGE
+# ============================================================
+
+CPAGRIP_LANDING_URL = os.getenv(
+    "CPAGRIP_LANDING_URL",
+    "https://sites.google.com/view/taskcoin-offer/home"
+).strip()
+CPAGRIP_SMART_LINK = os.getenv(
+    "CPAGRIP_SMART_LINK",
+    "https://tundrafile.com/1917387/"
+).strip()
+
+
+def _valid_cpagrip_tracking_id(value):
+    value = str(value or "").strip()
+    return bool(__import__("re").fullmatch(r"tc_\d+_\d+_[a-f0-9]{20}", value))
+
+
+@app.route("/api/cpagrip/prepare", methods=["GET"])
+def cpagrip_prepare():
+    """
+    Store the TaskCoin tracking ID in a short-lived first-party cookie, then
+    send the user to the existing Google Sites landing page.
+
+    Google Sites buttons are static, so the cookie is the bridge that lets the
+    static button later reach /api/cpagrip/redirect with the correct tracking ID.
+    """
+    tracking_id = str(request.args.get("tracking_id") or "").strip()
+    if not _valid_cpagrip_tracking_id(tracking_id):
+        return jsonify({"success": False, "message": "Invalid CPAGrip tracking_id."}), 400
+
+    response = __import__("flask").redirect(CPAGRIP_LANDING_URL, code=302)
+    response.set_cookie(
+        "taskcoin_cpagrip_tracking_id",
+        tracking_id,
+        max_age=1800,
+        secure=True,
+        httponly=True,
+        samesite="Lax",
+        path="/"
+    )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+@app.route("/api/cpagrip/redirect", methods=["GET"])
+def cpagrip_redirect():
+    """Read the short-lived tracking cookie and redirect to CPAGrip Smart Link."""
+    tracking_id = str(request.cookies.get("taskcoin_cpagrip_tracking_id") or "").strip()
+    if not _valid_cpagrip_tracking_id(tracking_id):
+        # Direct visits still reach the offer, but are not attributable to a
+        # TaskCoin start and therefore cannot unlock a TaskCoin reward.
+        return __import__("flask").redirect(CPAGRIP_SMART_LINK, code=302)
+
+    from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+    parts = urlsplit(CPAGRIP_SMART_LINK)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["tracking_id"] = tracking_id
+    target = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+    response = __import__("flask").redirect(target, code=302)
+    response.delete_cookie("taskcoin_cpagrip_tracking_id", path="/")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+# ============================================================
 # CPAGRIP GLOBAL POSTBACK
 # ============================================================
 
