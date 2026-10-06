@@ -4877,14 +4877,28 @@ function buildCpagripTaskUrl(url, trackingId) {
     const value = String(url || "").trim();
     const token = String(trackingId || "").trim();
     if (!value || !token) return value;
-    if (!/(cpagrip\.com|tundrafile\.com)\//i.test(value)) return value;
-    try {
-        const u = new URL(value);
-        u.searchParams.set("tracking_id", token);
-        return u.toString();
-    } catch (_) {
-        return value + (value.includes("?") ? "&" : "?") + "tracking_id=" + encodeURIComponent(token);
+
+    // Direct CPAGrip/TundraFile links can receive tracking_id directly.
+    if (/(cpagrip\.com|tundrafile\.com)\//i.test(value)) {
+        try {
+            const u = new URL(value);
+            u.searchParams.set("tracking_id", token);
+            return u.toString();
+        } catch (_) {
+            return value + (value.includes("?") ? "&" : "?") + "tracking_id=" + encodeURIComponent(token);
+        }
     }
+
+    // Google Sites cannot dynamically rewrite a normal Button URL.
+    // Instead, TaskCoin first hits our Render bridge, which stores the
+    // tracking ID in a short-lived cookie and then returns the user to the
+    // existing Google Sites landing page. The static Sites button can then
+    // call /api/cpagrip/redirect and the server appends the same tracking ID.
+    if (/^https:\/\/sites\.google\.com\/view\/taskcoin-offer(?:\/|$)/i.test(value)) {
+        return API_BASE_URL + "/api/cpagrip/prepare?tracking_id=" + encodeURIComponent(token);
+    }
+
+    return value;
 }
 
 
