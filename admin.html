@@ -1589,6 +1589,7 @@ async function adminLogin() {
         message.textContent = "";
 
         await loadDashboard();
+        startReferralAutoRefresh();
 
     } catch (error) {
 
@@ -2962,6 +2963,17 @@ async function rejectReferral(id){
     try{const data=await apiRequest(`/api/admin/referral-requests/${id}`,{method:"PUT",body:JSON.stringify({status:"rejected"})});if(!data.success)throw new Error(data.message||"Unable to reject referral.");showAlert("referralBonusAlert","Referral request rejected.","success");await loadReferralRequests();}catch(e){showAlert("referralBonusAlert",e.message||"Unable to reject referral.","error");}
 }
 
+// Keep the referral queue near real-time without changing any other admin feature.
+let referralRefreshTimer = null;
+function startReferralAutoRefresh() {
+    if (referralRefreshTimer) clearInterval(referralRefreshTimer);
+    referralRefreshTimer = setInterval(() => {
+        if (adminToken) {
+            loadReferralRequests().catch(() => {});
+        }
+    }, 10000);
+}
+
 // ================================
 // LOAD USERS
 // ================================
@@ -3008,6 +3020,22 @@ async function loadUsers() {
 
         allUsers =
             data.users || [];
+
+        // Pending referrals already count as referrals in the admin Users view.
+        // They remain pending for bonus approval.
+        let pendingReferralCounts = {};
+        try {
+            const pendingData = await apiRequest(
+                "/api/admin/referral-requests?status=pending"
+            );
+            (pendingData.requests || []).forEach(ref => {
+                const referrerId = String(ref.referrer_id);
+                pendingReferralCounts[referrerId] =
+                    (pendingReferralCounts[referrerId] || 0) + 1;
+            });
+        } catch (refError) {
+            console.warn("Pending referral count unavailable:", refError);
+        }
 
         tbody.innerHTML = "";
 
@@ -3088,7 +3116,15 @@ async function loadUsers() {
                         </td>
 
                         <td>
-                            ${user.referral_count || 0}
+                            ${Number(user.referral_count || 0) +
+                              Number(pendingReferralCounts[String(user.telegram_id)] || 0)}
+                            ${
+                                Number(pendingReferralCounts[String(user.telegram_id)] || 0) > 0
+                                    ? `<br><small style="color:#92400e;font-weight:700;">⏳ ${
+                                        Number(pendingReferralCounts[String(user.telegram_id)] || 0)
+                                      } pending</small>`
+                                    : ""
+                            }
                         </td>
 
                         <td>
@@ -3184,6 +3220,7 @@ async function checkAdminLogin() {
 
 
         await loadDashboard();
+        startReferralAutoRefresh();
 
 
     } catch (error) {
