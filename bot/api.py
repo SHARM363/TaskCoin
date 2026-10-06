@@ -23,6 +23,7 @@ from database import (
     start_task,
     process_adgem_conversion,
     process_monetag_postback,
+    add_adsgram_reward,
 
     get_active_tasks,
     get_active_tasks_for_user,
@@ -1965,6 +1966,39 @@ def adgem_postback():
         "message": "AdGem postback received.",
         "data": data
     })
+# ============================================================
+# ADSGRAM REWARDED AD
+# ============================================================
+
+ADSGRAM_BLOCK_ID = "52331"
+ADSGRAM_REWARD = 50
+
+@app.route("/api/adsgram/reward", methods=["POST"])
+def adsgram_reward():
+    """Credit the fixed TaskCoin reward after AdsGram Rewarded completion."""
+    data = request.get_json(silent=True) or {}
+    telegram_id = data.get("telegram_id")
+    block_id = str(data.get("block_id") or "").strip()
+
+    if block_id != ADSGRAM_BLOCK_ID:
+        return jsonify({"success": False, "message": "Invalid AdsGram block."}), 400
+
+    try:
+        telegram_id = int(telegram_id)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid telegram_id."}), 400
+
+    try:
+        result = add_adsgram_reward(telegram_id, ADSGRAM_REWARD)
+        if not result.get("success"):
+            return jsonify(result), 400
+        result["message"] = f"AdsGram reward credited: +{ADSGRAM_REWARD} TaskCoins."
+        return jsonify(result), 200
+    except Exception as e:
+        app.logger.exception("AdsGram reward processing failed")
+        return jsonify({"success": False, "message": "AdsGram reward processing failed.", "error": str(e)}), 500
+
+
 # ============================================================
 # MONETAG POSTBACK
 # ============================================================
