@@ -380,54 +380,6 @@ def init_db():
                 PRIMARY KEY (telegram_id, task_id)
             );
         """)
-        # CPAGrip verification fields are additive and do not change the
-        # existing task-start primary key or existing task flow.
-        cur.execute("""
-            ALTER TABLE task_starts
-            ADD COLUMN IF NOT EXISTS tracking_id TEXT;
-        """)
-        cur.execute("""
-            ALTER TABLE task_starts
-            ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'pending';
-        """)
-        cur.execute("""
-            ALTER TABLE task_starts
-            ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;
-        """)
-        cur.execute("""
-            ALTER TABLE task_starts
-            ADD COLUMN IF NOT EXISTS verification_ref TEXT;
-        """)
-        cur.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_task_starts_tracking_id
-            ON task_starts(tracking_id)
-            WHERE tracking_id IS NOT NULL;
-        """)
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS cpagrip_conversions (
-                id BIGSERIAL PRIMARY KEY,
-                tracking_id TEXT NOT NULL,
-                telegram_id BIGINT NOT NULL,
-                task_id INTEGER NOT NULL,
-                transaction_id TEXT,
-                payout NUMERIC(20, 8) DEFAULT 0,
-                offer_id TEXT,
-                offer_name TEXT,
-                conversion_status TEXT DEFAULT 'approved',
-                postback_fingerprint TEXT UNIQUE NOT NULL,
-                raw_payload TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_cpagrip_conversions_user
-            ON cpagrip_conversions(telegram_id, created_at);
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_cpagrip_conversions_task
-            ON cpagrip_conversions(task_id, created_at);
-        """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS task_cooldowns (
                 telegram_id BIGINT NOT NULL,
@@ -1644,21 +1596,10 @@ def claim_task_reward(telegram_id, task_id):
                 msg = f"This task is reserved for VIP Level {int(target)}."
             conn.rollback(); return {"success":False,"message":msg}
 
-        # CPAGrip tasks are rewarded only after a verified Global Postback.
-        # A page visit, elapsed time, or a client-side Claim click is never enough.
-        cpagrip_task = _is_cpagrip_task(task)
-        if cpagrip_task:
-            cur.execute("""
-                SELECT tracking_id, verification_status, verified_at, verification_ref
-                FROM task_starts
-                WHERE telegram_id=%s AND task_id=%s
-                FOR UPDATE;
-            """, (telegram_id, task_id))
-            verification = cur.fetchone()
-            if not verification:
-                conn.rollback(); return {"success":False,"message":"Start the task first."}
-            if str(verification.get('verification_status') or '').lower() != 'verified':
-                conn.rollback(); return {"success":False,"message":"Offer not completed yet. Complete the CPAGrip offer and wait for verification before claiming the reward.","verified":False}
+        # Adsterra Reward Club tasks require the server-side 10-second session gate.
+        # Smartlink traffic is tracked separately; it does not expose a publisher-side
+        # "10 seconds viewed" completion callback.
+        adsterra_task = _is_adsterra_task(task)
 
         platform=str(task.get('platform') or '').strip().lower()
         is_social=platform in PREMIUM_SOCIAL_PLATFORMS
@@ -1684,7 +1625,7 @@ def claim_task_reward(telegram_id, task_id):
         cur.execute("SELECT started_at FROM task_starts WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id)); st=cur.fetchone()
         if not st: conn.rollback(); return {"success":False,"message":"Start Task first."}
         cur.execute("SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-%s)) AS seconds;",(st['started_at'],)); elapsed=float(cur.fetchone()['seconds'] or 0)
-        required=max(1,int(task.get('duration') or 20))
+        required=10 if adsterra_task else max(1,int(task.get('duration') or 20))
         # For rewarded-ad tasks the ad completion is the completion gate; do not
         # reject a valid claim merely because the configured page duration is longer
         # than the ad. Non-ad tasks keep the original duration requirement.
@@ -2093,22 +2034,16 @@ def update_deposit_status(deposit_id,status):
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
 
-def _is_cpagrip_task(task):
-    """Return True only for tasks that use CPAGrip tracking/postback verification."""
+def _is_adsterra_task(task):
     if not task:
         return False
-    platform = str(task.get('platform') or '').strip().lower()
-    url = str(task.get('task_url') or '').strip().lower()
-    # CPAGrip can be reached either directly (TundraFile/CPAGrip) or
-    # through the TaskCoin Google Sites landing page. The exact landing-page
-    # match prevents unrelated Google Sites tasks from becoming CPAGrip tasks.
+    platform = str(task.get("platform") or "").strip().lower()
+    url = str(task.get("task_url") or "").strip().lower()
     return (
-        platform in {'cpagrip', 'cpa grip'}
-        or 'tundrafile.com/' in url
-        or 'cpagrip.com/' in url
-        or url.startswith('https://sites.google.com/view/taskcoin-offer')
+        platform in {"adsterra", "smartlink", "adsterra_smartlink", "reward_club"}
+        or "auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631" in url
+        or url.startswith("https://sites.google.com/view/taskcoin-offer")
     )
-
 
 def start_task(telegram_id,task_id):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
@@ -2125,34 +2060,15 @@ def start_task(telegram_id,task_id):
         cur.execute("SELECT available_at FROM task_cooldowns WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id)); cd=cur.fetchone()
         if cd and cd['available_at'] > __import__('datetime').datetime.now(__import__('datetime').timezone.utc).replace(tzinfo=None):
             conn.rollback(); return {"success":False,"message":"Please wait 10 seconds before starting again.","available_at":cd['available_at'].isoformat()}
-        tracking_id = None
-        if _is_cpagrip_task(task):
-            # One-time per-start identifier. CPAGrip receives this as tracking_id
-            # and returns it in the Global Postback when the offer converts.
-            tracking_id = f"tc_{int(telegram_id)}_{int(task_id)}_{secrets.token_hex(10)}"
-
-        if tracking_id:
-            cur.execute("""
-                INSERT INTO task_starts(telegram_id,task_id,started_at,tracking_id,verification_status,verified_at,verification_ref)
-                VALUES(%s,%s,CURRENT_TIMESTAMP,%s,'pending',NULL,NULL)
-                ON CONFLICT(telegram_id,task_id) DO UPDATE SET
-                    started_at=CURRENT_TIMESTAMP,
-                    tracking_id=EXCLUDED.tracking_id,
-                    verification_status='pending',
-                    verified_at=NULL,
-                    verification_ref=NULL
-                RETURNING *;
-            """,(telegram_id,task_id,tracking_id));
-        else:
-            cur.execute("""
-                INSERT INTO task_starts(telegram_id,task_id,started_at)
-                VALUES(%s,%s,CURRENT_TIMESTAMP)
-                ON CONFLICT(telegram_id,task_id) DO UPDATE SET
-                    started_at=CURRENT_TIMESTAMP
-                RETURNING *;
-            """,(telegram_id,task_id))
+        cur.execute("""
+            INSERT INTO task_starts(telegram_id,task_id,started_at)
+            VALUES(%s,%s,CURRENT_TIMESTAMP)
+            ON CONFLICT(telegram_id,task_id) DO UPDATE SET
+                started_at=CURRENT_TIMESTAMP
+            RETURNING *;
+        """,(telegram_id,task_id))
         row=cur.fetchone(); conn.commit();
-        return {"success":True,"start":row,"verification_required":bool(tracking_id),"tracking_id":tracking_id}
+        return {"success":True,"start":row,"verification_required":False}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
 
@@ -3488,95 +3404,6 @@ def add_monetag_reward(telegram_id, reward):
     finally:
         cur.close()
         conn.close()
-
-def process_cpagrip_postback(
-    tracking_id, payout=0, transaction_id=None, status=None,
-    offer_id=None, offer_name=None, raw_payload=None
-):
-    """
-    Verify and record one CPAGrip Global Postback.
-
-    This function NEVER credits the user's reward directly. It only marks the
-    matching task start as verified. The existing claim_task_reward() function
-    remains the single reward-crediting path.
-    """
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        tracking_id = str(tracking_id or '').strip()
-        transaction_id = str(transaction_id or '').strip() or None
-        status_norm = str(status or '').strip().lower()
-        try:
-            payout = float(payout or 0)
-        except (TypeError, ValueError):
-            payout = 0.0
-
-        if not tracking_id:
-            return {"success": False, "verified": False, "message": "Missing CPAGrip tracking_id."}
-        if status_norm and status_norm not in {'1','approved','complete','completed','converted','conversion','success','successful','credited','lead','ok'}:
-            return {"success": False, "verified": False, "message": "CPAGrip postback status is not approved."}
-
-        cur.execute("""
-            SELECT ts.*, t.title, t.platform, t.task_url, t.reward
-            FROM task_starts ts
-            JOIN tasks t ON t.id=ts.task_id
-            WHERE ts.tracking_id=%s
-            FOR UPDATE;
-        """, (tracking_id,))
-        start = cur.fetchone()
-        if not start:
-            conn.rollback()
-            return {"success": False, "verified": False, "message": "Unknown CPAGrip tracking_id."}
-
-        if not _is_cpagrip_task(start):
-            conn.rollback()
-            return {"success": False, "verified": False, "message": "Tracking ID is not attached to a CPAGrip task."}
-
-        if str(start.get('verification_status') or '').lower() == 'verified':
-            conn.rollback()
-            return {"success": True, "verified": True, "already_verified": True, "telegram_id": int(start['telegram_id']), "task_id": int(start['task_id'])}
-
-        payload_text = json.dumps(raw_payload or {}, ensure_ascii=False, sort_keys=True, default=str)
-        fingerprint_source = '|'.join([
-            tracking_id, transaction_id or '', str(payout), status_norm,
-            str(offer_id or ''), str(offer_name or ''), payload_text
-        ])
-        fingerprint = hashlib.sha256(fingerprint_source.encode('utf-8')).hexdigest()
-
-        cur.execute("""
-            INSERT INTO cpagrip_conversions(
-                tracking_id,telegram_id,task_id,transaction_id,payout,offer_id,offer_name,
-                conversion_status,postback_fingerprint,raw_payload
-            ) VALUES(%s,%s,%s,%s,%s,%s,%s,'approved',%s,%s)
-            ON CONFLICT(postback_fingerprint) DO NOTHING
-            RETURNING id;
-        """, (tracking_id, int(start['telegram_id']), int(start['task_id']), transaction_id, payout, offer_id, offer_name, fingerprint, payload_text))
-        inserted = cur.fetchone()
-        if not inserted:
-            conn.rollback()
-            return {"success": True, "verified": True, "already_verified": True, "telegram_id": int(start['telegram_id']), "task_id": int(start['task_id'])}
-
-        verification_ref = transaction_id or f"cpagrip:{inserted['id']}"
-        cur.execute("""
-            UPDATE task_starts
-            SET verification_status='verified', verified_at=CURRENT_TIMESTAMP, verification_ref=%s
-            WHERE telegram_id=%s AND task_id=%s
-            RETURNING tracking_id, verification_status, verified_at, verification_ref;
-        """, (verification_ref, int(start['telegram_id']), int(start['task_id'])))
-        verified = cur.fetchone()
-        conn.commit()
-        return {
-            "success": True, "verified": True, "already_verified": False,
-            "telegram_id": int(start['telegram_id']), "task_id": int(start['task_id']),
-            "verification": verified
-        }
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        cur.close()
-        conn.close()
-
 
 def process_monetag_postback(
     ymid, telegram_id, zone_id=None, sub_zone_id=None,
