@@ -6,6 +6,7 @@ import hmac
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from psycopg2.extras import RealDictCursor
 
 from telegram_admin_bot import start_bot, notify_admins
 from database import (
@@ -22,7 +23,6 @@ from database import (
     start_task,
     process_adgem_conversion,
     process_monetag_postback,
-    process_cpagrip_postback,
 
     get_active_tasks,
     get_active_tasks_for_user,
@@ -1812,123 +1812,138 @@ def api_referrals():
             "error": str(e)
         }), 500
 # ============================================================
-# CPAGRIP LANDING-PAGE TRACKING BRIDGE
+# ADSTERRA SMARTLINK REWARD BRIDGE
 # ============================================================
 
-CPAGRIP_LANDING_URL = os.getenv(
-    "CPAGRIP_LANDING_URL",
+ADSTERRA_LANDING_URL = os.getenv(
+    "ADSTERRA_LANDING_URL",
     "https://sites.google.com/view/taskcoin-offer/home"
 ).strip()
-CPAGRIP_SMART_LINK = os.getenv(
-    "CPAGRIP_SMART_LINK",
-    "https://tundrafile.com/1917387/"
+ADSTERRA_SMART_LINK = os.getenv(
+    "ADSTERRA_SMART_LINK",
+    "https://auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631"
 ).strip()
+ADSTERRA_MIN_SECONDS = 10
+ADSTERRA_COOKIE_NAME = "taskcoin_adsterra_session"
 
 
-def _valid_cpagrip_tracking_id(value):
-    value = str(value or "").strip()
-    return bool(__import__("re").fullmatch(r"tc_\d+_\d+_[a-f0-9]{20}", value))
+def _adsterra_session_secret():
+    return (
+        os.getenv("ADSTERRA_SESSION_SECRET")
+        or os.getenv("WEBHOOK_SECRET")
+        or os.getenv("DATABASE_URL")
+        or "taskcoin-adsterra-session"
+    ).encode("utf-8")
 
 
-@app.route("/api/cpagrip/prepare", methods=["GET"])
-def cpagrip_prepare():
-    """
-    Store the TaskCoin tracking ID in a short-lived first-party cookie, then
-    send the user to the existing Google Sites landing page.
+def _make_adsterra_session_token(telegram_id, task_id):
+    import time
+    payload = f"{int(telegram_id)}:{int(task_id)}:{int(time.time())}"
+    signature = hmac.new(_adsterra_session_secret(), payload.encode("utf-8"), "sha256").hexdigest()[:32]
+    return f"{payload}:{signature}"
 
-    Google Sites buttons are static, so the cookie is the bridge that lets the
-    static button later reach /api/cpagrip/redirect with the correct tracking ID.
-    """
-    tracking_id = str(request.args.get("tracking_id") or "").strip()
-    if not _valid_cpagrip_tracking_id(tracking_id):
-        return jsonify({"success": False, "message": "Invalid CPAGrip tracking_id."}), 400
 
-    response = __import__("flask").redirect(CPAGRIP_LANDING_URL, code=302)
-    response.set_cookie(
-        "taskcoin_cpagrip_tracking_id",
-        tracking_id,
-        max_age=1800,
-        secure=True,
-        httponly=True,
-        samesite="Lax",
-        path="/"
+def _read_adsterra_session_token(token):
+    import time
+    parts = str(token or "").strip().split(":")
+    if len(parts) != 4:
+        return None
+    try:
+        telegram_id, task_id, issued_at = int(parts[0]), int(parts[1]), int(parts[2])
+    except (TypeError, ValueError):
+        return None
+    payload = f"{telegram_id}:{task_id}:{issued_at}"
+    expected = hmac.new(_adsterra_session_secret(), payload.encode("utf-8"), "sha256").hexdigest()[:32]
+    if not hmac.compare_digest(parts[3], expected):
+        return None
+    if issued_at < int(time.time()) - 1800:
+        return None
+    return telegram_id, task_id
+
+
+def _is_adsterra_task_record(task):
+    if not task:
+        return False
+    platform = str(task.get("platform") or "").strip().lower()
+    url = str(task.get("task_url") or "").strip().lower()
+    return (
+        platform in {"adsterra", "smartlink", "adsterra_smartlink", "reward_club"}
+        or "auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631" in url
+        or url.startswith("https://sites.google.com/view/taskcoin-offer")
     )
+
+
+@app.route("/api/adsterra/prepare", methods=["GET"])
+def adsterra_prepare():
+    try:
+        telegram_id = int(request.args.get("telegram_id")); task_id = int(request.args.get("task_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid Adsterra task session."}), 400
+
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM tasks WHERE id=%s AND is_active=TRUE;", (task_id,)); task = cur.fetchone()
+        cur.execute("SELECT started_at FROM task_starts WHERE telegram_id=%s AND task_id=%s;", (telegram_id, task_id)); started = cur.fetchone()
+        if not _is_adsterra_task_record(task) or not started:
+            conn.rollback(); return jsonify({"success": False, "message": "Start Task first."}), 400
+        conn.rollback()
+    finally:
+        cur.close(); conn.close()
+
+    response = __import__("flask").redirect(ADSTERRA_LANDING_URL, code=302)
+    response.set_cookie(ADSTERRA_COOKIE_NAME, _make_adsterra_session_token(telegram_id, task_id), max_age=1800, secure=True, httponly=True, samesite="Lax", path="/")
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
 
-@app.route("/api/cpagrip/redirect", methods=["GET"])
-def cpagrip_redirect():
-    """Read the short-lived tracking cookie and redirect to CPAGrip Smart Link."""
-    tracking_id = str(request.cookies.get("taskcoin_cpagrip_tracking_id") or "").strip()
-    if not _valid_cpagrip_tracking_id(tracking_id):
-        # Direct visits still reach the offer, but are not attributable to a
-        # TaskCoin start and therefore cannot unlock a TaskCoin reward.
-        return __import__("flask").redirect(CPAGRIP_SMART_LINK, code=302)
+@app.route("/api/adsterra/redirect", methods=["GET"])
+def adsterra_redirect():
+    session = _read_adsterra_session_token(request.cookies.get(ADSTERRA_COOKIE_NAME))
+    if not session:
+        return jsonify({"success": False, "message": "Reward session expired. Start the task again."}), 400
+    telegram_id, task_id = session
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM tasks WHERE id=%s AND is_active=TRUE;", (task_id,)); task = cur.fetchone()
+        cur.execute("SELECT started_at FROM task_starts WHERE telegram_id=%s AND task_id=%s;", (telegram_id, task_id)); started = cur.fetchone()
+        if not _is_adsterra_task_record(task) or not started:
+            conn.rollback(); return jsonify({"success": False, "message": "Reward session is no longer valid."}), 400
+        conn.rollback()
+    finally:
+        cur.close(); conn.close()
 
     from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
-    parts = urlsplit(CPAGRIP_SMART_LINK)
+    parts = urlsplit(ADSTERRA_SMART_LINK)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
-    query["tracking_id"] = tracking_id
+    query["psid"] = f"tc_{telegram_id}_{task_id}"
     target = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
-
     response = __import__("flask").redirect(target, code=302)
-    response.delete_cookie("taskcoin_cpagrip_tracking_id", path="/")
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
 
-# ============================================================
-# CPAGRIP GLOBAL POSTBACK
-# ============================================================
-
-@app.route("/api/cpagrip/postback", methods=["GET", "POST"])
-def cpagrip_postback():
-    """
-    Receive CPAGrip's Global Postback and mark the matching task as verified.
-
-    Configure CPAGRIP_POSTBACK_PASSWORD in Render and use the same password
-    in CPAGrip Global Postback. The reward is NOT credited here; claim_task_reward
-    credits it only after this verification gate is satisfied.
-    """
+@app.route("/api/adsterra/verify", methods=["POST"])
+def adsterra_verify():
+    data = request.get_json(silent=True) or {}
     try:
-        data = {}
-        data.update(request.args.to_dict(flat=True))
-        data.update(request.form.to_dict(flat=True))
-        body = request.get_json(silent=True) or {}
-        if isinstance(body, dict):
-            data.update(body)
+        telegram_id = int(data.get("telegram_id")); task_id = int(data.get("task_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "verified": False, "message": "Invalid verification data."}), 400
 
-        configured_password = str(os.getenv("CPAGRIP_POSTBACK_PASSWORD") or "").strip()
-        supplied_password = str(
-            data.get("password") or data.get("pass") or data.get("postback_password") or ""
-        ).strip()
-        if configured_password:
-            if not supplied_password or not hmac.compare_digest(supplied_password, configured_password):
-                return jsonify({"success": False, "verified": False, "message": "Invalid CPAGrip postback password."}), 403
-
-        tracking_id = (
-            data.get("tracking_id") or data.get("subid") or data.get("sub_id")
-            or data.get("click_id") or data.get("clickid")
-        )
-        payout = data.get("payout") or data.get("revenue") or data.get("amount") or data.get("commission") or 0
-        transaction_id = (
-            data.get("transaction_id") or data.get("transactionid") or data.get("txid")
-            or data.get("conversion_id") or data.get("conversionid")
-        )
-        status = data.get("status") or data.get("conversion_status") or ""
-        offer_id = data.get("offer_id") or data.get("offerid") or data.get("campaign_id") or ""
-        offer_name = data.get("offer_name") or data.get("offername") or data.get("campaign_name") or ""
-
-        result = process_cpagrip_postback(
-            tracking_id=tracking_id, payout=payout, transaction_id=transaction_id,
-            status=status, offer_id=offer_id, offer_name=offer_name, raw_payload=data
-        )
-        code = 200 if result.get("success") else 400
-        return jsonify(result), code
-    except Exception as e:
-        app.logger.exception("CPAGrip postback failed")
-        return jsonify({"success": False, "verified": False, "message": "CPAGrip postback processing failed."}), 500
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM tasks WHERE id=%s AND is_active=TRUE;", (task_id,)); task = cur.fetchone()
+        if not _is_adsterra_task_record(task):
+            conn.rollback(); return jsonify({"success": False, "verified": False, "message": "Not an Adsterra reward task."}), 400
+        cur.execute("SELECT started_at FROM task_starts WHERE telegram_id=%s AND task_id=%s FOR UPDATE;", (telegram_id, task_id)); started = cur.fetchone()
+        if not started:
+            conn.rollback(); return jsonify({"success": False, "verified": False, "message": "Start Task first."}), 400
+        cur.execute("SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-%s)) AS seconds;", (started["started_at"],)); elapsed = float(cur.fetchone()["seconds"] or 0)
+        remaining = max(0, ADSTERRA_MIN_SECONDS - int(elapsed)); verified = elapsed >= ADSTERRA_MIN_SECONDS
+        conn.rollback()
+        return jsonify({"success": True, "verified": verified, "elapsed_seconds": int(elapsed), "required_seconds": ADSTERRA_MIN_SECONDS, "remaining_seconds": remaining, "message": "Ad session verified. You can claim the reward." if verified else f"Please stay for {remaining} more seconds."})
+    finally:
+        cur.close(); conn.close()
 
 
 # ============================================================
