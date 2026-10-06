@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import re
 
 from flask import request, jsonify
 
@@ -58,9 +59,25 @@ ADMIN_TELEGRAM_IDS = {
 # ============================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Register the Telegram user and open the TaskCoin WebApp."""
+    """Register the Telegram user and securely capture a referral deep-link."""
 
     telegram_user = update.effective_user
+
+    # Telegram sends /start <payload> in context.args.
+    # TaskCoin referral links use: https://t.me/TaskCoinEarnBot?start=<referrer_id>
+    # The referral is saved server-side here, so it does not depend on
+    # Telegram Mini App start_param being present in the WebView.
+    referrer_id = None
+    if context.args:
+        raw_referrer = str(context.args[0] or "").strip()
+        raw_referrer = re.sub(r"^ref_", "", raw_referrer, flags=re.IGNORECASE)
+        if raw_referrer.isdigit():
+            try:
+                candidate = int(raw_referrer)
+                if telegram_user and candidate != int(telegram_user.id):
+                    referrer_id = candidate
+            except (TypeError, ValueError):
+                referrer_id = None
 
     if telegram_user:
         try:
@@ -68,8 +85,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 telegram_id=telegram_user.id,
                 username=telegram_user.username,
                 first_name=telegram_user.first_name,
+                referrer_id=referrer_id,
             )
-            print(f"User saved: {telegram_user.id}")
+            if referrer_id:
+                print(
+                    f"User saved with referral: {telegram_user.id} "
+                    f"<- {referrer_id}"
+                )
+            else:
+                print(f"User saved: {telegram_user.id}")
         except Exception as exc:
             print(f"User save error: {exc}")
 
