@@ -4778,8 +4778,15 @@ function renderTasks() {
                 : `💎 VIP ${Number(task.target_vip_level)}`;
         let buttonHtml;
 
-        const isWebView = ["webview","web view","web-view"].includes(String(task.platform || "").trim().toLowerCase());
-        if (claimedTasks.includes(taskId) && !isWebView) {
+        const platform = String(task.platform || "").trim().toLowerCase();
+        const isWebView = ["webview","web view","web-view"].includes(platform);
+        const isSocial = ["facebook","tiktok","youtube","telegram","instagram"].includes(platform);
+        if (isSocial && task.completed_ever) {
+            buttonHtml = `
+                <button type="button" class="primary-button" style="margin-top:14px;" disabled>
+                    ✅ Reward Claimed — One Time Only
+                </button>`;
+        } else if (claimedTasks.includes(taskId) && !isWebView && !isSocial) {
             buttonHtml = `
                 <button type="button" class="primary-button" style="margin-top:14px;" disabled>
                     ✅ Reward Claimed
@@ -4896,8 +4903,14 @@ async function startTask(taskId) {
         return;
     }
 
-    const isWebViewTask = ["webview","web view","web-view"].includes(String(task.platform || "").trim().toLowerCase());
-    if (!isWebViewTask && getTaskIdList(TASK_CLAIMED_KEY).includes(id)) {
+    const platform = String(task.platform || "").trim().toLowerCase();
+    const isWebViewTask = ["webview","web view","web-view"].includes(platform);
+    const isSocialTask = ["facebook","tiktok","youtube","telegram","instagram"].includes(platform);
+    if (isSocialTask && task.completed_ever) {
+        showToast("এই Social Media Task-এর Reward আপনি ইতিমধ্যে নিয়েছেন। এটি আর কখনও নেওয়া যাবে না।");
+        return;
+    }
+    if (!isWebViewTask && !isSocialTask && getTaskIdList(TASK_CLAIMED_KEY).includes(id)) {
         showToast("এই Task-এর আজকের Reward ইতিমধ্যে নেওয়া হয়েছে।");
         return;
     }
@@ -5024,6 +5037,11 @@ async function claimTask(taskId) {
     const id = Number(taskId);
     const task = appState.tasks.find(item => Number(item.id) === id);
     if (!task) { showToast("Task not found."); return; }
+    if (task.completed_ever) {
+        showToast("এই Social Media Task-এর Reward আপনি ইতিমধ্যে নিয়েছেন। এটি আর কখনও নেওয়া যাবে না।");
+        renderTasks();
+        return;
+    }
     if (!getTaskIdList(TASK_PENDING_KEY).includes(id)) { showToast("প্রথমে Start Task চাপুন।"); renderTasks(); return; }
     if (!appState.telegramUser) await loadTelegramProfile();
     if (!appState.telegramUser?.id) { showToast("Telegram user not detected. Please reopen the Mini App."); return; }
@@ -5089,8 +5107,15 @@ async function proceedWithTaskClaim(id, task, button) {
 
     // Remove Pending ONLY after backend success. WebView can be repeated up to 20/day.
     removeTaskId(TASK_PENDING_KEY, id);
-    const isWebView = ["webview","web view","web-view"].includes(String(task.platform || "").trim().toLowerCase());
-    if (!isWebView) addTaskId(TASK_CLAIMED_KEY, id);
+    const platform = String(task.platform || "").trim().toLowerCase();
+    const isWebView = ["webview","web view","web-view"].includes(platform);
+    const isSocial = ["facebook","tiktok","youtube","telegram","instagram"].includes(platform);
+    if (isSocial) {
+        // Keep the server-confirmed lifetime state in memory; it must not reset at midnight.
+        task.completed_ever = true;
+    } else if (!isWebView) {
+        addTaskId(TASK_CLAIMED_KEY, id);
+    }
     localStorage.removeItem(TASK_LAST_PENDING_KEY);
     sessionStorage.removeItem(TASK_LAST_PENDING_KEY);
 
