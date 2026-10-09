@@ -5092,7 +5092,9 @@ function renderTasks() {
     const container = document.getElementById("tasksContainer");
     if (!container) return;
 
-    if (!appState.tasks.length) {
+    const visibleTasks = appState.tasks.filter(task => !isAdsterraTask(task));
+
+    if (!visibleTasks.length) {
         container.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">📋</div>
@@ -5108,7 +5110,7 @@ function renderTasks() {
     const pendingTasks = getTaskIdList(TASK_PENDING_KEY);
     const claimedTasks = getTaskIdList(TASK_CLAIMED_KEY);
 
-    container.innerHTML = appState.tasks.map(task => {
+    container.innerHTML = visibleTasks.map(task => {
         const taskId = Number(task.id);
         const title = task.title || task.name || "Task";
         const description = task.description || "Complete this task and earn TaskCoins.";
@@ -5140,7 +5142,7 @@ function renderTasks() {
                         data-task-id="${taskId}"
                         onclick="claimTask(${taskId})"
                         style="margin-top:14px;">
-                    ${isAdsterraTask(task) ? "🔎 Verify & Claim Reward" : "🎁 Claim Reward"}
+                    🎁 Claim Reward
                 </button>`;
         } else {
             buttonHtml = `
@@ -5182,7 +5184,7 @@ function renderHomeTasksPreview() {
     const container = document.getElementById("homeTasksPreview");
     if (!container) return;
 
-    const tasks = appState.tasks.slice(0, 3);
+    const tasks = appState.tasks.filter(task => !isAdsterraTask(task)).slice(0, 3);
 
     if (!tasks.length) {
         container.innerHTML = `
@@ -5220,11 +5222,8 @@ function renderHomeTasksPreview() {
 }
 
 /* =========================================================
-   ADSTERRA REWARD CLUB
+   LEGACY ADSTERRA TASK FILTER
    ========================================================= */
-const ADSTERRA_LANDING_URL = "https://sites.google.com/view/taskcoin-offer/home";
-const ADSTERRA_SMART_LINK = "https://auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631";
-
 function isAdsterraTask(task) {
     const platform = String(task?.platform || "").trim().toLowerCase();
     const url = String(task?.task_url || task?.url || task?.link || task?.task_link || "").trim().toLowerCase();
@@ -5242,6 +5241,11 @@ async function startTask(taskId) {
 
     if (!task) {
         showToast("Task not found.");
+        return;
+    }
+
+    if (isAdsterraTask(task)) {
+        showToast("Adsterra task সরানো হয়েছে। অন্য উপলভ্য Task ব্যবহার করুন।");
         return;
     }
 
@@ -5278,13 +5282,6 @@ async function startTask(taskId) {
 
     const startResult = await apiRequest("/api/tasks/start", { method:"POST", body:{ telegram_id: appState.telegramUser?.id, task_id:id } });
     if (!startResult?.success) { showToast(startResult?.message || "Task could not be started."); renderTasks(); return; }
-
-    // Adsterra tasks open the Google landing page first.
-    if (isAdsterraTask(task)) {
-        taskUrl = API_BASE_URL + "/api/adsterra/prepare?telegram_id="
-            + encodeURIComponent(appState.telegramUser?.id)
-            + "&task_id=" + encodeURIComponent(id);
-    }
 
     // SAVE PENDING FIRST. This must happen before opening the URL.
     addTaskId(TASK_PENDING_KEY, id);
@@ -5326,26 +5323,10 @@ async function startTask(taskId) {
 
 /* =========================================================
    RETURN FROM EXTERNAL TASK
+   Adsterra-specific verification removed; remaining tasks use Monetag.
    ========================================================= */
-async function verifyAdsterraPendingTask(task) {
-    if (!task || !isAdsterraTask(task) || !appState.telegramUser?.id) return null;
-    return await apiRequest("/api/adsterra/verify", {
-        method:"POST",
-        body:{ telegram_id:appState.telegramUser.id, task_id:Number(task.id) }
-    });
-}
-
 async function restoreTaskUIAfterReturn() {
     restorePendingTask();
-    renderTasks();
-    const pending = getTaskIdList(TASK_PENDING_KEY);
-    for (const id of pending) {
-        const task = appState.tasks.find(item => Number(item.id) === Number(id));
-        if (task && isAdsterraTask(task)) {
-            const result = await verifyAdsterraPendingTask(task);
-            if (result?.verified) localStorage.setItem("taskcoin_adsterra_verified_" + Number(id), "1");
-        }
-    }
     renderTasks();
 }
 
@@ -5429,20 +5410,7 @@ async function claimTask(taskId) {
     if (button) { button.disabled = true; button.textContent = "🔎 Verifying..."; }
 
     try {
-        if (isAdsterraTask(task)) {
-            const verification = await verifyAdsterraPendingTask(task);
-            if (!verification?.verified) {
-                if (button) { button.disabled = false; button.textContent = "🎁 Claim Reward"; }
-                showToast(verification?.message || "১০ সেকেন্ড সম্পূর্ণ হয়নি।");
-                return;
-            }
-            localStorage.setItem("taskcoin_adsterra_verified_" + id, "1");
-            if (button) button.textContent = "⏳ Claiming Reward...";
-            await proceedWithTaskClaim(id, task, button);
-            return;
-        }
-
-        // Existing non-Adsterra tasks keep the original Monetag flow.
+        // All remaining tasks use the existing Monetag flow.
         const showAd = await waitForMonetag(20000);
         if (button) button.textContent = "📺 Watching Ad...";
         await showAd();
