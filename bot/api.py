@@ -23,7 +23,6 @@ from database import (
     start_task,
     process_adgem_conversion,
     process_monetag_postback,
-    add_adsgram_reward,
 
     get_active_tasks,
     get_active_tasks_for_user,
@@ -72,7 +71,11 @@ from database import (
     delete_admin_session,
     update_admin_last_login,
     get_dashboard_stats,
-    init_db
+    init_db,
+    create_mobile_recharge,
+    get_user_mobile_recharges,
+    get_all_mobile_recharges,
+    update_mobile_recharge_status
 )
 
 app = Flask(__name__)
@@ -1967,37 +1970,54 @@ def adgem_postback():
         "data": data
     })
 # ============================================================
-# ADSGRAM REWARDED AD
+# MOBILE RECHARGE (replaces AdsGram option)
 # ============================================================
 
-ADSGRAM_BLOCK_ID = "52331"
-ADSGRAM_REWARD = 50
-
-@app.route("/api/adsgram/reward", methods=["POST"])
-def adsgram_reward():
-    """Credit the fixed TaskCoin reward after AdsGram Rewarded completion."""
+@app.route("/api/mobile-recharge", methods=["POST"])
+def api_create_mobile_recharge():
     data = request.get_json(silent=True) or {}
     telegram_id = data.get("telegram_id")
-    block_id = str(data.get("block_id") or "").strip()
-
-    if block_id != ADSGRAM_BLOCK_ID:
-        return jsonify({"success": False, "message": "Invalid AdsGram block."}), 400
-
     try:
         telegram_id = int(telegram_id)
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Invalid telegram_id."}), 400
-
     try:
-        result = add_adsgram_reward(telegram_id, ADSGRAM_REWARD)
+        result = create_mobile_recharge(telegram_id, data.get("operator"), data.get("phone_number"), data.get("amount"))
         if not result.get("success"):
             return jsonify(result), 400
-        result["message"] = f"AdsGram reward credited: +{ADSGRAM_REWARD} TaskCoins."
+        recharge = result.get("recharge") or {}
+        notify_admins(
+            "📱 <b>New Mobile Recharge Request</b>\n\n"
+            f"🧾 Request: <b>#{recharge.get('id')}</b>\n"
+            f"👤 User: <code>{recharge.get('telegram_id')}</code>\n"
+            f"📡 Operator: <b>{recharge.get('operator')}</b>\n"
+            f"📞 Number: <code>{recharge.get('phone_number')}</code>\n"
+            f"💵 Recharge: <b>৳{recharge.get('amount')}</b>\n"
+            f"🪙 Coins: <b>{recharge.get('total_coins')}</b> (VAT: {recharge.get('vat_coins')})\n"
+            "Status: <b>Pending</b>",
+            {"inline_keyboard": [[
+                {"text": "✅ Approve", "callback_data": f"approve:mobile_recharge:{recharge.get('id')}"},
+                {"text": "❌ Reject", "callback_data": f"reject:mobile_recharge:{recharge.get('id')}"}
+            ]]}
+        )
+        result["message"] = "মোবাইল রিচার্জের আবেদন জমা হয়েছে। অ্যাডমিন অনুমোদনের অপেক্ষা করুন।"
         return jsonify(result), 200
-    except Exception as e:
-        app.logger.exception("AdsGram reward processing failed")
-        return jsonify({"success": False, "message": "AdsGram reward processing failed.", "error": str(e)}), 500
+    except Exception as exc:
+        app.logger.exception("Mobile recharge request failed")
+        return jsonify({"success": False, "message": "Mobile recharge request failed.", "error": str(exc)}), 500
 
+@app.route("/api/mobile-recharges", methods=["GET"])
+def api_user_mobile_recharges():
+    try:
+        telegram_id = int(request.args.get("telegram_id", ""))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid telegram_id."}), 400
+    try:
+        rows = get_user_mobile_recharges(telegram_id)
+        return jsonify({"success": True, "recharges": [dict(row) for row in rows]})
+    except Exception as exc:
+        app.logger.exception("Mobile recharge history failed")
+        return jsonify({"success": False, "message": "Could not load mobile recharge history."}), 500
 
 # ============================================================
 # MONETAG POSTBACK
