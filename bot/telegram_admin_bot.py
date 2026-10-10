@@ -14,6 +14,8 @@ from database import (
     update_deposit_status,
     update_exchange_status,
     update_withdrawal_status,
+    get_all_mobile_recharges,
+    update_mobile_recharge_status,
     get_user,
     get_dashboard_stats,
     get_premium_membership_requests,
@@ -171,6 +173,12 @@ def main_menu():
             ],
             [
                 {
+                    "text": "📱 Mobile Recharge Requests",
+                    "callback_data": "list:mobile_recharge",
+                }
+            ],
+            [
+                {
                     "text": "💸 Withdrawal Requests",
                     "callback_data": "list:withdrawal",
                 }
@@ -216,6 +224,9 @@ def pending_items(kind):
             get_premium_membership_requests("pending")
         )[:20]
 
+    if kind == "mobile_recharge":
+        return [item for item in get_all_mobile_recharges() if str(item.get("status")) == "pending"][:20]
+
     return []
 
 
@@ -252,6 +263,20 @@ def format_item(kind, row):
             f"Status: {row.get('status')}"
         )
 
+    if kind == "mobile_recharge":
+        return (
+            f"📱 <b>Mobile Recharge #{row['id']}</b>\n"
+            f"User: <code>{user_id}</code>\n"
+            f"Operator: <b>{row.get('operator')}</b>\n"
+            f"Number: <code>{row.get('phone_number')}</code>\n"
+            f"Recharge: <b>৳{_money(row.get('amount'))}</b>\n"
+            f"Base TaskCoins: <b>{row.get('base_coin_cost')}</b>\n"
+            f"Owner 3% fee: <b>{row.get('owner_commission')}</b> TaskCoins\n"
+            f"Total deducted on approval: <b>{row.get('coin_cost')}</b> TaskCoins\n"
+            f"Status: {row.get('status')}\n\n"
+            "Only approve after you have completed the mobile recharge."
+        )
+
     if kind == "premium":
         price = row.get("price_paid")
         if price is None:
@@ -277,6 +302,7 @@ def send_list(chat_id, kind):
         "premium",
         "exchange",
         "withdrawal",
+        "mobile_recharge",
     }
 
     if kind not in allowed:
@@ -294,6 +320,7 @@ def send_list(chat_id, kind):
         "premium": "💎 Pending VIP / Premium Requests",
         "exchange": "🔄 Pending Exchanges",
         "withdrawal": "💸 Pending Withdrawals",
+        "mobile_recharge": "📱 Pending Mobile Recharge Requests",
     }[kind]
 
     if not items:
@@ -454,6 +481,7 @@ def handle_callback(cb):
                 "premium",
                 "exchange",
                 "withdrawal",
+                "mobile_recharge",
             }:
                 answer_callback(
                     callback_id,
@@ -538,6 +566,9 @@ def handle_callback(cb):
                 status,
             )
 
+        elif kind == "mobile_recharge":
+            result = update_mobile_recharge_status(item_id, status)
+
         else:
             answer_callback(
                 callback_id,
@@ -571,6 +602,8 @@ def handle_callback(cb):
             or result.get("withdrawal")
             or result.get("exchange")
             or result.get("deposit")
+            or result.get("recharge")
+            or result.get("request")
         )
 
         if row and row.get("telegram_id"):
@@ -584,6 +617,11 @@ def handle_callback(cb):
                     f"🔄 Exchange #{item_id} has been "
                     f"<b>{status}</b>."
                 )
+            elif kind == "mobile_recharge":
+                if status == "approved":
+                    text = f"📱 আপনার ৳{row.get('amount')} মোবাইল রিচার্জের আবেদন #{item_id} অনুমোদিত হয়েছে। অ্যাডমিন রিচার্জ সম্পন্ন করেছেন। {row.get('coin_cost')} TaskCoins কাটা হয়েছে।"
+                else:
+                    text = f"❌ আপনার মোবাইল রিচার্জের আবেদন #{item_id} বাতিল হয়েছে। কোনো TaskCoins কাটা হয়নি।"
             else:
                 text = (
                     f"💸 Withdrawal #{item_id} has been "
@@ -656,6 +694,9 @@ def handle_message(message):
 
     elif text == "/withdrawals":
         send_list(chat_id, "withdrawal")
+
+    elif text in ("/recharges", "/mobile_recharges"):
+        send_list(chat_id, "mobile_recharge")
 
     elif text == "/stats":
         stats = get_dashboard_stats()
