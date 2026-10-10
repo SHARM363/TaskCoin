@@ -34,9 +34,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
      <script src='//libtl.com/sdk.js' data-zone='11915530' data-sdk='show_11915530'></script>
-    <!-- AdsGram Rewarded Ads — separate optional placement -->
-    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-    <!-- ========================================================
+<!-- ========================================================
          GOOGLE FONT
     ========================================================= -->
 
@@ -2625,6 +2623,12 @@ body{
                             <div class="quick-action-text">30-day membership</div>
                         </button>
 
+                        <button class="quick-action" type="button" onclick="openPage('mobileRechargePage'); loadMobileRechargeHistory();">
+                            <div class="quick-action-icon">📱</div>
+                            <div class="quick-action-title">Mobile Recharge</div>
+                            <div class="quick-action-text">৳২০–৳১০০ · ৫টি অপারেটর</div>
+                        </button>
+
                         <button class="quick-action" type="button" onclick="openPage('exchangePage')">
                             <div class="quick-action-icon">🔄</div>
                             <div class="quick-action-title">Exchange</div>
@@ -2744,29 +2748,7 @@ body{
                     </div>
 
                 </div>
-
-
-                <!-- ============================================
-                     ADSGRAM OPTIONAL REWARDED AD
-                ============================================= -->
-                <div class="section" style="margin-top:16px;">
-                    <div class="card" style="border:1px solid #dbeafe;background:linear-gradient(145deg,#eff6ff,#ffffff);">
-                        <div style="display:flex;align-items:flex-start;gap:12px;">
-                            <div style="width:44px;height:44px;border-radius:14px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🎁</div>
-                            <div style="flex:1;">
-                                <div style="font-size:16px;font-weight:800;color:#173b70;">Watch Ad & Earn TaskCoins</div>
-                                <div style="margin-top:5px;font-size:12px;color:#64748b;line-height:1.5;">Optional AdsGram rewarded ad. সম্পূর্ণ বিজ্ঞাপন দেখলে 50 TaskCoins পাবেন।</div>
-                            </div>
-                        </div>
-                        <button id="adsgramRewardButton" type="button" class="primary-button" style="width:100%;margin-top:14px;" onclick="showAdsGramRewardAd()">
-                            🎬 Watch Ad & Earn 50 TaskCoins
-                        </button>
-                        <div style="margin-top:7px;font-size:10px;color:#94a3b8;text-align:center;">You can use all other app functions without watching this ad.</div>
-                    </div>
-                </div>
-
-
-                <!-- ============================================
+<!-- ============================================
                      RECENT TASKS PREVIEW
                 ============================================= -->
 
@@ -3352,6 +3334,47 @@ body{
             </div>
         </div>
         <div class="section"><div class="section-title">Exchange History</div><div id="exchangeHistory" style="margin-top:10px;"></div></div>
+    </div>
+</section>
+
+<section class="page" id="mobileRechargePage">
+    <div class="container">
+        <div class="section">
+            <div class="section-title">📱 মোবাইল রিচার্জ</div>
+            <div class="page-subtitle" style="margin-top:6px;line-height:1.6;">গ্রামীণফোন, বাংলালিংক, রবি, এয়ারটেল ও স্কিটো। প্রতিদিন সর্বোচ্চ ৳১০০। অ্যাডমিন রিচার্জ সম্পন্ন করে Approve করলে TaskCoins কাটা হবে।</div>
+        </div>
+        <div class="card" style="border:1px solid #dbeafe;background:linear-gradient(145deg,#eff6ff,#ffffff);">
+            <div class="wallet-card" style="margin-bottom:12px;">
+                <div class="wallet-label">আপনার TaskCoin ব্যালেন্স</div>
+                <div class="wallet-balance" id="mobileRechargeBalance">0</div>
+                <div class="wallet-balance-sub">TaskCoins</div>
+            </div>
+            <label for="mobileRechargeOperator" class="form-label">মোবাইল অপারেটর</label>
+            <select id="mobileRechargeOperator" class="form-input" style="width:100%;margin-top:6px;padding:12px;">
+                <option value="grameenphone">গ্রামীণফোন</option>
+                <option value="banglalink">বাংলালিংক</option>
+                <option value="robi">রবি</option>
+                <option value="airtel">এয়ারটেল</option>
+                <option value="skitto">স্কিটো</option>
+            </select>
+            <label for="mobileRechargeNumber" class="form-label" style="display:block;margin-top:12px;">রিচার্জ নম্বর</label>
+            <input id="mobileRechargeNumber" type="tel" inputmode="numeric" maxlength="14" placeholder="01XXXXXXXXX" class="form-input" style="width:100%;box-sizing:border-box;margin-top:6px;">
+            <label for="mobileRechargeAmount" class="form-label" style="display:block;margin-top:12px;">রিচার্জের পরিমাণ</label>
+            <select id="mobileRechargeAmount" class="form-input" onchange="updateMobileRechargeCost()" style="width:100%;margin-top:6px;padding:12px;">
+                <option value="20">৳২০ — ৪৪২.৯ TaskCoins (৩% ফি সহ)</option>
+                <option value="40">৳৪০ — ৮৮৫.৮ TaskCoins (৩% ফি সহ)</option>
+                <option value="60">৳৬০ — ১,৩২৮.৭ TaskCoins (৩% ফি সহ)</option>
+                <option value="80">৳৮০ — ১,৭৭১.৬ TaskCoins (৩% ফি সহ)</option>
+                <option value="100">৳১০০ — ২,২১৪.৫ TaskCoins (৩% ফি সহ)</option>
+            </select>
+            <div id="mobileRechargeCostPreview" style="margin-top:10px;padding:12px;border-radius:10px;background:#f8fafc;font-size:13px;line-height:1.8;">
+                মূল কয়েন: ৪৩০ · মালিকের ৩% ফি: ১২.৯ · মোট: ৪৪২.৯ TaskCoins
+            </div>
+            <div id="mobileRechargeDailyLimit" style="margin-top:9px;font-size:12px;color:#64748b;">আজকের রিচার্জ: ৳০ / ৳১০০</div>
+            <button id="mobileRechargeSubmit" type="button" class="primary-button" style="width:100%;margin-top:14px;" onclick="submitMobileRecharge()">📱 রিচার্জের আবেদন করুন</button>
+            <div style="margin-top:8px;font-size:11px;color:#64748b;line-height:1.5;">১০০ টাকার মূল মূল্য ২,১৫০ TaskCoins। এর অতিরিক্ত ৩% ফি মালিকের Telegram অ্যাকাউন্টে TaskCoins হিসেবে জমা হবে। আবেদন Pending থাকা অবস্থায় কয়েন কাটা হবে না।</div>
+        </div>
+        <div class="section" style="margin-top:16px;"><div class="section-title">রিচার্জের ইতিহাস</div><div id="mobileRechargeHistory" style="margin-top:10px;"></div></div>
     </div>
 </section>
 
@@ -5365,84 +5388,6 @@ async function waitForMonetag(timeout = 20000) {
 }
 
 /* =========================================================
-   ADSGRAM OPTIONAL REWARDED AD
-   Block ID: 52331
-   ========================================================= */
-const ADSGRAM_BLOCK_ID = "52331";
-const ADSGRAM_REWARD = 50;
-let adsgramController = null;
-let adsgramRewardBusy = false;
-
-function getAdsGramController() {
-    if (adsgramController) return adsgramController;
-    if (!window.Adsgram || typeof window.Adsgram.init !== "function") {
-        throw new Error("AdsGram SDK not loaded.");
-    }
-    adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID, debug: false });
-    return adsgramController;
-}
-
-async function showAdsGramRewardAd() {
-    if (adsgramRewardBusy) return;
-    if (!appState.telegramUser?.id) {
-        await loadTelegramProfile();
-    }
-    if (!appState.telegramUser?.id) {
-        showToast("Telegram user not detected. Please reopen the Mini App.");
-        return;
-    }
-
-    const button = document.getElementById("adsgramRewardButton");
-    adsgramRewardBusy = true;
-    if (button) {
-        button.disabled = true;
-        button.textContent = "📺 Loading AdsGram...";
-    }
-
-    try {
-        const controller = getAdsGramController();
-        if (button) button.textContent = "📺 Watching AdsGram Ad...";
-
-        // For Reward format, AdsGram resolves this promise after the user
-        // watches the rewarded ad to the end.
-        await controller.show();
-
-        if (button) button.textContent = "⏳ Crediting Reward...";
-
-        const result = await apiRequest("/api/adsgram/reward", {
-            method: "POST",
-            body: {
-                telegram_id: appState.telegramUser.id,
-                block_id: ADSGRAM_BLOCK_ID
-            }
-        });
-
-        if (!result || result.success === false) {
-            showToast(result?.message || "AdsGram reward could not be credited.");
-            return;
-        }
-
-        if (result.user) {
-            applyUserData(result.user);
-        } else {
-            await loadUserData();
-        }
-
-        if (typeof updateBalanceUI === "function") updateBalanceUI();
-        showToast(result.message || `AdsGram Reward: +${ADSGRAM_REWARD} TaskCoins`);
-    } catch (error) {
-        console.error("AdsGram reward error:", error);
-        showToast("AdsGram বিজ্ঞাপন সম্পূর্ণ হয়নি বা এখন কোনো বিজ্ঞাপন পাওয়া যায়নি।");
-    } finally {
-        adsgramRewardBusy = false;
-        if (button) {
-            button.disabled = false;
-            button.textContent = `🎬 Watch Ad & Earn ${ADSGRAM_REWARD} TaskCoins`;
-        }
-    }
-}
-
-/* =========================================================
    CLAIM TASK
    ========================================================= */
 async function claimTask(taskId) {
@@ -6494,6 +6439,73 @@ async function submitExchange() {
     await loadExchangeHistory();
 }
 
+/* =========================================================
+   MOBILE RECHARGE
+   ========================================================= */
+function updateMobileRechargeCost() {
+    const amount = Number(document.getElementById("mobileRechargeAmount")?.value || 20);
+    const base = amount * 21.5;
+    const fee = Math.round(base * 0.03 * 100) / 100;
+    const total = Math.round((base + fee) * 100) / 100;
+    const preview = document.getElementById("mobileRechargeCostPreview");
+    if (preview) preview.innerHTML = `মূল কয়েন: <b>${base.toLocaleString()}</b><br>মালিকের ৩% ফি: <b>${fee.toLocaleString()}</b><br>অনুমোদনের পর মোট কাটা হবে: <b>${total.toLocaleString()} TaskCoins</b>`;
+    const button = document.getElementById("mobileRechargeSubmit");
+    if (button) button.textContent = `📱 আবেদন করুন — ${total.toLocaleString()} TaskCoins`;
+}
+
+async function submitMobileRecharge() {
+    const telegramId = appState?.telegramUser?.id;
+    const operator = document.getElementById("mobileRechargeOperator")?.value || "";
+    let phone_number = (document.getElementById("mobileRechargeNumber")?.value || "").trim().replace(/[\s+-]/g, "");
+    const amount = Number(document.getElementById("mobileRechargeAmount")?.value || 0);
+    if (!telegramId) { showToast("Telegram account শনাক্ত করা যায়নি। অ্যাপটি আবার খুলুন।"); return; }
+    if (phone_number.startsWith("+880")) phone_number = "0" + phone_number.slice(4);
+    else if (phone_number.startsWith("880") && phone_number.length === 13) phone_number = "0" + phone_number.slice(3);
+    if (!/^01\d{9}$/.test(phone_number)) { showToast("সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর লিখুন।"); return; }
+    if (![20,40,60,80,100].includes(amount)) { showToast("২০, ৪০, ৬০, ৮০ অথবা ১০০ টাকা নির্বাচন করুন।"); return; }
+    const button = document.getElementById("mobileRechargeSubmit");
+    if (button) { button.disabled = true; button.textContent = "আবেদন জমা হচ্ছে..."; }
+    try {
+        const result = await apiRequest("/api/mobile-recharge", {method:"POST", body:{telegram_id:telegramId, operator, phone_number, amount}});
+        showToast(result.message || "মোবাইল রিচার্জের আবেদন জমা হয়েছে।");
+        if (result.success) {
+            document.getElementById("mobileRechargeNumber").value = "";
+            await loadMobileRechargeHistory();
+            if (typeof loadUserData === "function") await loadUserData();
+        }
+    } catch (error) { showToast(error.message || "রিচার্জের আবেদন করা যায়নি।"); }
+    finally { if (button) button.disabled = false; updateMobileRechargeCost(); }
+}
+
+async function loadMobileRechargeHistory() {
+    const telegramId = appState?.telegramUser?.id;
+    if (!telegramId) return;
+    try {
+        const [data, userData] = await Promise.all([
+            apiRequest("/api/mobile-recharges?telegram_id=" + encodeURIComponent(telegramId)),
+            apiRequest("/api/user?telegram_id=" + encodeURIComponent(telegramId)).catch(() => null)
+        ]);
+        const rows = Array.isArray(data?.requests) ? data.requests : [];
+        const box = document.getElementById("mobileRechargeHistory");
+        if (!box) return;
+        const today = new Date().toLocaleDateString("en-CA", {timeZone:"Asia/Dhaka"});
+        const used = rows.filter(r => r.status !== "rejected" && r.requested_at && new Date(r.requested_at).toLocaleDateString("en-CA", {timeZone:"Asia/Dhaka"}) === today).reduce((sum,r)=>sum+Number(r.amount||0),0);
+        const limit = document.getElementById("mobileRechargeDailyLimit");
+        if (limit) limit.textContent = `আজকের রিচার্জ/পেন্ডিং আবেদন: ৳${Math.min(used,100)} / ৳১০০`;
+        const bal = document.getElementById("mobileRechargeBalance");
+        if (bal && userData?.user) bal.textContent = Number(userData.user.task_balance || 0).toLocaleString();
+        box.innerHTML = rows.length ? rows.slice(0,10).map(r => {
+            const status = String(r.status || "pending");
+            const coinText = Number(r.coin_cost || 0).toLocaleString();
+            return `<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;"><div><b>${escapeHtml(String(r.operator||""))}</b> · ${escapeHtml(String(r.phone_number||""))}<div style="font-size:12px;color:#64748b;margin-top:4px;">৳${Number(r.amount||0)} · ${coinText} TaskCoins (৩% ফি সহ)</div></div><strong>${escapeHtml(status)}</strong></div>`;
+        }).join("") : '<div class="empty-state">এখনও কোনো রিচার্জ আবেদন নেই।</div>';
+    } catch (error) { console.error("Mobile recharge history failed", error); }
+}
+window.submitMobileRecharge = submitMobileRecharge;
+window.updateMobileRechargeCost = updateMobileRechargeCost;
+window.loadMobileRechargeHistory = loadMobileRechargeHistory;
+document.addEventListener("DOMContentLoaded", () => { updateMobileRechargeCost(); });
+
 async function loadExchangeHistory() {
     if (!appState.telegramUser) return;
     const data = await apiRequest("/api/exchanges?telegram_id=" + encodeURIComponent(appState.telegramUser.id));
@@ -6786,6 +6798,10 @@ function openPage(pageId) {
             "active"
         );
 
+    }
+    if (pageId === "mobileRechargePage") {
+        updateMobileRechargeCost();
+        loadMobileRechargeHistory();
     }
 
 
@@ -7264,10 +7280,6 @@ window.copyReferralLink =
 
 window.refreshAppData = 
   refreshAppData;
-
-window.showAdsGramRewardAd =
-  showAdsGramRewardAd;
-                  
 </script>
 
 </div>
