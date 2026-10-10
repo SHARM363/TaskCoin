@@ -495,31 +495,7 @@ def init_db():
                     DEFAULT CURRENT_TIMESTAMP
             );
         """)
-                 # ----------------------------------------------------
-        # ADSGRAM REWARDS
-        # ----------------------------------------------------
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS adsgram_rewards (
-
-                id SERIAL PRIMARY KEY,
-
-                telegram_id BIGINT NOT NULL,
-
-                reward NUMERIC(20, 2)
-                    NOT NULL DEFAULT 0,
-
-                created_at TIMESTAMP
-                    DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_adsgram_rewards_user
-            ON adsgram_rewards(telegram_id);
-        """)
-        # ----------------------------------------------------
+# ----------------------------------------------------
         # OLD DATABASE COMPATIBILITY
         # ----------------------------------------------------
 
@@ -827,6 +803,30 @@ def init_db():
         # a value that the admin has already customized.
         cur.execute("UPDATE premium_plans SET bonus_website_tasks=48 WHERE level=9 AND bonus_website_tasks=57;")
         cur.execute("UPDATE premium_plans SET bonus_website_tasks=50 WHERE level=10 AND bonus_website_tasks=80;")
+
+        # ----------------------------------------------------
+        # MOBILE RECHARGE REQUESTS
+        # ----------------------------------------------------
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS mobile_recharge_requests (
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT NOT NULL,
+                operator TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                base_coin_cost NUMERIC(20,2) NOT NULL DEFAULT 0,
+                coin_cost NUMERIC(20,2) NOT NULL,
+                owner_commission NUMERIC(20,2) NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                processed_at TIMESTAMP,
+                processed_by INTEGER,
+                admin_note TEXT
+            );
+        """)
+        cur.execute("ALTER TABLE mobile_recharge_requests ADD COLUMN IF NOT EXISTS base_coin_cost NUMERIC(20,2) NOT NULL DEFAULT 0;")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_mobile_recharge_user ON mobile_recharge_requests(telegram_id);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_mobile_recharge_status ON mobile_recharge_requests(status);")
 
         # ----------------------------------------------------
         # INDEXES
@@ -1509,115 +1509,6 @@ def task_completed_today(
         cur.close()
         conn.close()
  # ============================================================
-# ADSGRAM REWARD
-# ============================================================
-
-def add_adsgram_reward(
-    telegram_id,
-    reward
-):
-    """
-    Credit an AdsGram reward to a user.
-    """
-
-    conn = get_connection()
-
-    cur = conn.cursor(
-        cursor_factory=RealDictCursor
-    )
-
-    try:
-
-        reward = float(reward)
-
-        if reward <= 0:
-            return {
-                "success": False,
-                "message": "Invalid reward."
-            }
-
-        # Lock user row
-        cur.execute("""
-            SELECT *
-            FROM users
-            WHERE telegram_id = %s
-            FOR UPDATE;
-        """, (
-            telegram_id,
-        ))
-
-        user = cur.fetchone()
-
-        if not user:
-            conn.rollback()
-
-            return {
-                "success": False,
-                "message": "User not found."
-            }
-
-        # Credit balance
-        cur.execute("""
-            UPDATE users
-            SET
-                task_balance = COALESCE(task_balance, 0) + %s,
-                balance = COALESCE(task_balance, 0) + %s,
-
-                total_earned =
-                    COALESCE(total_earned, 0) + %s,
-
-                last_active =
-                    CURRENT_TIMESTAMP
-
-            WHERE telegram_id = %s
-
-            RETURNING *;
-        """, (
-            reward,
-            reward,
-            reward,
-            telegram_id
-        ))
-
-        updated_user = cur.fetchone()
-
-        # Save reward record
-        cur.execute("""
-            INSERT INTO adsgram_rewards (
-                telegram_id,
-                reward
-            )
-            VALUES (
-                %s,
-                %s
-            )
-            RETURNING *;
-        """, (
-            telegram_id,
-            reward
-        ))
-
-        reward_record = cur.fetchone()
-
-        conn.commit()
-
-        return {
-            "success": True,
-            "reward": reward,
-            "user": updated_user,
-            "reward_record": reward_record
-        }
-
-    except Exception:
-
-        conn.rollback()
-
-        raise
-
-    finally:
-
-        cur.close()
-        conn.close()
 
 def claim_task_reward(telegram_id, task_id):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
@@ -3607,6 +3498,142 @@ def process_monetag_postback(
 # ----------------------------------------------------
 EXCHANGE_FEE_PERCENT = 3
 OWNER_TELEGRAM_ID = 8746453103
+
+# ============================================================
+# MOBILE RECHARGE (admin-confirmed, TaskCoin-funded)
+# ============================================================
+
+MOBILE_RECHARGE_OPERATORS = {
+    "grameenphone": "Grameenphone",
+    "banglalink": "Banglalink",
+    "robi": "Robi",
+    "airtel": "Airtel",
+    "skitto": "Skitto",
+}
+MOBILE_RECHARGE_AMOUNTS = (20, 40, 60, 80, 100)
+MOBILE_RECHARGE_COIN_RATE = Decimal("21.5")  # 100 BDT = 2150 TaskCoins
+MOBILE_RECHARGE_OWNER_RATE = Decimal("0.03")
+MOBILE_RECHARGE_DAILY_LIMIT = 100
+
+
+def create_mobile_recharge_request(telegram_id, operator, phone_number, amount):
+    from decimal import Decimal, ROUND_DOWN
+    try:
+        telegram_id = int(telegram_id)
+        amount = int(amount)
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Invalid recharge request."}
+    operator_key = str(operator or "").strip().lower()
+    phone_number = "".join(ch for ch in str(phone_number or "") if ch.isdigit())
+    if operator_key not in MOBILE_RECHARGE_OPERATORS:
+        return {"success": False, "message": "Select a supported mobile operator."}
+    if amount not in MOBILE_RECHARGE_AMOUNTS:
+        return {"success": False, "message": "Recharge amount must be 20, 40, 60, 80, or 100 BDT."}
+    if len(phone_number) != 11 or not phone_number.startswith("01"):
+        return {"success": False, "message": "Enter a valid 11-digit Bangladesh mobile number."}
+
+    base_coin_cost = (Decimal(amount) * MOBILE_RECHARGE_COIN_RATE).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    owner_commission = (base_coin_cost * MOBILE_RECHARGE_OWNER_RATE).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    coin_cost = base_coin_cost + owner_commission
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;", (telegram_id,))
+        user = cur.fetchone()
+        if not user:
+            conn.rollback()
+            return {"success": False, "message": "User account not found. Open TaskCoin from Telegram first."}
+        cur.execute("""
+            SELECT COALESCE(SUM(amount),0) AS used
+            FROM mobile_recharge_requests
+            WHERE telegram_id=%s
+              AND status IN ('pending','approved')
+              AND (requested_at AT TIME ZONE 'Asia/Dhaka')::date=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date;
+        """, (telegram_id,))
+        used = int(cur.fetchone()["used"] or 0)
+        if used + amount > MOBILE_RECHARGE_DAILY_LIMIT:
+            conn.rollback()
+            return {"success": False, "message": f"Daily mobile recharge limit is 100 BDT. Already requested/used today: {used} BDT."}
+        available = Decimal(str(user.get("task_balance") or 0))
+        cur.execute("SELECT COALESCE(SUM(coin_cost),0) AS reserved FROM mobile_recharge_requests WHERE telegram_id=%s AND status='pending';", (telegram_id,))
+        reserved = Decimal(str(cur.fetchone()["reserved"] or 0))
+        if available - reserved < coin_cost:
+            conn.rollback()
+            return {"success": False, "message": f"Insufficient available TaskCoins after pending requests. Required for this recharge: {coin_cost} TaskCoins."}
+        cur.execute("""
+            INSERT INTO mobile_recharge_requests
+                (telegram_id,operator,phone_number,amount,base_coin_cost,coin_cost,owner_commission,status)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,'pending') RETURNING *;
+        """, (telegram_id, MOBILE_RECHARGE_OPERATORS[operator_key], phone_number, amount, base_coin_cost, coin_cost, owner_commission))
+        row = cur.fetchone()
+        conn.commit()
+        return {"success": True, "message": "Recharge request sent. TaskCoins will be deducted only after admin confirms the recharge.", "request": row}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_user_mobile_recharges(telegram_id):
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM mobile_recharge_requests WHERE telegram_id=%s ORDER BY id DESC LIMIT 50;", (int(telegram_id),))
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+
+def get_all_mobile_recharges(status=None):
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        if status in ("pending", "approved", "rejected"):
+            cur.execute("SELECT r.*,u.username,u.first_name FROM mobile_recharge_requests r LEFT JOIN users u ON u.telegram_id=r.telegram_id WHERE r.status=%s ORDER BY r.id DESC;", (status,))
+        else:
+            cur.execute("SELECT r.*,u.username,u.first_name FROM mobile_recharge_requests r LEFT JOIN users u ON u.telegram_id=r.telegram_id ORDER BY r.id DESC LIMIT 500;")
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+
+def update_mobile_recharge_status(request_id, status, admin_id=None, admin_note=None):
+    if status not in ("approved", "rejected"):
+        return {"success": False, "message": "Invalid recharge status."}
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM mobile_recharge_requests WHERE id=%s FOR UPDATE;", (int(request_id),))
+        req = cur.fetchone()
+        if not req:
+            conn.rollback(); return {"success": False, "message": "Recharge request not found."}
+        if req["status"] != "pending":
+            conn.rollback(); return {"success": False, "message": "This request has already been processed."}
+        if status == "approved":
+            cur.execute("SELECT * FROM users WHERE telegram_id=%s FOR UPDATE;", (req["telegram_id"],))
+            user = cur.fetchone()
+            if not user:
+                conn.rollback(); return {"success": False, "message": "User account not found."}
+            coin_cost = Decimal(str(req["coin_cost"]))
+            if Decimal(str(user.get("task_balance") or 0)) < coin_cost:
+                conn.rollback(); return {"success": False, "message": "User no longer has enough TaskCoins."}
+            # The request is only approved after the admin has actually completed the top-up.
+            cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(task_balance,0)-%s WHERE telegram_id=%s;", (coin_cost, coin_cost, req["telegram_id"]))
+            commission = Decimal(str(req["owner_commission"] or 0))
+            cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (OWNER_TELEGRAM_ID,))
+            owner = cur.fetchone()
+            if not owner:
+                cur.execute("INSERT INTO users (telegram_id,username,first_name,balance,task_balance) VALUES (%s,'taskcoin_owner','TaskCoin Owner',0,0) ON CONFLICT (telegram_id) DO NOTHING;", (OWNER_TELEGRAM_ID,))
+            if commission > 0:
+                cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(balance,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s;", (commission, commission, OWNER_TELEGRAM_ID))
+        cur.execute("UPDATE mobile_recharge_requests SET status=%s,processed_at=CURRENT_TIMESTAMP,processed_by=%s,admin_note=%s WHERE id=%s RETURNING *;", (status, admin_id, admin_note, request_id))
+        row = cur.fetchone()
+        conn.commit()
+        return {"success": True, "message": "Recharge request approved." if status == "approved" else "Recharge request rejected.", "request": row}
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        cur.close(); conn.close()
+
 TRANSFER_FEE_PERCENT = 5
 
 def calculate_exchange_payout(amount):
