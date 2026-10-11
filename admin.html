@@ -1745,15 +1745,15 @@ async function saveCharacterAdmin(id) {
         if(file){ if(file.size>512*1024) throw new Error('Logo image must be 512 KB or smaller.'); payload.image_url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file);}); }
         const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)});
         if(!data.success) throw new Error(data.message||'Save failed.');
-        // Some deployed API versions return success without echoing the full character.
-        // Verify the saved logo with a fresh GET instead of relying only on the PUT response.
-        if (file) {
-            const verify = await apiRequest('/api/characters/admin/config');
-            const savedCharacter = (verify.characters || []).find(c => Number(c.id) === Number(id));
-            if (!savedCharacter || !savedCharacter.image_url || !String(savedCharacter.image_url).startsWith('data:image/')) {
-                throw new Error('Character details were saved, but the server did not return a saved logo. Check that the latest character_api.py is deployed and the database update succeeded.');
-            }
+        // Older API deployments may omit image_url in the PUT response. Verify
+        // the committed record through the admin GET endpoint before reporting failure.
+        let savedLogo = data.character && data.character.image_url ? data.character.image_url : '';
+        if (file && !savedLogo) {
+            const verify=await apiRequest('/api/characters/admin/config');
+            const savedCharacter=(verify.characters||[]).find(c=>Number(c.id)===Number(id));
+            savedLogo=savedCharacter && savedCharacter.image_url ? savedCharacter.image_url : '';
         }
+        if (file && !savedLogo) throw new Error('চরিত্রের তথ্য সেভ হয়েছে, কিন্তু সার্ভার/ডেটাবেজে লোগো পাওয়া যায়নি। GitHub-এ সর্বশেষ character_api.py আপলোড করে Render-এ Deploy latest commit দিন।');
         showAlert('characterAdminAlert', file ? `Character ${id} and logo saved successfully.` : `Character ${id} updated successfully.`, 'success');
         await loadCharacterAdmin();
     } catch(e){ showAlert('characterAdminAlert',e.message||'Character update failed.','error'); }
