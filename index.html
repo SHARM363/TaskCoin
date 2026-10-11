@@ -4310,6 +4310,15 @@ body{
   </div></header>
   <div class="container" id="characterDetailContainer"></div>
 </section>
+<section class="page" id="characterDailyRewardPage">
+  <header class="app-header"><div class="header-inner"><div><div class="header-title">🎁 Character Daily Reward</div><div class="header-subtitle">সপ্তাহের প্রতিদিন আলাদা TaskCoin Reward</div></div><button class="header-profile" type="button" onclick="openPage('characterListPage')">‹</button></div></header>
+  <div class="container"><div class="card" style="padding:18px;border-radius:18px;background:var(--card-bg,#fff);">
+    <div id="characterDailyStatus" style="margin-bottom:12px;">Reward status loading…</div>
+    <div id="characterWeeklyRewards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0;"></div>
+    <button class="character-action" id="claimCharacterDailyBtn" type="button" onclick="claimCharacterDailyReward()">আজকের Daily Reward নিন</button>
+    <div id="characterDailyResult" style="font-size:12px;margin-top:10px;"></div>
+  </div></div>
+</section>
 
 <nav class="bottom-nav" id="bottomNav">
 
@@ -6775,7 +6784,9 @@ async function submitWithdraw() {
 let lastOpenedPage = "homePage";
 let navigationAdBusy = false;
 async function showNavigationAdIfNeeded(targetPageId) {
-    if (navigationAdBusy || lastOpenedPage !== "homePage" || targetPageId === "homePage") return;
+    // Show Monetag when entering a different app section/page; avoid duplicate ads
+    // for repeated calls to the same page and never block the page itself.
+    if (navigationAdBusy || !targetPageId || targetPageId === lastOpenedPage) return;
     navigationAdBusy = true;
     try {
         const showAd = await waitForMonetag(12000);
@@ -7197,11 +7208,12 @@ async function loadCharacters(){
     const chars=Array.isArray(data.characters)?data.characters:[];
     grid.innerHTML=chars.map((c,i)=>`
       <article class="character-card" style="background:${CHARACTER_BG[i%CHARACTER_BG.length]}" onclick="openCharacterDetail(${Number(c.id)})">
+        ${c.image_url?`<img src="${escapeHtml(c.image_url)}" alt="${escapeHtml(c.name||'Character')}" style="width:72px;height:72px;object-fit:contain;border-radius:14px;background:rgba(255,255,255,.12);margin-bottom:8px;">`:''}
         <div class="code">${escapeHtml(c.code||('TC-'+String(c.id).padStart(3,'0')))}</div>
         <div class="name">${escapeHtml(c.name||'Character')}</div>
         <span class="rarity">${escapeHtml(c.rarity||'—')}</span>
-        <div class="price">৳${Number(c.current_price||c.base_price||0).toLocaleString('en-BD')}</div>
-        <div class="meta">Boost +${Number(c.boost_percent||0)}% • Sold ${Number(c.sold_count||0)} / ${Number(c.max_supply||0)}</div>
+        <div class="price">৳${Number(c.base_price||0).toLocaleString('en-BD')}</div>
+        <div class="meta">Level 1–5 Boost • Sold ${Number(c.sold_count||0)} • Remaining ${Math.max(0,Number(c.max_supply||0)-Number(c.sold_count||0))} / Total ${Number(c.max_supply||0)}</div>
       </article>`).join('');
     status.textContent=`${chars.length}টি Character`;
   }catch(e){
@@ -7224,22 +7236,33 @@ async function openCharacterDetail(id){
     box.innerHTML=`
       <button class="character-back" type="button" onclick="openPage('characterListPage')">‹ সব Character</button>
       <div class="character-detail" style="background:${bg}">
-        <div class="big-icon">🪙</div>
+        ${c.image_url?`<img src="${escapeHtml(c.image_url)}" alt="${escapeHtml(c.name||'Character')}" style="width:104px;height:104px;object-fit:contain;border-radius:18px;background:rgba(255,255,255,.12);">`:'<div class="big-icon">🪙</div>'}
         <div class="big-name">${escapeHtml(c.name||'Character')}</div>
         <div class="rarity" style="display:inline-block;margin-top:7px;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.14);font-size:10px;">${escapeHtml(c.rarity||'—')}</div>
         <div class="description">${escapeHtml(c.description||'')}</div>
         <div class="character-stat-grid">
-          <div class="character-stat"><b>৳${Number(c.current_price||0).toLocaleString('en-BD')}</b><span>Current Price</span></div>
-          <div class="character-stat"><b>+${Number(c.boost_percent||0)}%</b><span>Boost</span></div>
-          <div class="character-stat"><b>${sold.toLocaleString()} / ${supply.toLocaleString()}</b><span>Sold / Supply</span></div>
+          <div class="character-stat"><b>৳${Number(c.base_price||0).toLocaleString('en-BD')}</b><span>Current Price</span></div>
+          <div class="character-stat"><b>5% / 7% / 10% / 15% / 20%</b><span>Level Boost</span></div>
+          <div class="character-stat"><b>${sold.toLocaleString()} sold • ${Math.max(0,supply-sold).toLocaleString()} left</b><span>Total supply ${supply.toLocaleString()}</span></div>
           <div class="character-stat"><b>${c.is_active?'Active':'Inactive'}</b><span>Status</span></div>
         </div>
         <div style="margin-top:14px;font-size:12px;opacity:.9;"><b>Skill:</b> ${escapeHtml(c.ability_name||'—')}</div>
         <div style="margin-top:5px;font-size:11px;opacity:.75;line-height:1.45;">${escapeHtml(c.ability_description||'')}</div>
+        <div style="margin-top:8px;font-size:12px;line-height:1.5;"><b>বিশেষ সুবিধা:</b> ${escapeHtml(c.benefits||'Admin নির্ধারিত Character সুবিধা')}</div>
+        <div style="margin-top:8px;font-size:11px;line-height:1.5;">Upgrade cost: L2 ${Number(c.upgrade_cost_l2||1000).toLocaleString()} • L3 ${Number(c.upgrade_cost_l3||2500).toLocaleString()} • L4 ${Number(c.upgrade_cost_l4||5000).toLocaleString()} • L5 ${Number(c.upgrade_cost_l5||10000).toLocaleString()} TaskCoin</div>
       </div>
-      <button class="character-action" type="button" onclick="buyCharacter(${Number(c.id)},${Number(c.current_price||0)})" ${(!c.is_active||!c.trading_enabled||sold>=supply)?'disabled':''}>
-        ${sold>=supply?'Sold Out':(!c.is_active?'Inactive':'Buy Character')}
-      </button>`;
+      <button class="character-action" type="button" onclick="buyCharacter(${Number(c.id)},${Number(c.base_price||0)})" ${(!c.is_active||sold>=supply)?'disabled':''}>
+        ${sold>=supply?'Sold Out':(!c.is_active?'Inactive':'Level 1 কিনুন — ৳'+Number(c.base_price||0).toLocaleString('en-BD'))}
+      </button>
+      <button class="character-action" type="button" onclick="openPage('characterDailyRewardPage');loadCharacterDailyReward();">🎁 Daily Reward</button>`;
+    const uid=appState?.telegramUser?.id;
+    if(uid){
+      try{
+        const ownRes=await fetch(API_BASE_URL+'/api/characters/user/'+encodeURIComponent(uid)); const ownData=await ownRes.json();
+        const own=(ownData.owned||ownData.characters||[]).find(x=>Number(x.character_id)===Number(c.id)&&x.status==='owned');
+        if(own){const level=Number(own.level||1);box.insertAdjacentHTML('beforeend',`<div class="card" style="margin-top:12px;padding:15px;border-radius:16px;"><b>আপনার Character — Level ${level}</b><p style="font-size:12px;">বর্তমান Boost: +${({1:5,2:7,3:10,4:15,5:20})[level]||5}%</p>${level<5?`<button class="character-action" onclick="upgradeCharacter(${Number(own.id)})">Level ${level+1} Upgrade করুন (${Number(c['upgrade_cost_l'+(level+1)]||0).toLocaleString()} TaskCoin)</button>`:'<p>সর্বোচ্চ Level 5 অর্জিত।</p>'}</div>`);}
+      }catch(ownErr){console.warn('Character ownership lookup failed',ownErr);}
+    }
   }catch(e){
     console.error('Character detail error:',e);
     box.innerHTML='<div style="padding:20px;color:#b91c1c;">Character information could not be loaded.</div>';
@@ -7249,7 +7272,7 @@ async function openCharacterDetail(id){
 async function buyCharacter(characterId){
   const telegramId=appState?.telegramUser?.id;
   if(!telegramId){showToast('Telegram user not available.');return;}
-  if(!confirm('এই Characterটি Main Balance থেকে কিনতে চান?'))return;
+  if(!confirm('এই Characterটি Deposit Balance থেকে Level 1 হিসেবে কিনতে চান?'))return;
   try{
     const res=await fetch(API_BASE_URL + '/api/characters/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegram_id:telegramId,character_id:characterId})});
     const data=await res.json();
@@ -7258,6 +7281,31 @@ async function buyCharacter(characterId){
     if(typeof refreshAppData==='function')await refreshAppData();
     await openCharacterDetail(characterId);
   }catch(e){console.error('Character purchase error:',e);showToast('Character purchase failed.');}
+}
+
+async function upgradeCharacter(ownershipId){
+  const id=appState?.telegramUser?.id;if(!id)return;
+  if(!confirm('পরবর্তী Level-এ Upgrade করতে TaskCoin কাটবে। চালিয়ে যাবেন?'))return;
+  try{const res=await fetch(API_BASE_URL+'/api/characters/upgrade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegram_id:id,ownership_id:ownershipId})});const d=await res.json();if(!res.ok||!d.success)throw new Error(d.message||'Upgrade failed');showToast(d.message||'Upgrade successful');if(typeof refreshAppData==='function')await refreshAppData();await loadCharacters();}
+  catch(e){showToast(e.message||'Upgrade failed');}
+}
+
+async function loadCharacterDailyReward(){
+  const id=appState?.telegramUser?.id; const status=document.getElementById('characterDailyStatus'); const grid=document.getElementById('characterWeeklyRewards'); const btn=document.getElementById('claimCharacterDailyBtn');
+  if(!id){if(status)status.textContent='Telegram user পাওয়া যায়নি।';return;}
+  try{
+    const res=await fetch(API_BASE_URL+'/api/characters/user/'+encodeURIComponent(id)+'/daily-status'); const d=await res.json(); if(!res.ok||!d.success)throw new Error(d.message||'Status load failed');
+    if(!d.owns_character){status.textContent='Daily Reward পেতে আগে একটি Character কিনুন।';btn.disabled=true;grid.innerHTML='';return;}
+    const days=['সোম','মঙ্গল','বুধ','বৃহস্পতি','শুক্র','শনি','রবি'];
+    grid.innerHTML=(d.weekly_rewards||[100,200,350,400,500,650,800]).map((v,i)=>`<div style="padding:10px;border-radius:12px;background:${i+1===d.weekday?'#dbeafe':'rgba(127,127,127,.09)'};font-size:12px;"><b>${days[i]}</b><div>${Number(v).toLocaleString()} TaskCoin</div></div>`).join('');
+    status.textContent=d.claimed_today?'আজকের Reward নেওয়া হয়েছে।':'আজকের Reward: '+Number(d.today_reward).toLocaleString()+' TaskCoin';btn.disabled=!!d.claimed_today;
+  }catch(e){status.textContent=e.message||'Daily Reward status load failed.';btn.disabled=true;}
+}
+async function claimCharacterDailyReward(){
+  const id=appState?.telegramUser?.id; const btn=document.getElementById('claimCharacterDailyBtn'); const result=document.getElementById('characterDailyResult');
+  if(!id)return; if(btn)btn.disabled=true;
+  try{const res=await fetch(API_BASE_URL+'/api/characters/daily-reward/claim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegram_id:id})});const d=await res.json();if(!res.ok||!d.success)throw new Error(d.message||'Reward claim failed');if(result)result.textContent=`সফল! ${Number(d.reward).toLocaleString()} TaskCoin যোগ হয়েছে।`;if(typeof refreshAppData==='function')await refreshAppData();await loadCharacterDailyReward();}
+  catch(e){if(result)result.textContent=e.message||'Reward claim failed.';if(btn)btn.disabled=false;}
 }
 
 function escapeHtml(value){
