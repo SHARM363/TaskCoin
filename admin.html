@@ -1674,7 +1674,13 @@ async function loadCharacterAdmin() {
             <td><input id="charRarity_${c.id}" value="${escapeHtml(c.rarity||'')}" style="width:95px"></td>
             <td><input id="charBase_${c.id}" type="number" min="0" step="0.01" value="${Number(c.base_price||0)}" style="width:100px"></td>
             <td><textarea id="charBenefits_${c.id}" style="width:160px">${escapeHtml(c.benefits||'')}</textarea></td>
-            <td><input id="charImage_${c.id}" type="file" accept="image/*" style="width:150px"><small>${c.image_url?'Logo saved':'No logo'}</small></td>
+            <td style="min-width:190px;vertical-align:top;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+                    <img id="charImagePreview_${c.id}" src="${c.image_url ? escapeHtml(c.image_url) : ''}" alt="Character ${Number(c.id)} logo" style="${c.image_url ? 'display:block;' : 'display:none;'}width:54px;height:54px;object-fit:contain;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;padding:3px;">
+                    <small id="charImageStatus_${c.id}" style="display:block;max-width:105px;overflow-wrap:anywhere;">${c.image_url?'Saved logo':'No logo saved'}</small>
+                </div>
+                <input id="charImage_${c.id}" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" style="width:170px" onchange="previewCharacterLogo(${Number(c.id)})">
+            </td>
             <td><input id="charCost2_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l2||1000)}" style="width:90px"></td>
             <td><input id="charCost3_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l3||2500)}" style="width:90px"></td>
             <td><input id="charCost4_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l4||5000)}" style="width:90px"></td>
@@ -1689,6 +1695,34 @@ async function loadCharacterAdmin() {
     } catch(e) {
         if(body) body.innerHTML=`<tr><td colspan="15" class="loading">${escapeHtml(e.message||'Failed to load characters.')}</td></tr>`;
     }
+}
+
+function previewCharacterLogo(id) {
+    const input = document.getElementById(`charImage_${id}`);
+    const preview = document.getElementById(`charImagePreview_${id}`);
+    const status = document.getElementById(`charImageStatus_${id}`);
+    const file = input?.files?.[0];
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+        input.value = '';
+        showAlert('characterAdminAlert', 'Please select a valid image file.', 'error');
+        return;
+    }
+    if (file.size > 512 * 1024) {
+        input.value = '';
+        showAlert('characterAdminAlert', 'Logo image must be 512 KB or smaller.', 'error');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        if (preview) {
+            preview.src = String(reader.result || '');
+            preview.style.display = preview.src ? 'block' : 'none';
+        }
+        if (status) status.textContent = 'New logo selected — press Save';
+    };
+    reader.onerror = () => showAlert('characterAdminAlert', 'Could not preview the selected image.', 'error');
+    reader.readAsDataURL(file);
 }
 
 async function saveCharacterAdmin(id) {
@@ -1709,7 +1743,11 @@ async function saveCharacterAdmin(id) {
     };
     try {
         if(file){ if(file.size>512*1024) throw new Error('Logo image must be 512 KB or smaller.'); payload.image_url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file);}); }
-        const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)}); if(!data.success) throw new Error(data.message||'Save failed.'); showAlert('characterAdminAlert',`Character ${id} updated successfully.`,'success'); await loadCharacterAdmin();
+        const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)});
+        if(!data.success) throw new Error(data.message||'Save failed.');
+        if (file && !(data.character && data.character.image_url)) throw new Error('Server did not confirm that the logo was saved. Please try again.');
+        showAlert('characterAdminAlert', file ? `Character ${id} and logo saved successfully.` : `Character ${id} updated successfully.`, 'success');
+        await loadCharacterAdmin();
     } catch(e){ showAlert('characterAdminAlert',e.message||'Character update failed.','error'); }
 }
 async function saveCharacterDailyRewards(){
