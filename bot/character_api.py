@@ -56,7 +56,7 @@ def _money(value):
 
 def _json_character(row):
     d = dict(row)
-    for key in ("base_price", "current_price", "market_multiplier", "seller_pressure", "external_pressure"):
+    for key in ("base_price", "current_price", "market_multiplier", "seller_pressure", "external_pressure", "upgrade_cost_l2", "upgrade_cost_l3", "upgrade_cost_l4", "upgrade_cost_l5"):
         if key in d and d[key] is not None:
             d[key] = float(d[key])
     return d
@@ -97,9 +97,15 @@ def ensure_character_schema():
                 description TEXT NOT NULL DEFAULT '',
                 ability_name TEXT NOT NULL DEFAULT '',
                 ability_description TEXT NOT NULL DEFAULT '',
+                benefits TEXT NOT NULL DEFAULT '',
+                image_url TEXT NOT NULL DEFAULT '',
                 rarity TEXT NOT NULL DEFAULT 'Common',
                 base_price NUMERIC(20,2) NOT NULL DEFAULT 0,
-                boost_percent NUMERIC(10,2) NOT NULL DEFAULT 0,
+                boost_percent NUMERIC(10,2) NOT NULL DEFAULT 5,
+                upgrade_cost_l2 NUMERIC(20,2) NOT NULL DEFAULT 1000,
+                upgrade_cost_l3 NUMERIC(20,2) NOT NULL DEFAULT 2500,
+                upgrade_cost_l4 NUMERIC(20,2) NOT NULL DEFAULT 5000,
+                upgrade_cost_l5 NUMERIC(20,2) NOT NULL DEFAULT 10000,
                 max_supply INTEGER NOT NULL DEFAULT 0,
                 sold_count INTEGER NOT NULL DEFAULT 0,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -154,6 +160,39 @@ def ensure_character_schema():
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_character_market_active
             ON character_market_listings(status, created_at DESC);
+        """)
+        # Safe additive migrations: do not drop or rewrite existing user data.
+        for column, definition in [
+            ("benefits", "TEXT NOT NULL DEFAULT ''"),
+            ("image_url", "TEXT NOT NULL DEFAULT ''"),
+            ("upgrade_cost_l2", "NUMERIC(20,2) NOT NULL DEFAULT 1000"),
+            ("upgrade_cost_l3", "NUMERIC(20,2) NOT NULL DEFAULT 2500"),
+            ("upgrade_cost_l4", "NUMERIC(20,2) NOT NULL DEFAULT 5000"),
+            ("upgrade_cost_l5", "NUMERIC(20,2) NOT NULL DEFAULT 10000"),
+        ]:
+            cur.execute(f"ALTER TABLE characters ADD COLUMN IF NOT EXISTS {column} {definition}")
+        cur.execute("ALTER TABLE character_ownerships ADD COLUMN IF NOT EXISTS level INTEGER NOT NULL DEFAULT 1")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS character_daily_rewards (
+                id BIGSERIAL PRIMARY KEY,
+                telegram_id BIGINT NOT NULL,
+                ownership_id BIGINT NOT NULL REFERENCES character_ownerships(id),
+                reward_day DATE NOT NULL DEFAULT CURRENT_DATE,
+                reward_amount NUMERIC(20,2) NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(telegram_id, reward_day)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS character_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            INSERT INTO character_settings(setting_key,setting_value)
+            VALUES('weekly_daily_rewards','100,200,350,400,500,650,800')
+            ON CONFLICT(setting_key) DO NOTHING
         """)
 
         for cid, name, description, ability, rarity, price, boost, supply in DEFAULT_CHARACTERS:
@@ -279,10 +318,11 @@ def buy_character():
         cur.execute("SELECT 1 FROM character_ownerships WHERE character_id=%s AND telegram_id=%s AND status='owned' LIMIT 1", (character_id, telegram_id))
         if cur.fetchone():
             return jsonify({"success": False, "message": "You already own this character."}), 400
-        price = _recalculate_price(cur, character_id)
+        # Character Level 1 is purchased at the admin-set BDT price, from deposit_balance only.
+        price = _money(c.get("base_price"))
         balance = Decimal(str(user[2] or 0))
         if balance < price:
-            return jsonify({"success": False, "message": "Insufficient Main Balance.", "required": float(price), "available": float(balance)}), 400
+            return jsonify({"success": False, "message": "Insufficient Deposit Balance.", "required": float(price), "available": float(balance)}), 400
         cur.execute("UPDATE users SET deposit_balance=deposit_balance-%s WHERE telegram_id=%s", (price, telegram_id))
         cur.execute("UPDATE characters SET sold_count=sold_count+1 WHERE id=%s", (character_id,))
         cur.execute("INSERT INTO character_ownerships(character_id,telegram_id,purchase_price) VALUES(%s,%s,%s)", (character_id, telegram_id, price))
@@ -458,11 +498,16 @@ def admin_list_characters(admin):
 def admin_update_character(admin, character_id):
     data=request.get_json(silent=True) or {}
     allowed={
-        "name","description","ability_name","ability_description","rarity",
-        "base_price","boost_percent","max_supply","is_active","trading_enabled",
-        "seller_pressure","external_pressure","market_multiplier"
+        "name","description","ability_name","ability_description","benefits","image_url","rarity",
+        "base_price","boost_percent","upgrade_cost_l2","upgrade_cost_l3","upgrade_cost_l4","upgrade_cost_l5",
+        "max_supply","is_active","trading_enabled","seller_pressure","external_pressure","market_multiplier"
     }
     updates={k:data[k] for k in allowed if k in data}
+    if "image_url" in updates:
+        image_value=str(updates["image_url"] or "")
+        if len(image_value)>750000 or (image_value and not (image_value.startswith("data:image/") or image_value.startswith("https://") or image_value.startswith("http://"))):
+            return jsonify({"success":False,"message":"Logo must be an image upload or a valid image URL, maximum 512 KB."}),400
+        updates["image_url"]=image_value
     if not updates:
         return jsonify({"success":False,"message":"No character fields supplied."}),400
     if "base_price" in updates and not (MIN_PRICE <= _money(updates["base_price"]) <= MAX_PRICE):
@@ -549,3 +594,119 @@ def admin_trades(admin):
 # PUT    /api/characters/admin/config/<id>
 # POST   /api/characters/admin/config/<id>/market
 # GET    /api/characters/admin/trades
+
+
+# Character ownership level upgrades, daily reward, and admin-configurable weekly rewards.
+LEVEL_BOOSTS = {1: 5, 2: 7, 3: 10, 4: 15, 5: 20}
+WEEKLY_REWARD_DEFAULTS = [100, 200, 350, 400, 500, 650, 800]
+
+@character_bp.get("/user/<int:telegram_id>/daily-status")
+def character_daily_status(telegram_id):
+    conn=get_connection(); cur=conn.cursor()
+    try:
+        cur.execute("""SELECT o.id,o.character_id,o.level,c.name,c.image_url
+                       FROM character_ownerships o JOIN characters c ON c.id=o.character_id
+                       WHERE o.telegram_id=%s AND o.status='owned' ORDER BY o.acquired_at DESC""",(telegram_id,))
+        owned=cur.fetchall()
+        if not owned:
+            return jsonify({"success":True,"owns_character":False,"claimed_today":False,"message":"Daily Reward পেতে Character কিনুন।"})
+        cur.execute("SELECT setting_value FROM character_settings WHERE setting_key='weekly_daily_rewards'")
+        row=cur.fetchone()
+        try: rewards=[max(0,float(x)) for x in (row[0] if row else '').split(',')]
+        except Exception: rewards=[]
+        if len(rewards)!=7: rewards=WEEKLY_REWARD_DEFAULTS
+        cur.execute("SELECT 1 FROM character_daily_rewards WHERE telegram_id=%s AND reward_day=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date",(telegram_id,))
+        claimed=cur.fetchone() is not None
+        cur.execute("SELECT EXTRACT(ISODOW FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date)::int")
+        day=int(cur.fetchone()[0])
+        return jsonify({"success":True,"owns_character":True,"claimed_today":claimed,"today_reward":rewards[day-1],"weekday":day,"weekly_rewards":rewards,"owned":[{"ownership_id":r[0],"character_id":r[1],"level":r[2],"name":r[3],"image_url":r[4]} for r in owned]})
+    finally: cur.close(); conn.close()
+
+@character_bp.post("/daily-reward/claim")
+def claim_character_daily_reward():
+    data=request.get_json(silent=True) or {}
+    try: telegram_id=int(data.get('telegram_id'))
+    except (TypeError,ValueError): return jsonify({"success":False,"message":"telegram_id is required."}),400
+    conn=get_connection(); cur=conn.cursor()
+    try:
+        cur.execute("SELECT id FROM character_ownerships WHERE telegram_id=%s AND status='owned' ORDER BY acquired_at DESC LIMIT 1 FOR UPDATE",(telegram_id,))
+        own=cur.fetchone()
+        if not own: conn.rollback(); return jsonify({"success":False,"message":"Daily Reward পেতে Character থাকতে হবে।"}),403
+        cur.execute("SELECT setting_value FROM character_settings WHERE setting_key='weekly_daily_rewards' FOR SHARE")
+        row=cur.fetchone()
+        try: rewards=[Decimal(x.strip()) for x in row[0].split(',')] if row else []
+        except Exception: rewards=[]
+        if len(rewards)!=7 or any(x<0 for x in rewards): rewards=[Decimal(str(x)) for x in WEEKLY_REWARD_DEFAULTS]
+        cur.execute("SELECT EXTRACT(ISODOW FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date)::int")
+        day=int(cur.fetchone()[0]); amount=rewards[day-1]
+        cur.execute("""INSERT INTO character_daily_rewards(telegram_id,ownership_id,reward_day,reward_amount)
+                       VALUES(%s,%s,(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date,%s) ON CONFLICT(telegram_id,reward_day) DO NOTHING RETURNING id""",(telegram_id,own[0],amount))
+        if not cur.fetchone(): conn.rollback(); return jsonify({"success":False,"message":"আজকের Daily Reward ইতিমধ্যে নেওয়া হয়েছে।"}),409
+        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)+%s,balance=COALESCE(task_balance,0)+%s,total_earned=COALESCE(total_earned,0)+%s,last_active=CURRENT_TIMESTAMP WHERE telegram_id=%s RETURNING task_balance",(amount,amount,amount,telegram_id))
+        updated=cur.fetchone()
+        if not updated: conn.rollback(); return jsonify({"success":False,"message":"User not found."}),404
+        conn.commit()
+        return jsonify({"success":True,"message":"Daily Reward পেয়েছেন!","reward":float(amount),"balance":float(updated[0]),"weekday":day})
+    except Exception as exc:
+        conn.rollback(); return jsonify({"success":False,"message":"Daily Reward failed.","error":str(exc)}),500
+    finally: cur.close(); conn.close()
+
+@character_bp.post("/upgrade")
+def upgrade_character_level():
+    data=request.get_json(silent=True) or {}
+    try: telegram_id=int(data.get('telegram_id')); ownership_id=int(data.get('ownership_id'))
+    except (TypeError,ValueError): return jsonify({"success":False,"message":"telegram_id and ownership_id are required."}),400
+    conn=get_connection(); cur=conn.cursor()
+    try:
+        cur.execute("SELECT * FROM character_ownerships WHERE id=%s AND telegram_id=%s AND status='owned' FOR UPDATE",(ownership_id,telegram_id))
+        own=cur.fetchone()
+        if not own: conn.rollback(); return jsonify({"success":False,"message":"আপনার এই Character নেই।"}),404
+        cols=[d[0] for d in cur.description]; own=dict(zip(cols,own)); level=int(own.get('level') or 1)
+        if level>=5: conn.rollback(); return jsonify({"success":False,"message":"Character ইতিমধ্যে Level 5।"}),400
+        next_level=level+1; cost_col=f'upgrade_cost_l{next_level}'
+        cur.execute(f"SELECT {cost_col},name FROM characters WHERE id=%s FOR UPDATE",(own['character_id'],))
+        c=cur.fetchone()
+        if not c: conn.rollback(); return jsonify({"success":False,"message":"Character not found."}),404
+        cost=Decimal(str(c[0] or 0))
+        cur.execute("SELECT task_balance FROM users WHERE telegram_id=%s FOR UPDATE",(telegram_id,)); user=cur.fetchone()
+        if not user: conn.rollback(); return jsonify({"success":False,"message":"User not found."}),404
+        available=Decimal(str(user[0] or 0))
+        if cost<0 or available<cost: conn.rollback(); return jsonify({"success":False,"message":"Upgrade-এর জন্য পর্যাপ্ত TaskCoin নেই।","required":float(cost),"available":float(available)}),400
+        cur.execute("UPDATE users SET task_balance=COALESCE(task_balance,0)-%s,balance=COALESCE(task_balance,0)-%s WHERE telegram_id=%s",(cost,cost,telegram_id))
+        cur.execute("UPDATE character_ownerships SET level=%s WHERE id=%s",(next_level,ownership_id))
+        conn.commit()
+        return jsonify({"success":True,"message":f"Character Level {next_level} হয়েছে!","level":next_level,"boost_percent":LEVEL_BOOSTS[next_level],"cost":float(cost)})
+    except Exception as exc:
+        conn.rollback(); return jsonify({"success":False,"message":"Upgrade failed.","error":str(exc)}),500
+    finally: cur.close(); conn.close()
+
+@character_bp.put("/admin/daily-rewards")
+@require_admin
+def admin_update_weekly_rewards(admin):
+    data=request.get_json(silent=True) or {}; values=data.get('weekly_rewards')
+    if not isinstance(values,list) or len(values)!=7:
+        return jsonify({"success":False,"message":"সাত দিনের জন্য ৭টি reward amount দিন।"}),400
+    try: rewards=[Decimal(str(v)) for v in values]
+    except Exception: return jsonify({"success":False,"message":"Invalid reward values."}),400
+    if any(v<0 or v>100000000 for v in rewards): return jsonify({"success":False,"message":"Reward values must be between 0 and 100000000."}),400
+    conn=get_connection(); cur=conn.cursor()
+    try:
+        cur.execute("INSERT INTO character_settings(setting_key,setting_value) VALUES('weekly_daily_rewards',%s) ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value",(','.join(str(v) for v in rewards),))
+        conn.commit(); return jsonify({"success":True,"weekly_rewards":[float(v) for v in rewards]})
+    except Exception as exc:
+        conn.rollback(); return jsonify({"success":False,"message":"Could not save weekly rewards.","error":str(exc)}),500
+    finally: cur.close(); conn.close()
+
+
+@character_bp.get("/admin/daily-rewards")
+@require_admin
+def admin_get_weekly_rewards(admin):
+    conn=get_connection(); cur=conn.cursor()
+    try:
+        cur.execute("SELECT setting_value FROM character_settings WHERE setting_key='weekly_daily_rewards'")
+        row=cur.fetchone()
+        try: values=[float(v.strip()) for v in row[0].split(',')] if row else WEEKLY_REWARD_DEFAULTS
+        except Exception: values=WEEKLY_REWARD_DEFAULTS
+        if len(values)!=7: values=WEEKLY_REWARD_DEFAULTS
+        return jsonify({"success":True,"weekly_rewards":values})
+    finally: cur.close(); conn.close()
