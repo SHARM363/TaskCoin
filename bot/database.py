@@ -1577,7 +1577,18 @@ def claim_task_reward(telegram_id, task_id):
         if cd:
             cur.execute("SELECT EXTRACT(EPOCH FROM (%s-CURRENT_TIMESTAMP)) AS seconds;",(cd['available_at'],)); remain=float(cur.fetchone()['seconds'] or 0)
             if remain>0: conn.rollback(); return {"success":False,"message":"Please wait before starting this task again.","cooldown":int(remain)+1}
-        reward=float(task['reward'] or 0)
+        base_reward=float(task['reward'] or 0)
+        # Character boost applies only to task earnings, never to deposits, spins,
+        # referral bonuses, exchanges, or other balance credits. Level boost is fixed.
+        reward=base_reward
+        cur.execute("SELECT to_regclass('public.character_ownerships') AS ownership_table")
+        ownership_table=(cur.fetchone() or {}).get('ownership_table')
+        if ownership_table:
+            cur.execute("""SELECT MAX(CASE COALESCE(level,1) WHEN 1 THEN 5 WHEN 2 THEN 7 WHEN 3 THEN 10 WHEN 4 THEN 15 WHEN 5 THEN 20 ELSE 0 END) AS boost_percent
+                           FROM character_ownerships WHERE telegram_id=%s AND status='owned'""",(telegram_id,))
+            boost_row=cur.fetchone(); boost_percent=float((boost_row or {}).get('boost_percent') or 0)
+            if boost_percent>0:
+                reward=round(base_reward*(1+boost_percent/100.0),2)
         if is_social:
             cur.execute("""
                 INSERT INTO task_completions(telegram_id,task_id,reward,completed_date,lifetime_once)
