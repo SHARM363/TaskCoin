@@ -1232,14 +1232,15 @@
 
         <section id="charactersSection" class="section">
             <div class="page-title">🧑‍🚀 Character Management</div>
-            <div class="page-subtitle">Admin controls price, boost, supply, active/trading status and market pressure for all 10 characters.</div>
+            <div class="page-subtitle">প্রতিটি Character-এর লোগো, BDT মূল্য, সুবিধা, Level upgrade cost, supply এবং status নিয়ন্ত্রণ করুন। Level Boost: 5%, 7%, 10%, 15%, 20%.</div>
+            <div class="card"><div class="card-title">🎁 Weekly Character Daily Reward</div><p>সোমবার থেকে রবিবার পর্যন্ত reward amount (TaskCoin)</p><div style="display:grid;grid-template-columns:repeat(7,minmax(70px,1fr));gap:8px;overflow:auto"><label>সোম<input id="dailyReward1" type="number" value="100" min="0"></label><label>মঙ্গল<input id="dailyReward2" type="number" value="200" min="0"></label><label>বুধ<input id="dailyReward3" type="number" value="350" min="0"></label><label>বৃহস্পতি<input id="dailyReward4" type="number" value="400" min="0"></label><label>শুক্র<input id="dailyReward5" type="number" value="500" min="0"></label><label>শনি<input id="dailyReward6" type="number" value="650" min="0"></label><label>রবি<input id="dailyReward7" type="number" value="800" min="0"></label></div><button class="action-button green" onclick="saveCharacterDailyRewards()">Save Weekly Rewards</button></div>
             <div id="characterAdminAlert" class="alert"></div>
             <div class="card">
                 <div class="card-title">⚙️ Character Settings</div>
                 <div class="table-wrapper">
                     <table style="min-width:1350px;">
-                        <thead><tr><th>ID</th><th>Character</th><th>Rarity</th><th>Base Price</th><th>Boost %</th><th>Supply</th><th>Seller Pressure</th><th>External Pressure</th><th>Multiplier</th><th>Active</th><th>Trading</th><th>Save</th></tr></thead>
-                        <tbody id="characterAdminTableBody"><tr><td colspan="12" class="loading">Loading characters...</td></tr></tbody>
+                        <thead><tr><th>ID</th><th>Name</th><th>Rarity</th><th>BDT Price</th><th>Benefits</th><th>Logo Upload</th><th>L2 Cost</th><th>L3 Cost</th><th>L4 Cost</th><th>L5 Cost</th><th>Supply</th><th>Sold</th><th>Active</th><th>Trading</th><th>Save</th></tr></thead>
+                        <tbody id="characterAdminTableBody"><tr><td colspan="15" class="loading">Loading characters...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -1666,40 +1667,56 @@ async function loadCharacterAdmin() {
             apiRequest("/api/characters/admin/trades")
         ]);
         const chars=data.characters||[];
+        try { const weekly=await apiRequest('/api/characters/admin/daily-rewards'); if(weekly.success && Array.isArray(weekly.weekly_rewards)) weekly.weekly_rewards.forEach((v,i)=>{const el=document.getElementById(`dailyReward${i+1}`);if(el)el.value=v;}); } catch(_) {}
         body.innerHTML=chars.map(c=>`<tr>
             <td>${Number(c.id)}</td>
-            <td><b>${escapeHtml(c.name||c.code)}</b><br><small>${escapeHtml(c.code)}</small></td>
+            <td><input id="charName_${c.id}" value="${escapeHtml(c.name||'')}" style="width:130px"></td>
             <td><input id="charRarity_${c.id}" value="${escapeHtml(c.rarity||'')}" style="width:95px"></td>
-            <td><input id="charBase_${c.id}" type="number" step="0.01" value="${Number(c.base_price||0)}" style="width:105px"></td>
-            <td><input id="charBoost_${c.id}" type="number" step="0.01" value="${Number(c.boost_percent||0)}" style="width:85px"></td>
-            <td><input id="charSupply_${c.id}" type="number" value="${Number(c.max_supply||0)}" style="width:90px"></td>
-            <td><input id="charSeller_${c.id}" type="number" step="0.01" value="${Number(c.seller_pressure||0)}" style="width:100px"></td>
-            <td><input id="charExternal_${c.id}" type="number" step="0.01" value="${Number(c.external_pressure||0)}" style="width:100px"></td>
-            <td><input id="charMult_${c.id}" type="number" step="0.0001" value="${Number(c.market_multiplier||1)}" style="width:100px"></td>
+            <td><input id="charBase_${c.id}" type="number" min="0" step="0.01" value="${Number(c.base_price||0)}" style="width:100px"></td>
+            <td><textarea id="charBenefits_${c.id}" style="width:160px">${escapeHtml(c.benefits||'')}</textarea></td>
+            <td><input id="charImage_${c.id}" type="file" accept="image/*" style="width:150px"><small>${c.image_url?'Logo saved':'No logo'}</small></td>
+            <td><input id="charCost2_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l2||1000)}" style="width:90px"></td>
+            <td><input id="charCost3_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l3||2500)}" style="width:90px"></td>
+            <td><input id="charCost4_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l4||5000)}" style="width:90px"></td>
+            <td><input id="charCost5_${c.id}" type="number" min="0" value="${Number(c.upgrade_cost_l5||10000)}" style="width:90px"></td>
+            <td><input id="charSupply_${c.id}" type="number" min="0" value="${Number(c.max_supply||0)}" style="width:90px"></td>
+            <td>${Number(c.sold_count||0)}</td>
             <td><input id="charActive_${c.id}" type="checkbox" ${c.is_active?'checked':''}></td>
             <td><input id="charTrading_${c.id}" type="checkbox" ${c.trading_enabled?'checked':''}></td>
             <td><button class="action-button green" onclick="saveCharacterAdmin(${Number(c.id)})">Save</button></td>
-        </tr>`).join('') || '<tr><td colspan="12">No characters.</td></tr>';
+        </tr>`).join('') || '<tr><td colspan="15">No characters.</td></tr>';
         tradesBody.innerHTML=(trades.trades||[]).map(t=>`<tr><td>${escapeHtml(t.name||t.code||'')}</td><td>${escapeHtml(String(t.seller_id))}</td><td>${escapeHtml(String(t.buyer_id??'—'))}</td><td>৳${Number(t.price||0).toLocaleString()}</td><td>${escapeHtml(t.trade_type||'')}</td><td>${escapeHtml(String(t.created_at||''))}</td></tr>`).join('') || '<tr><td colspan="6">No trades.</td></tr>';
     } catch(e) {
-        if(body) body.innerHTML=`<tr><td colspan="12" class="loading">${escapeHtml(e.message||'Failed to load characters.')}</td></tr>`;
+        if(body) body.innerHTML=`<tr><td colspan="15" class="loading">${escapeHtml(e.message||'Failed to load characters.')}</td></tr>`;
     }
 }
 
 async function saveCharacterAdmin(id) {
+    const imageInput=document.getElementById(`charImage_${id}`); const file=imageInput?.files?.[0];
     const payload={
+        name:document.getElementById(`charName_${id}`).value,
         rarity:document.getElementById(`charRarity_${id}`).value,
         base_price:Number(document.getElementById(`charBase_${id}`).value),
-        boost_percent:Number(document.getElementById(`charBoost_${id}`).value),
+        benefits:document.getElementById(`charBenefits_${id}`).value,
+        upgrade_cost_l2:Number(document.getElementById(`charCost2_${id}`).value),
+        upgrade_cost_l3:Number(document.getElementById(`charCost3_${id}`).value),
+        upgrade_cost_l4:Number(document.getElementById(`charCost4_${id}`).value),
+        upgrade_cost_l5:Number(document.getElementById(`charCost5_${id}`).value),
         max_supply:Number(document.getElementById(`charSupply_${id}`).value),
-        seller_pressure:Number(document.getElementById(`charSeller_${id}`).value),
-        external_pressure:Number(document.getElementById(`charExternal_${id}`).value),
-        market_multiplier:Number(document.getElementById(`charMult_${id}`).value),
+        boost_percent:5,
         is_active:document.getElementById(`charActive_${id}`).checked,
         trading_enabled:document.getElementById(`charTrading_${id}`).checked
     };
-    try { const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)}); if(!data.success) throw new Error(data.message||'Save failed.'); showAlert('characterAdminAlert',`Character ${id} updated successfully.`,'success'); await loadCharacterAdmin(); }
-    catch(e){ showAlert('characterAdminAlert',e.message||'Character update failed.','error'); }
+    try {
+        if(file){ if(file.size>512*1024) throw new Error('Logo image must be 512 KB or smaller.'); payload.image_url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file);}); }
+        const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)}); if(!data.success) throw new Error(data.message||'Save failed.'); showAlert('characterAdminAlert',`Character ${id} updated successfully.`,'success'); await loadCharacterAdmin();
+    } catch(e){ showAlert('characterAdminAlert',e.message||'Character update failed.','error'); }
+}
+async function saveCharacterDailyRewards(){
+    const values=Array.from({length:7},(_,i)=>Number(document.getElementById(`dailyReward${i+1}`).value));
+    try{const d=await apiRequest('/api/characters/admin/daily-rewards',{method:'PUT',body:JSON.stringify({weekly_rewards:values})});if(!d.success)throw new Error(d.message||'Save failed');showAlert('characterAdminAlert','Weekly daily rewards saved.','success');}
+    catch(e){showAlert('characterAdminAlert',e.message||'Could not save weekly rewards.','error');}
+
 }
 
 // ================================
