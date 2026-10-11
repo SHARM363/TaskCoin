@@ -19,6 +19,7 @@ are created automatically in the existing PostgreSQL database on first use.
 
 import hashlib
 import os
+import threading
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import wraps
 
@@ -28,6 +29,10 @@ from database import get_connection, get_admin_by_token
 
 
 character_bp = Blueprint("character_api", __name__, url_prefix="/api/characters")
+
+# Run schema creation/migrations only once per worker, not on every HTTP request.
+_schema_lock = threading.Lock()
+_schema_ready = False
 
 CHARACTER_COUNT = 10
 MIN_PRICE = Decimal("0.00")
@@ -86,9 +91,23 @@ def require_admin(fn):
 
 
 def ensure_character_schema():
+    global _schema_ready
+    if _schema_ready:
+        return
+    with _schema_lock:
+        if _schema_ready:
+            return
+        _ensure_character_schema_locked()
+        _schema_ready = True
+
+def _ensure_character_schema_locked():
     conn = get_connection()
     cur = conn.cursor()
     try:
+        # Serialize schema DDL across ALL Render workers/processes. A Python
+        # threading.Lock only protects one worker and cannot prevent DB deadlocks.
+        # This transaction-level PostgreSQL advisory lock is shared by all workers.
+        cur.execute("SELECT pg_advisory_xact_lock(731905112)")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS characters (
                 id INTEGER PRIMARY KEY,
