@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from psycopg2.extras import RealDictCursor
 
-from telegram_admin_bot import start_bot, notify_admins
+from telegram_admin_bot import start_bot, notify_admins, send_message, PAYMENT_PROOF_CHANNEL
 from database import (
 
     get_user,
@@ -1158,6 +1158,25 @@ def admin_update_withdrawal(
 
             return jsonify(result), 400
 
+        # Keep channel announcements text-only and notify the user on rejection.
+        row = result.get("withdrawal") or result.get("request") or {}
+        if status == "approved":
+            try:
+                send_message(
+                    PAYMENT_PROOF_CHANNEL,
+                    "✅ TaskCoin Withdrawal Successful\n💰 Amount: ৳" + str(row.get("amount") or "") + "\n✅ Payment completed successfully.",
+                )
+            except Exception:
+                app.logger.exception("Could not publish withdrawal success notice")
+        elif status == "rejected" and row.get("telegram_id"):
+            try:
+                send_message(
+                    row.get("telegram_id"),
+                    "❌ আপনার Withdrawal অনুরোধটি সফল হয়নি। অনুগ্রহ করে তথ্য যাচাই করে পুনরায় চেষ্টা করুন।",
+                )
+            except Exception:
+                app.logger.exception("Could not notify user about rejected withdrawal")
+
         return jsonify(result)
 
     except Exception as e:
@@ -1316,6 +1335,29 @@ def admin_update_mobile_recharge(request_id):
     except Exception:
         app.logger.exception("Could not process mobile recharge request")
         return jsonify({"success": False, "message": "Could not process recharge request."}), 500
+
+    # Notify the user when the request is rejected. If approved through the web admin,
+    # publish a text-only success notice (the Telegram bot approval flow handles screenshot proof).
+    if result.get("success"):
+        row = result.get("request") or result.get("recharge") or {}
+        telegram_id = row.get("telegram_id")
+        amount = row.get("amount")
+        if status == "rejected" and telegram_id:
+            try:
+                send_message(
+                    telegram_id,
+                    "❌ আপনার মোবাইল রিচার্জের অনুরোধটি সফল হয়নি। অনুগ্রহ করে তথ্য যাচাই করে পুনরায় চেষ্টা করুন।",
+                )
+            except Exception:
+                app.logger.exception("Could not notify user about rejected mobile recharge")
+        elif status == "approved":
+            try:
+                send_message(
+                    PAYMENT_PROOF_CHANNEL,
+                    "✅ TaskCoin Mobile Recharge Successful\n📱 Mobile Recharge\n💰 Amount: ৳" + str(amount or ""),
+                )
+            except Exception:
+                app.logger.exception("Could not publish mobile recharge success notice")
     return jsonify(result), (400 if not result.get("success") else 200)
 
 
