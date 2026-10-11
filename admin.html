@@ -1745,7 +1745,15 @@ async function saveCharacterAdmin(id) {
         if(file){ if(file.size>512*1024) throw new Error('Logo image must be 512 KB or smaller.'); payload.image_url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file);}); }
         const data=await apiRequest(`/api/characters/admin/config/${id}`,{method:'PUT',body:JSON.stringify(payload)});
         if(!data.success) throw new Error(data.message||'Save failed.');
-        if (file && !(data.character && data.character.image_url)) throw new Error('Server did not confirm that the logo was saved. Please try again.');
+        // Some deployed API versions return success without echoing the full character.
+        // Verify the saved logo with a fresh GET instead of relying only on the PUT response.
+        if (file) {
+            const verify = await apiRequest('/api/characters/admin/config');
+            const savedCharacter = (verify.characters || []).find(c => Number(c.id) === Number(id));
+            if (!savedCharacter || !savedCharacter.image_url || !String(savedCharacter.image_url).startsWith('data:image/')) {
+                throw new Error('Character details were saved, but the server did not return a saved logo. Check that the latest character_api.py is deployed and the database update succeeded.');
+            }
+        }
         showAlert('characterAdminAlert', file ? `Character ${id} and logo saved successfully.` : `Character ${id} updated successfully.`, 'success');
         await loadCharacterAdmin();
     } catch(e){ showAlert('characterAdminAlert',e.message||'Character update failed.','error'); }
