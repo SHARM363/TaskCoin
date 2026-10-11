@@ -1661,11 +1661,11 @@ async function adminLogout() {
 async function loadCharacterAdmin() {
     const body=document.getElementById("characterAdminTableBody");
     const tradesBody=document.getElementById("characterTradesTableBody");
+    if (body) body.innerHTML='<tr><td colspan="15" class="loading">Loading characters…</td></tr>';
+    // Load the character configuration independently: a trade-history failure
+    // must never hide the character rows or logo upload controls.
     try {
-        const [data,trades]=await Promise.all([
-            apiRequest("/api/characters/admin/config"),
-            apiRequest("/api/characters/admin/trades")
-        ]);
+        const data=await apiRequest("/api/characters/admin/config");
         const chars=data.characters||[];
         try { const weekly=await apiRequest('/api/characters/admin/daily-rewards'); if(weekly.success && Array.isArray(weekly.weekly_rewards)) weekly.weekly_rewards.forEach((v,i)=>{const el=document.getElementById(`dailyReward${i+1}`);if(el)el.value=v;}); } catch(_) {}
         body.innerHTML=chars.map(c=>`<tr>
@@ -1691,9 +1691,17 @@ async function loadCharacterAdmin() {
             <td><input id="charTrading_${c.id}" type="checkbox" ${c.trading_enabled?'checked':''}></td>
             <td><button class="action-button green" onclick="saveCharacterAdmin(${Number(c.id)})">Save</button></td>
         </tr>`).join('') || '<tr><td colspan="15">No characters.</td></tr>';
-        tradesBody.innerHTML=(trades.trades||[]).map(t=>`<tr><td>${escapeHtml(t.name||t.code||'')}</td><td>${escapeHtml(String(t.seller_id))}</td><td>${escapeHtml(String(t.buyer_id??'—'))}</td><td>৳${Number(t.price||0).toLocaleString()}</td><td>${escapeHtml(t.trade_type||'')}</td><td>${escapeHtml(String(t.created_at||''))}</td></tr>`).join('') || '<tr><td colspan="6">No trades.</td></tr>';
     } catch(e) {
         if(body) body.innerHTML=`<tr><td colspan="15" class="loading">${escapeHtml(e.message||'Failed to load characters.')}</td></tr>`;
+    }
+    // Trades are optional for rendering the character list.
+    if (tradesBody) {
+        try {
+            const trades=await apiRequest("/api/characters/admin/trades");
+            tradesBody.innerHTML=(trades.trades||[]).map(t=>`<tr><td>${escapeHtml(t.name||t.code||'')}</td><td>${escapeHtml(String(t.seller_id))}</td><td>${escapeHtml(String(t.buyer_id??'—'))}</td><td>৳${Number(t.price||0).toLocaleString()}</td><td>${escapeHtml(t.trade_type||'')}</td><td>${escapeHtml(String(t.created_at||''))}</td></tr>`).join('') || '<tr><td colspan="6">No trades.</td></tr>';
+        } catch(e) {
+            tradesBody.innerHTML=`<tr><td colspan="6">Trade history unavailable: ${escapeHtml(e.message||'request failed')}</td></tr>`;
+        }
     }
 }
 
