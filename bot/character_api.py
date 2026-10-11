@@ -532,8 +532,21 @@ def admin_update_character(admin, character_id):
         if not row:
             conn.rollback(); return jsonify({"success":False,"message":"Character not found."}),404
         cols=[d[0] for d in cur.description]
+        saved_character = _json_character(dict(zip(cols, row)))
         conn.commit()
-        return jsonify({"success":True,"character":_json_character(dict(zip(cols,row)))})
+        # Re-read the persisted record after commit so the API confirms the
+        # value that is actually stored, rather than only the UPDATE RETURNING row.
+        cur.execute("SELECT * FROM characters WHERE id=%s", (character_id,))
+        persisted_row = cur.fetchone()
+        if not persisted_row:
+            return jsonify({"success":False,"message":"Character update committed but could not be read back."}),500
+        persisted_cols=[d[0] for d in cur.description]
+        persisted_character=_json_character(dict(zip(persisted_cols,persisted_row)))
+        if "image_url" in updates and str(persisted_character.get("image_url") or "") != str(updates["image_url"] or ""):
+            return jsonify({"success":False,"message":"Character details were saved, but logo was not persisted. Check database column/update."}),500
+        # Ensure the image field is explicitly present in the JSON response.
+        persisted_character["image_url"] = persisted_character.get("image_url") or ""
+        return jsonify({"success":True,"character":persisted_character,"logo_saved":bool(persisted_character.get("image_url"))})
     except Exception as exc:
         conn.rollback(); return jsonify({"success":False,"message":"Character update failed.","error":str(exc)}),500
     finally: cur.close(); conn.close()
