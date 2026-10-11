@@ -39,6 +39,8 @@ PAYMENT_PROOF_CHANNEL = os.getenv(
 ).strip()
 
 _stop = False
+# Admins must send a screenshot after choosing Approve for a mobile recharge.
+_pending_recharge_proof = {}
 
 
 def _telegram(method, payload=None):
@@ -112,41 +114,43 @@ def _mask_payment_account(value):
 
 
 def publish_withdrawal_payment_proof(withdrawal):
-    """Publish an anonymized successful withdrawal proof to the public channel."""
+    """Publish a simple text-only successful withdrawal notice to the public channel."""
     if not PAYMENT_PROOF_CHANNEL:
-        return {
-            "ok": False,
-            "description": "PAYMENT_PROOF_CHANNEL is empty",
-        }
+        return {"ok": False, "description": "PAYMENT_PROOF_CHANNEL is empty"}
 
-    method = html.escape(str(withdrawal.get("method") or "Unknown"))
     amount = _money(withdrawal.get("amount"))
-    account = html.escape(
-        _mask_payment_account(withdrawal.get("account_number"))
-    )
-    withdrawal_id = html.escape(str(withdrawal.get("id") or ""))
-    processed_at = withdrawal.get("processed_at")
-    if processed_at:
-        processed_text = html.escape(str(processed_at))
-    else:
-        processed_text = "Just now"
-
     text = (
-        "✅ <b>TaskCoin Payment Successful</b>\n\n"
-        f"🧾 Withdrawal: <b>#{withdrawal_id}</b>\n"
-        f"💰 Amount: <b>৳{amount}</b>\n"
-        f"💳 Method: <b>{method}</b>\n"
-        f"📱 Account: <code>{account}</code>\n"
-        f"📅 Processed: <code>{processed_text}</code>\n\n"
-        "✅ <b>Status: Successfully Paid</b>"
+        "✅ TaskCoin Withdrawal Successful\n"
+        f"💰 Amount: ৳{amount}\n"
+        "✅ Payment completed successfully."
     )
-
     result = send_message(PAYMENT_PROOF_CHANNEL, text)
     if not result.get("ok"):
-        print(
-            "Payment proof channel post failed:",
-            result.get("description", "Unknown Telegram API error"),
-        )
+        print("Withdrawal success channel post failed:", result.get("description", "Unknown Telegram API error"))
+    return result
+
+
+def publish_mobile_recharge_proof(photo_file_id, recharge):
+    """Publish the admin's recharge screenshot and a minimal text success notice."""
+    if not PAYMENT_PROOF_CHANNEL:
+        return {"ok": False, "description": "PAYMENT_PROOF_CHANNEL is empty"}
+
+    photo_result = _telegram("sendPhoto", {
+        "chat_id": PAYMENT_PROOF_CHANNEL,
+        "photo": photo_file_id,
+    })
+    if not photo_result.get("ok"):
+        print("Mobile recharge screenshot post failed:", photo_result.get("description", "Unknown Telegram API error"))
+        return photo_result
+
+    text = (
+        "✅ TaskCoin Mobile Recharge Successful\n"
+        f"📱 Mobile Recharge: ৳{_money(recharge.get('amount'))}\n"
+        "✅ Recharge completed successfully."
+    )
+    result = send_message(PAYMENT_PROOF_CHANNEL, text)
+    if not result.get("ok"):
+        print("Mobile recharge success channel post failed:", result.get("description", "Unknown Telegram API error"))
     return result
 
 
@@ -542,6 +546,22 @@ def handle_callback(cb):
             )
             return
 
+        # Clear any unfinished screenshot step if this request is rejected.
+        if kind == "mobile_recharge" and action == "reject":
+            _pending_recharge_proof.pop(user_id, None)
+
+        # For mobile recharge approvals, collect the proof screenshot first.
+        # The request is only approved (and coins deducted) after the admin sends it.
+        if kind == "mobile_recharge" and action == "approve":
+            _pending_recharge_proof[user_id] = {"request_id": item_id, "chat_id": chat_id}
+            answer_callback(callback_id, "Send the recharge screenshot in this chat")
+            send_message(
+                chat_id,
+                f"📸 রিচার্জ #{item_id} সম্পন্ন করার স্ক্রিনশট এখন এই চ্যাটে Photo হিসেবে পাঠান। স্ক্রিনশট পাওয়ার পরই রিচার্জ Approved হবে এবং চ্যানেলে যাবে।",
+                main_menu(),
+            )
+            return
+
         status = (
             "approved"
             if action == "approve"
@@ -621,12 +641,15 @@ def handle_callback(cb):
                 if status == "approved":
                     text = f"📱 আপনার ৳{row.get('amount')} মোবাইল রিচার্জের আবেদন #{item_id} অনুমোদিত হয়েছে। অ্যাডমিন রিচার্জ সম্পন্ন করেছেন। {row.get('coin_cost')} TaskCoins কাটা হয়েছে।"
                 else:
-                    text = f"❌ আপনার মোবাইল রিচার্জের আবেদন #{item_id} বাতিল হয়েছে। কোনো TaskCoins কাটা হয়নি।"
+                    text = f"❌ আপনার মোবাইল রিচার্জের অনুরোধটি সফল হয়নি। কোনো TaskCoins কাটা হয়নি। অনুগ্রহ করে তথ্য যাচাই করে পুনরায় চেষ্টা করুন। (Request #{item_id})"
             else:
-                text = (
-                    f"💸 Withdrawal #{item_id} has been "
-                    f"<b>{status}</b>."
-                )
+                if kind == "withdrawal" and status == "rejected":
+                    text = "❌ আপনার Withdrawal অনুরোধটি সফল হয়নি। অনুগ্রহ করে তথ্য যাচাই করে পুনরায় চেষ্টা করুন।"
+                else:
+                    text = (
+                        f"💸 Withdrawal #{item_id} has been "
+                        f"<b>{status}</b>."
+                    )
 
             send_message(
                 row["telegram_id"],
@@ -658,6 +681,35 @@ def handle_message(message):
     chat_id = chat.get("id")
     user_id = user.get("id")
     text = (message.get("text") or "").strip()
+
+    # A photo from an admin who just approved a recharge completes the approval.
+    pending = _pending_recharge_proof.get(user_id)
+    photos = message.get("photo") or []
+    if pending and photos and is_admin(user_id):
+        photo_file_id = photos[-1].get("file_id")
+        request_id = pending["request_id"]
+        try:
+            result = update_mobile_recharge_status(request_id, "approved")
+            if not result.get("success"):
+                send_message(chat_id, "❌ রিচার্জ অনুমোদন করা যায়নি: " + str(result.get("message", "Failed")), main_menu())
+                return
+            row = result.get("request") or result.get("recharge") or {}
+            if not row:
+                # Some database versions return the request under a generic key.
+                row = result.get("mobile_recharge") or {}
+            publish_mobile_recharge_proof(photo_file_id, row)
+            telegram_id = row.get("telegram_id")
+            if telegram_id:
+                send_message(
+                    telegram_id,
+                    f"✅ আপনার ৳{_money(row.get('amount'))} মোবাইল রিচার্জ সফল হয়েছে। {row.get('coin_cost', '')} TaskCoins কাটা হয়েছে।",
+                )
+            send_message(chat_id, f"✅ Recharge #{request_id} approved. Screenshot and success message sent to the channel.", main_menu())
+            _pending_recharge_proof.pop(user_id, None)
+        except Exception as exc:
+            print("mobile recharge screenshot approval error:", exc)
+            send_message(chat_id, "❌ স্ক্রিনশট প্রক্রিয়া করা যায়নি। আবার চেষ্টা করুন।", main_menu())
+        return
 
     if text == "/id":
         send_message(
