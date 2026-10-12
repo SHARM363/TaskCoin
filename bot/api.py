@@ -384,53 +384,9 @@ def api_claim_task():
 
     try:
 
-        # Adsterra tasks require a server-recorded landing-page button click.
-        is_adsterra_claim = False
-        check_conn = get_connection()
-        check_cur = check_conn.cursor(cursor_factory=RealDictCursor)
-        try:
-            check_cur.execute("SELECT * FROM tasks WHERE id=%s AND is_active=TRUE;", (task_id,))
-            claim_task = check_cur.fetchone()
-            if _is_adsterra_task_record(claim_task):
-                is_adsterra_claim = True
-                _ensure_adsterra_click_table(check_cur)
-                check_cur.execute(
-                    "SELECT clicked_at, claimed_at FROM adsterra_click_sessions WHERE telegram_id=%s AND task_id=%s FOR UPDATE;",
-                    (telegram_id, task_id)
-                )
-                click_proof = check_cur.fetchone()
-                if not click_proof or not click_proof.get("clicked_at"):
-                    check_conn.rollback()
-                    return jsonify({"success": False, "message": "ল্যান্ডিং পেজের বাটনে ক্লিক কনফার্ম হয়নি। Verify Now চাপুন।", "click_confirmed": False}), 400
-                if click_proof.get("claimed_at"):
-                    check_conn.rollback()
-                    return jsonify({"success": False, "message": "এই টাস্কের রিওয়ার্ড ইতিমধ্যে নেওয়া হয়েছে।"}), 400
-                check_conn.commit()
-            else:
-                check_conn.rollback()
-        finally:
-            check_cur.close()
-            check_conn.close()
-
-        result = claim_task_reward(
-            telegram_id,
-            task_id
-        )
-
-        # Mark the confirmed click as consumed only after the reward succeeds.
-        if is_adsterra_claim and isinstance(result, dict) and result.get("success") is not False:
-            mark_conn = get_connection()
-            mark_cur = mark_conn.cursor()
-            try:
-                mark_cur.execute(
-                    "UPDATE adsterra_click_sessions SET claimed_at=CURRENT_TIMESTAMP WHERE telegram_id=%s AND task_id=%s AND clicked_at IS NOT NULL AND claimed_at IS NULL;",
-                    (telegram_id, task_id)
-                )
-                mark_conn.commit()
-            finally:
-                mark_cur.close()
-                mark_conn.close()
-
+        # Do not require the landing-page click-tracking cookie/session to claim.
+        # The user flow is Start Task -> return to app -> Claim Reward (Monetag).
+        result = claim_task_reward(telegram_id, task_id)
         return jsonify(result)
 
     except Exception as e:
