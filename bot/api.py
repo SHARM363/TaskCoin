@@ -384,8 +384,8 @@ def api_claim_task():
 
     try:
 
-        # Do not require the landing-page click-tracking cookie/session to claim.
-        # The user flow is Start Task -> return to app -> Claim Reward (Monetag).
+        # A client-supplied boolean is not proof of ad completion. The database claim
+        # function requires a Monetag-confirmed postback linked to a pending ad session.
         result = claim_task_reward(telegram_id, task_id)
         return jsonify(result)
 
@@ -1928,12 +1928,12 @@ def api_referrals():
 # ADSTERRA SMARTLINK REWARD BRIDGE
 # ============================================================
 
-ADSTERRA_LANDING_URL = "https://sites.google.com/view/taskcoin-earn/home"
+ADSTERRA_LANDING_URL = "https://sites.google.com/view/taskcoin-reward1/home"
 ADSTERRA_SMART_LINK = os.getenv(
     "ADSTERRA_SMART_LINK",
     "https://auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631"
 ).strip()
-ADSTERRA_MIN_SECONDS = 10
+ADSTERRA_MIN_SECONDS = 30
 ADSTERRA_COOKIE_NAME = "taskcoin_adsterra_session"
 
 
@@ -2050,10 +2050,11 @@ def adsterra_redirect():
         cur.execute("SELECT session_started_at FROM adsterra_click_sessions WHERE telegram_id=%s AND task_id=%s FOR UPDATE;", (telegram_id, task_id))
         active_session = cur.fetchone()
         if not active_session or int(active_session["session_started_at"]) != session_started_at:
-            conn.rollback(); return jsonify({"success": False, "message": "This landing-page session has expired. Press Verify Now to reopen it."}), 400
-        if int(time.time()) < session_started_at + ADSTERRA_MIN_SECONDS:
-            conn.rollback(); return jsonify({"success": False, "message": "Please wait 10 seconds before clicking the landing-page button."}), 400
-        cur.execute("UPDATE adsterra_click_sessions SET clicked_at=COALESCE(clicked_at, CURRENT_TIMESTAMP) WHERE telegram_id=%s AND task_id=%s AND session_started_at=%s;", (telegram_id, task_id, session_started_at))
+            conn.rollback(); return jsonify({"success": False, "message": "এই ল্যান্ডিং সেশনটি শেষ হয়েছে। টাস্ক আবার শুরু করুন।"}), 400
+        remaining = max(0, int(session_started_at + ADSTERRA_MIN_SECONDS - time.time()))
+        if remaining > 0:
+            conn.rollback(); return jsonify({"success": False, "remaining_seconds": remaining, "message": f"অনুগ্রহ করে আরও {remaining} সেকেন্ড অপেক্ষা করুন।"}), 400
+        # Green-button click is not required; the server's session timestamp is the wait gate.
         conn.commit()
     except Exception:
         conn.rollback()
@@ -2073,6 +2074,7 @@ def adsterra_redirect():
 
 @app.route("/api/adsterra/verify", methods=["POST"])
 def adsterra_verify():
+    import time
     data = request.get_json(silent=True) or {}
     try:
         telegram_id = int(data.get("telegram_id")); task_id = int(data.get("task_id"))
@@ -2088,19 +2090,21 @@ def adsterra_verify():
         if not started:
             conn.rollback(); return jsonify({"success": False, "verified": False, "message": "Start Task first."}), 400
         _ensure_adsterra_click_table(cur)
-        cur.execute("SELECT clicked_at, claimed_at FROM adsterra_click_sessions WHERE telegram_id=%s AND task_id=%s;", (telegram_id, task_id))
-        click_session = cur.fetchone()
-        clicked = bool(click_session and click_session.get("clicked_at"))
-        already_claimed = bool(click_session and click_session.get("claimed_at"))
+        cur.execute("SELECT session_started_at, claimed_at FROM adsterra_click_sessions WHERE telegram_id=%s AND task_id=%s;", (telegram_id, task_id))
+        landing_session = cur.fetchone()
+        already_claimed = bool(landing_session and landing_session.get("claimed_at"))
+        started_at = int(landing_session["session_started_at"]) if landing_session else None
+        elapsed = max(0, int(time.time()) - started_at) if started_at else 0
+        remaining = max(0, ADSTERRA_MIN_SECONDS - elapsed) if started_at else ADSTERRA_MIN_SECONDS
         conn.rollback()
-        verified = clicked and not already_claimed
+        verified = bool(started_at and remaining == 0 and not already_claimed)
         if already_claimed:
             message = "এই টাস্কের রিওয়ার্ড ইতিমধ্যে নেওয়া হয়েছে।"
         elif verified:
-            message = "Landing-page button click confirmed. You can claim the reward."
+            message = "৩০ সেকেন্ডের ল্যান্ডিং অপেক্ষা যাচাই হয়েছে। এখন Claim Reward চাপুন।"
         else:
-            message = "ক্লিক কনফার্ম হয়নি। Verify Now চাপলে ল্যান্ডিং পেজে আবার যেতে পারবেন।"
-        return jsonify({"success": True, "verified": verified, "click_confirmed": clicked, "already_claimed": already_claimed, "required_seconds": ADSTERRA_MIN_SECONDS, "message": message})
+            message = f"Claim Reward চালু হওয়ার আগে আরও {remaining} সেকেন্ড অপেক্ষা করুন।" if started_at else "প্রথমে Start Task চাপুন।"
+        return jsonify({"success": True, "verified": verified, "already_claimed": already_claimed, "required_seconds": ADSTERRA_MIN_SECONDS, "elapsed_seconds": elapsed, "remaining_seconds": remaining, "message": message})
     finally:
         cur.close(); conn.close()
 
@@ -2126,12 +2130,95 @@ def adgem_postback():
     })
 
 # ============================================================
+# MONETAG TASK-AD SERVER VERIFICATION
+# ============================================================
+
+def _ensure_monetag_task_ad_sessions(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS monetag_task_ad_sessions (
+            telegram_id BIGINT NOT NULL,
+            task_id BIGINT NOT NULL,
+            started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            verified_at TIMESTAMPTZ NULL,
+            claimed_at TIMESTAMPTZ NULL,
+            PRIMARY KEY (telegram_id, task_id)
+        );
+    """)
+
+
+@app.route("/api/monetag/task-ad/prepare", methods=["POST"])
+def monetag_task_ad_prepare():
+    data = request.get_json(silent=True) or {}
+    try:
+        telegram_id = int(data.get("telegram_id")); task_id = int(data.get("task_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid task-ad session."}), 400
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT 1 FROM task_starts WHERE telegram_id=%s AND task_id=%s;", (telegram_id, task_id))
+        if not cur.fetchone():
+            conn.rollback(); return jsonify({"success": False, "message": "Start Task first."}), 400
+        _ensure_monetag_task_ad_sessions(cur)
+        cur.execute("""
+            INSERT INTO monetag_task_ad_sessions (telegram_id, task_id, started_at, verified_at, claimed_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP, NULL, NULL)
+            ON CONFLICT (telegram_id, task_id) DO UPDATE SET
+                started_at=CURRENT_TIMESTAMP, verified_at=NULL, claimed_at=NULL;
+        """, (telegram_id, task_id))
+        conn.commit()
+        return jsonify({"success": True, "message": "Waiting for Monetag server confirmation."})
+    except Exception:
+        conn.rollback(); app.logger.exception("Monetag task-ad session creation failed")
+        return jsonify({"success": False, "message": "Could not start Monetag verification."}), 500
+    finally:
+        cur.close(); conn.close()
+
+
+@app.route("/api/monetag/task-ad/verify", methods=["POST"])
+def monetag_task_ad_verify():
+    data = request.get_json(silent=True) or {}
+    try:
+        telegram_id = int(data.get("telegram_id")); task_id = int(data.get("task_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "verified": False, "message": "Invalid verification data."}), 400
+    conn = get_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        _ensure_monetag_task_ad_sessions(cur)
+        cur.execute("SELECT verified_at, claimed_at, started_at FROM monetag_task_ad_sessions WHERE telegram_id=%s AND task_id=%s;", (telegram_id, task_id))
+        row = cur.fetchone(); conn.rollback()
+        verified = bool(row and row.get("verified_at") and not row.get("claimed_at"))
+        already_claimed = bool(row and row.get("claimed_at"))
+        return jsonify({"success": True, "verified": verified, "already_claimed": already_claimed,
+                        "message": "Monetag server confirmation received." if verified else ("This ad confirmation was already used." if already_claimed else "Monetag server confirmation has not arrived yet.")})
+    except Exception:
+        conn.rollback(); app.logger.exception("Monetag task-ad verification failed")
+        return jsonify({"success": False, "verified": False, "message": "Could not verify Monetag completion."}), 500
+    finally:
+        cur.close(); conn.close()
+
+
+# ============================================================
 # MONETAG POSTBACK
 # ============================================================
 
 @app.route("/api/monetag/postback", methods=["GET"])
 def monetag_postback():
-    """Receive Monetag TMA server-side postbacks."""
+    """Receive Monetag TMA server-side postbacks after shared-secret validation."""
+
+    configured_secret = os.getenv("MONETAG_POSTBACK_SECRET", "").strip()
+    supplied_secret = request.args.get("secret", "").strip()
+    if not configured_secret:
+        return jsonify({
+            "success": False,
+            "credited": False,
+            "message": "Monetag postback secret is not configured on the server."
+        }), 503
+    if not supplied_secret or not hmac.compare_digest(supplied_secret, configured_secret):
+        return jsonify({
+            "success": False,
+            "credited": False,
+            "message": "Invalid Monetag postback secret."
+        }), 403
 
     ymid = request.args.get("ymid")
     telegram_id = request.args.get("telegram_id")
@@ -2179,8 +2266,34 @@ def monetag_postback():
         if not result.get("success"):
             return jsonify(result), 400
 
-        # Always acknowledge valid/duplicate postbacks with HTTP 200 so
-        # Monetag does not keep retrying an already processed event.
+        # A valued Monetag impression is the server-side evidence used for task claims.
+        # Match it to the user's most recent unverified task-ad session.
+        normalized_event = str(event_type or "").strip().lower()
+        normalized_reward = str(reward_event_type or "").strip().lower()
+        if normalized_reward == "yes": normalized_reward = "valued"
+        if (normalized_event == "impression" and normalized_reward == "valued"
+                and str(zone_id or "") == "11915530"
+                and result.get("credited") is True and not result.get("duplicate")):
+            conn = get_connection(); cur = conn.cursor()
+            try:
+                _ensure_monetag_task_ad_sessions(cur)
+                cur.execute("""
+                    UPDATE monetag_task_ad_sessions
+                    SET verified_at=CURRENT_TIMESTAMP
+                    WHERE (telegram_id, task_id) = (
+                        SELECT telegram_id, task_id FROM monetag_task_ad_sessions
+                        WHERE telegram_id=%s AND verified_at IS NULL AND claimed_at IS NULL
+                          AND started_at >= CURRENT_TIMESTAMP - INTERVAL '20 minutes'
+                        ORDER BY started_at DESC LIMIT 1
+                        FOR UPDATE
+                    );
+                """, (int(telegram_id),))
+                conn.commit()
+            except Exception:
+                conn.rollback(); app.logger.exception("Could not attach Monetag postback to task session")
+            finally:
+                cur.close(); conn.close()
+        # Always acknowledge valid/duplicate postbacks with HTTP 200 so Monetag does not retry.
         return jsonify(result), 200
 
     except (ValueError, TypeError):
