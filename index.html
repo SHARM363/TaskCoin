@@ -5153,13 +5153,17 @@ function renderTasks() {
                     ✅ Reward Claimed — One Time Only
                 </button>`;
         } else if (pendingTasks.includes(taskId)) {
-            buttonHtml = `
+            const landingWaitPassed = !isAdsterraTask(task) || localStorage.getItem("taskcoin_adsterra_verified_" + taskId) === "1";
+            buttonHtml = landingWaitPassed ? `
                 <button type="button"
                         class="primary-button claim-task-btn"
                         data-task-id="${taskId}"
                         onclick="claimTask(${taskId})"
                         style="margin-top:14px;">
                     🎁 Claim Reward
+                </button>` : `
+                <button type="button" class="primary-button" data-task-id="${taskId}" disabled style="margin-top:14px;opacity:.75;">
+                    ⏳ ৩০ সেকেন্ড যাচাই হচ্ছে…
                 </button>`;
         } else {
             buttonHtml = `
@@ -5241,7 +5245,7 @@ function renderHomeTasksPreview() {
 /* =========================================================
    ADSTERRA REWARD CLUB
    ========================================================= */
-const ADSTERRA_LANDING_URL = "https://sites.google.com/view/taskcoin-earn/home";
+const ADSTERRA_LANDING_URL = "https://sites.google.com/view/taskcoin-reward1/home";
 const ADSTERRA_SMART_LINK = "https://auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631";
 
 function isAdsterraTask(task) {
@@ -5307,7 +5311,7 @@ async function startTask(taskId) {
     localStorage.setItem(TASK_LAST_PENDING_KEY, String(id));
     sessionStorage.setItem(TASK_LAST_PENDING_KEY, String(id));
 
-    // Immediately change Start Task -> Claim Reward.
+    // Reward Club remains locked until the server verifies the full 30-second wait.
     renderTasks();
 
     try {
@@ -5363,6 +5367,10 @@ async function restoreTaskUIAfterReturn() {
                 localStorage.setItem("taskcoin_adsterra_verified_" + Number(id), "1");
             } else {
                 localStorage.removeItem("taskcoin_adsterra_verified_" + Number(id));
+                const remaining = Math.max(0, Number(result?.remaining_seconds || 0));
+                if (remaining > 0) {
+                    setTimeout(() => { void restoreTaskUIAfterReturn(); }, Math.min(remaining, 30) * 1000 + 300);
+                }
             }
         }
     }
@@ -5405,6 +5413,16 @@ async function claimTask(taskId) {
         return;
     }
     if (!getTaskIdList(TASK_PENDING_KEY).includes(id)) { showToast("প্রথমে Start Task চাপুন।"); renderTasks(); return; }
+    // Reward Club tasks require the server-confirmed 30-second landing wait before showing Monetag.
+    if (isAdsterraTask(task) && localStorage.getItem("taskcoin_adsterra_verified_" + id) !== "1") {
+        const verification = await verifyAdsterraPendingTask(task);
+        if (!verification?.verified) {
+            showToast(verification?.message || "Google Sites ল্যান্ডিং পেজে ৩০ সেকেন্ড অপেক্ষা করে ফিরে আসুন।");
+            renderTasks();
+            return;
+        }
+        localStorage.setItem("taskcoin_adsterra_verified_" + id, "1");
+    }
     if (!appState.telegramUser) await loadTelegramProfile();
     if (!appState.telegramUser?.id) { showToast("Telegram user not detected. Please reopen the Mini App."); return; }
 
@@ -5412,11 +5430,26 @@ async function claimTask(taskId) {
     if (button) { button.disabled = true; button.textContent = "🔎 Verifying..."; }
 
     try {
-        // Keep the configured Monetag ad flow; no tracking ID / claim-code gate.
-        // Existing non-Adsterra tasks keep the original Monetag flow.
+        const prep = await apiRequest("/api/monetag/task-ad/prepare", {
+            method: "POST",
+            body: { telegram_id: appState.telegramUser.id, task_id: id }
+        });
+        if (!prep?.success) throw new Error(prep?.message || "Could not prepare server-side ad verification.");
         const showAd = await waitForMonetag(20000);
         if (button) button.textContent = "📺 Watching Ad...";
         await showAd();
+        if (button) button.textContent = "🔎 Waiting for Monetag confirmation...";
+        let monetagVerified = false;
+        const verifyDeadline = Date.now() + 20000;
+        while (Date.now() < verifyDeadline) {
+            const check = await apiRequest("/api/monetag/task-ad/verify", {
+                method: "POST",
+                body: { telegram_id: appState.telegramUser.id, task_id: id }
+            });
+            if (check?.verified) { monetagVerified = true; break; }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        if (!monetagVerified) throw new Error("Monetag-এর সার্ভার-সাইড completion postback এখনো আসেনি। Monetag postback সেটআপ যাচাই করুন, তারপর আবার চেষ্টা করুন।");
         if (button) button.textContent = "⏳ Claiming Reward...";
         await proceedWithTaskClaim(id, task, button);
     } catch (error) {
@@ -5434,7 +5467,8 @@ async function proceedWithTaskClaim(id, task, button) {
         method: "POST",
         body: {
             telegram_id: appState.telegramUser.id,
-            task_id: id
+            task_id: id,
+            monetag_ad_completed: true
         }
     });
 
@@ -5468,6 +5502,7 @@ async function proceedWithTaskClaim(id, task, button) {
     }
     localStorage.removeItem(TASK_LAST_PENDING_KEY);
     sessionStorage.removeItem(TASK_LAST_PENDING_KEY);
+    localStorage.removeItem("taskcoin_adsterra_verified_" + id);
 
     if (typeof updateBalanceUI === "function") {
         updateBalanceUI();
