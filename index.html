@@ -5440,7 +5440,8 @@ async function claimTask(taskId) {
         await showAd();
         if (button) button.textContent = "🔎 Waiting for Monetag confirmation...";
         let monetagVerified = false;
-        const verifyDeadline = Date.now() + 20000;
+        // Provider postbacks can arrive asynchronously; keep polling for up to 60 seconds.
+        const verifyDeadline = Date.now() + 60000;
         while (Date.now() < verifyDeadline) {
             const check = await apiRequest("/api/monetag/task-ad/verify", {
                 method: "POST",
