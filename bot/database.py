@@ -3407,7 +3407,8 @@ def process_cpalead_conversion(telegram_id, lead_id, payout=0, ip_address=None, 
         lead_id = str(lead_id or "").strip()
         if telegram_id <= 0 or not lead_id or len(lead_id) > 250:
             return {"success": False, "credited": False, "message": "subid and lead_id are required."}
-        if reward <= 0 or payout < 0:
+        if (not reward.is_finite() or not payout.is_finite()
+                or reward <= 0 or payout < 0):
             return {"success": False, "credited": False, "message": "Invalid reward or payout."}
 
         cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (telegram_id,))
@@ -3416,19 +3417,21 @@ def process_cpalead_conversion(telegram_id, lead_id, payout=0, ip_address=None, 
             conn.rollback()
             return {"success": False, "credited": False, "message": "TaskCoin user not found for subid."}
 
-        cur.execute("SELECT id FROM cpalead_conversions WHERE lead_id=%s;", (lead_id,))
-        if cur.fetchone():
-            conn.rollback()
-            return {"success": True, "credited": False, "duplicate": True, "message": "CPAlead lead already processed."}
-
+        # The unique constraint plus ON CONFLICT makes idempotency safe even when
+        # CPAlead retries the same postback concurrently.
         cur.execute("""
             INSERT INTO cpalead_conversions
                 (lead_id, telegram_id, campaign_id, payout, ip_address, credited_reward, status)
             VALUES (%s, %s, %s, %s, %s, %s, 'credited')
+            ON CONFLICT (lead_id) DO NOTHING
             RETURNING id, lead_id, telegram_id, credited_reward, status, created_at;
         """, (lead_id, telegram_id, str(campaign_id or '')[:250], payout,
               str(ip_address or '')[:100], reward))
         conversion = cur.fetchone()
+        if not conversion:
+            conn.rollback()
+            return {"success": True, "credited": False, "duplicate": True,
+                    "message": "CPAlead lead already processed."}
 
         cur.execute("""
             UPDATE users
