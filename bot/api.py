@@ -22,7 +22,6 @@ from database import (
     update_deposit_payment_setting,
     start_task,
     process_adgem_conversion,
-    process_cpalead_conversion,
     process_monetag_postback,
 get_active_tasks,
     get_active_tasks_for_user,
@@ -2109,60 +2108,6 @@ def adsterra_verify():
     finally:
         cur.close(); conn.close()
 
-
-# ============================================================
-# CPALEAD POSTBACK
-# ============================================================
-
-@app.route("/cpalead-callback", methods=["GET", "POST"])
-@app.route("/api/cpalead-callback", methods=["GET", "POST"])
-def cpalead_callback():
-    """CPAlead server-to-server conversion callback; balance is credited once per lead_id."""
-    data = request.args.to_dict(flat=True)
-    if request.method == "POST":
-        data.update(request.form.to_dict(flat=True))
-        data.update(request.get_json(silent=True) or {})
-
-    configured_password = os.getenv("CPALEAD_POSTBACK_PASSWORD", "").strip()
-    received_password = str(data.get("password") or "").strip()
-    if not configured_password:
-        app.logger.error("CPALEAD_POSTBACK_PASSWORD is not configured; callback rejected.")
-        return jsonify({"success": False, "credited": False, "message": "CPAlead postback password is not configured on the server."}), 503
-    if not received_password or not hmac.compare_digest(received_password, configured_password):
-        return jsonify({"success": False, "credited": False, "message": "Invalid postback password."}), 403
-
-    # CPAlead dashboard postback macros can be mapped to these parameter names.
-    # Accept common aliases so the callback can work with standard conversion IDs.
-    subid = str(data.get("subid") or data.get("sub_id") or "").strip()
-    lead_id = str(data.get("lead_id") or data.get("conversion_id") or data.get("transaction_id") or "").strip()
-    status = str(data.get("status") or data.get("event") or "lead").strip().lower()
-    if status not in ("lead", "approved", "complete", "completed", "1", "success"):
-        return jsonify({"success": True, "credited": False, "message": "Non-qualified CPAlead status ignored."}), 200
-    if not subid or not lead_id:
-        return jsonify({"success": False, "credited": False, "message": "CPAlead subid and lead_id are required."}), 400
-
-    try:
-        reward = float(os.getenv("CPALEAD_REWARD_COINS", "50"))
-        payout = float(data.get("payout") or data.get("amount") or 0)
-        if not __import__("math").isfinite(reward) or not __import__("math").isfinite(payout):
-            raise ValueError("Non-finite payout or reward")
-        if payout < 0 or reward <= 0:
-            raise ValueError("Negative payout or non-positive reward")
-        result = process_cpalead_conversion(
-            telegram_id=subid,
-            lead_id=lead_id,
-            payout=payout,
-            ip_address=data.get("ip_address") or data.get("ip"),
-            campaign_id=data.get("campaign_id"),
-            reward=reward,
-        )
-        # Return 200 for successfully handled duplicates so CPAlead won't retry endlessly.
-        return jsonify(result), (200 if result.get("success") else 400)
-    except (TypeError, ValueError):
-        return jsonify({"success": False, "credited": False, "message": "Invalid CPAlead payout or reward configuration."}), 400
-    except Exception:
-        app.logger.exception("CPAlead callback processing failed")
-        return jsonify({"success": False, "credited": False, "message": "CPAlead callback processing failed."}), 500
 
 
 # ============================================================
