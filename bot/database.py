@@ -1530,31 +1530,6 @@ def claim_task_reward(telegram_id, task_id):
         # "10 seconds viewed" completion callback.
         adsterra_task = _is_adsterra_task(task)
 
-        # Every task claim requires a Monetag-valued impression confirmed by the server postback.
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS monetag_task_ad_sessions (
-                telegram_id BIGINT NOT NULL,
-                task_id BIGINT NOT NULL,
-                started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                verified_at TIMESTAMPTZ NULL,
-                claimed_at TIMESTAMPTZ NULL,
-                PRIMARY KEY (telegram_id, task_id)
-            );
-        """)
-        cur.execute("""
-            SELECT verified_at, claimed_at
-            FROM monetag_task_ad_sessions
-            WHERE telegram_id=%s AND task_id=%s
-            FOR UPDATE;
-        """, (telegram_id, task_id))
-        monetag_session = cur.fetchone()
-        if not monetag_session or not monetag_session.get('verified_at'):
-            conn.rollback()
-            return {"success":False,"message":"Monetag-এর সার্ভার-সাইড বিজ্ঞাপন যাচাই এখনো আসেনি। কিছুক্ষণ অপেক্ষা করে আবার Claim Reward চাপুন।"}
-        if monetag_session.get('claimed_at'):
-            conn.rollback()
-            return {"success":False,"message":"এই বিজ্ঞাপন যাচাই ইতিমধ্যে ব্যবহার করা হয়েছে। আবার বিজ্ঞাপন দেখুন।"}
-
         # Google Sites Reward Club tasks require 30 seconds elapsed since the server-created session.
         if adsterra_task:
             cur.execute("""
@@ -1663,10 +1638,6 @@ def claim_task_reward(telegram_id, task_id):
         # 10-second cooldown after a successful reward.
         cur.execute("INSERT INTO task_cooldowns(telegram_id,task_id,available_at) VALUES(%s,%s,CURRENT_TIMESTAMP+INTERVAL '10 seconds') ON CONFLICT(telegram_id,task_id) DO UPDATE SET available_at=EXCLUDED.available_at;",(telegram_id,task_id))
         cur.execute("DELETE FROM task_starts WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id))
-        cur.execute("UPDATE monetag_task_ad_sessions SET claimed_at=CURRENT_TIMESTAMP WHERE telegram_id=%s AND task_id=%s AND verified_at IS NOT NULL AND claimed_at IS NULL;", (telegram_id, task_id))
-        if cur.rowcount != 1:
-            conn.rollback()
-            return {"success":False,"message":"Monetag server verification expired or was already used. Watch the ad again."}
         if adsterra_task:
             cur.execute("UPDATE adsterra_click_sessions SET claimed_at=CURRENT_TIMESTAMP WHERE telegram_id=%s AND task_id=%s AND claimed_at IS NULL;", (telegram_id, task_id))
             if cur.rowcount != 1:
