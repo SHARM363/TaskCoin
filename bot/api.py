@@ -384,8 +384,8 @@ def api_claim_task():
 
     try:
 
-        # A client-supplied boolean is not proof of ad completion. The database claim
-        # function requires a Monetag-confirmed postback linked to a pending ad session.
+        # Task claim follows the previous SDK-completion flow; postbacks remain available
+        # separately for Monetag event accounting and rewards.
         result = claim_task_reward(telegram_id, task_id)
         return jsonify(result)
 
