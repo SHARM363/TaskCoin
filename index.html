@@ -5037,6 +5037,45 @@ function updateBalanceUI() {
 const TASK_PENDING_KEY = "taskcoin_pending_tasks";
 const TASK_CLAIMED_KEY = "taskcoin_claimed_tasks";
 const TASK_LAST_PENDING_KEY = "taskcoin_last_pending_task";
+const TASK_RETURN_WAIT_MS = 20000;
+let taskPageWasBackgrounded = false;
+let taskReturnCountdownTimer = null;
+
+function taskExternalOpenedKey(taskId) { return "taskcoin_external_opened_" + Number(taskId); }
+function taskExternalAdsterraKey(taskId) { return "taskcoin_external_adsterra_" + Number(taskId); }
+function taskReturnWaitUntilKey(taskId) { return "taskcoin_return_wait_until_" + Number(taskId); }
+function getTaskReturnWaitRemaining(taskId) {
+    const until = Number(localStorage.getItem(taskReturnWaitUntilKey(taskId)) || 0);
+    return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+}
+function scheduleTaskReturnCountdownTick() {
+    if (taskReturnCountdownTimer !== null) return;
+    taskReturnCountdownTimer = setTimeout(() => {
+        taskReturnCountdownTimer = null;
+        if (typeof renderTasks === "function") renderTasks();
+    }, 1000);
+}
+function beginTaskReturnCountdowns() {
+    const pending = getTaskIdList(TASK_PENDING_KEY);
+    let started = false;
+    for (const id of pending) {
+        if (localStorage.getItem(taskExternalOpenedKey(id)) !== "1") continue;
+        const task = appState.tasks.find(item => Number(item.id) === Number(id));
+        // Reward Club has its own server-verified 30-second landing-page gate.
+        if (localStorage.getItem(taskExternalAdsterraKey(id)) === "1" || (task && isAdsterraTask(task))) {
+            localStorage.removeItem(taskExternalOpenedKey(id));
+            localStorage.removeItem(taskExternalAdsterraKey(id));
+            continue;
+        }
+        localStorage.setItem(taskReturnWaitUntilKey(id), String(Date.now() + TASK_RETURN_WAIT_MS));
+        localStorage.removeItem(taskExternalOpenedKey(id));
+        started = true;
+    }
+    if (started) {
+        renderTasks();
+        showToast("ফিরে এসেছেন—Claim Reward চালু হওয়ার আগে ২০ সেকেন্ড অপেক্ষা করুন।");
+    }
+}
 
 function getTaskDateKey() {
     const now = new Date();
@@ -5219,18 +5258,26 @@ function renderTasks() {
                     ✅ Reward Claimed — One Time Only
                 </button>`;
         } else if (pendingTasks.includes(taskId)) {
+            const returnWaitRemaining = isAdsterraTask(task) ? 0 : getTaskReturnWaitRemaining(taskId);
             const landingWaitPassed = !isAdsterraTask(task) || localStorage.getItem("taskcoin_adsterra_verified_" + taskId) === "1";
-            buttonHtml = landingWaitPassed ? `
-                <button type="button"
-                        class="primary-button claim-task-btn"
-                        data-task-id="${taskId}"
-                        onclick="claimTask(${taskId})"
-                        style="margin-top:14px;">
-                    🎁 Claim Reward
-                </button>` : `
-                <button type="button" class="primary-button" data-task-id="${taskId}" disabled style="margin-top:14px;opacity:.75;">
-                    ⏳ ৩০ সেকেন্ড যাচাই হচ্ছে…
-                </button>`;
+            if (returnWaitRemaining > 0) {
+                buttonHtml = `
+                    <button type="button" class="primary-button" data-task-id="${taskId}" disabled style="margin-top:14px;opacity:.75;">
+                        ⏳ ${returnWaitRemaining} সেকেন্ড অপেক্ষা করুন…
+                    </button>`;
+            } else {
+                buttonHtml = landingWaitPassed ? `
+                    <button type="button"
+                            class="primary-button claim-task-btn"
+                            data-task-id="${taskId}"
+                            onclick="claimTask(${taskId})"
+                            style="margin-top:14px;">
+                        🎁 Claim Reward
+                    </button>` : `
+                    <button type="button" class="primary-button" data-task-id="${taskId}" disabled style="margin-top:14px;opacity:.75;">
+                        ⏳ ৩০ সেকেন্ড যাচাই হচ্ছে…
+                    </button>`;
+            }
         } else {
             buttonHtml = `
                 <button type="button"
@@ -5262,6 +5309,9 @@ function renderTasks() {
     }).join("");
 
     renderHomeTasksPreview();
+    if (pendingTasks.some(id => getTaskReturnWaitRemaining(id) > 0)) {
+        scheduleTaskReturnCountdownTick();
+    }
 }
 
 /* =========================================================
@@ -5376,6 +5426,9 @@ async function startTask(taskId) {
     addTaskId(TASK_PENDING_KEY, id);
     localStorage.setItem(TASK_LAST_PENDING_KEY, String(id));
     sessionStorage.setItem(TASK_LAST_PENDING_KEY, String(id));
+    localStorage.setItem(taskExternalOpenedKey(id), "1");
+    localStorage.setItem(taskExternalAdsterraKey(id), isAdsterraTask(task) ? "1" : "0");
+    localStorage.removeItem(taskReturnWaitUntilKey(id));
 
     // Reward Club remains locked until the server verifies the full 30-second wait.
     renderTasks();
@@ -5443,10 +5496,37 @@ async function restoreTaskUIAfterReturn() {
     renderTasks();
 }
 
-window.addEventListener("pageshow", () => { void restoreTaskUIAfterReturn(); });
-window.addEventListener("focus", () => { void restoreTaskUIAfterReturn(); });
+window.addEventListener("blur", () => {
+    if (getTaskIdList(TASK_PENDING_KEY).some(id => localStorage.getItem(taskExternalOpenedKey(id)) === "1")) {
+        taskPageWasBackgrounded = true;
+    }
+});
+window.addEventListener("pageshow", () => {
+    if (taskPageWasBackgrounded) {
+        taskPageWasBackgrounded = false;
+        beginTaskReturnCountdowns();
+    }
+    void restoreTaskUIAfterReturn();
+});
+window.addEventListener("focus", () => {
+    if (taskPageWasBackgrounded) {
+        taskPageWasBackgrounded = false;
+        beginTaskReturnCountdowns();
+    }
+    void restoreTaskUIAfterReturn();
+});
 document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void restoreTaskUIAfterReturn();
+    if (document.visibilityState === "hidden") {
+        if (getTaskIdList(TASK_PENDING_KEY).some(id => localStorage.getItem(taskExternalOpenedKey(id)) === "1")) {
+            taskPageWasBackgrounded = true;
+        }
+    } else if (document.visibilityState === "visible") {
+        if (taskPageWasBackgrounded) {
+            taskPageWasBackgrounded = false;
+            beginTaskReturnCountdowns();
+        }
+        void restoreTaskUIAfterReturn();
+    }
 });
 
 /* =========================================================
@@ -5479,6 +5559,12 @@ async function claimTask(taskId) {
         return;
     }
     if (!getTaskIdList(TASK_PENDING_KEY).includes(id)) { showToast("প্রথমে Start Task চাপুন।"); renderTasks(); return; }
+    const returnWaitRemaining = isAdsterraTask(task) ? 0 : getTaskReturnWaitRemaining(id);
+    if (returnWaitRemaining > 0) {
+        showToast(`আর ${returnWaitRemaining} সেকেন্ড অপেক্ষা করুন।`);
+        renderTasks();
+        return;
+    }
     // Reward Club tasks require the server-confirmed 30-second landing wait before showing Monetag.
     if (isAdsterraTask(task) && localStorage.getItem("taskcoin_adsterra_verified_" + id) !== "1") {
         const verification = await verifyAdsterraPendingTask(task);
@@ -5570,6 +5656,9 @@ async function proceedWithTaskClaim(id, task, button) {
     localStorage.removeItem(TASK_LAST_PENDING_KEY);
     sessionStorage.removeItem(TASK_LAST_PENDING_KEY);
     localStorage.removeItem("taskcoin_adsterra_verified_" + id);
+    localStorage.removeItem(taskExternalOpenedKey(id));
+    localStorage.removeItem(taskExternalAdsterraKey(id));
+    localStorage.removeItem(taskReturnWaitUntilKey(id));
 
     if (typeof updateBalanceUI === "function") {
         updateBalanceUI();
