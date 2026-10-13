@@ -653,21 +653,6 @@ def init_db():
             DEFAULT TRUE;
         """)
         cur.execute("""
-    CREATE TABLE IF NOT EXISTS cpalead_conversions (
-        id SERIAL PRIMARY KEY,
-        lead_id TEXT UNIQUE NOT NULL,
-        telegram_id BIGINT NOT NULL,
-        campaign_id TEXT,
-        payout NUMERIC(20, 6) NOT NULL DEFAULT 0,
-        ip_address TEXT,
-        credited_reward NUMERIC(20, 2) NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'credited',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_cpalead_conversions_telegram_id
-    ON cpalead_conversions(telegram_id);
-
     CREATE TABLE IF NOT EXISTS adgem_conversions (
         id SERIAL PRIMARY KEY,
 
@@ -3386,71 +3371,6 @@ def process_adgem_conversion(data):
 
     finally:
 
-        cur.close()
-        conn.close()
-# ============================================================
-# CPALEAD SERVER-TO-SERVER POSTBACK
-# ============================================================
-
-def process_cpalead_conversion(telegram_id, lead_id, payout=0, ip_address=None, campaign_id=None, reward=50):
-    """Credit one confirmed CPAlead lead exactly once."""
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        try:
-            telegram_id = int(str(telegram_id).strip())
-            reward = Decimal(str(reward))
-            payout = Decimal(str(payout or 0))
-        except Exception:
-            return {"success": False, "credited": False, "message": "Invalid CPAlead values."}
-
-        lead_id = str(lead_id or "").strip()
-        if telegram_id <= 0 or not lead_id or len(lead_id) > 250:
-            return {"success": False, "credited": False, "message": "subid and lead_id are required."}
-        if (not reward.is_finite() or not payout.is_finite()
-                or reward <= 0 or payout < 0):
-            return {"success": False, "credited": False, "message": "Invalid reward or payout."}
-
-        cur.execute("SELECT telegram_id FROM users WHERE telegram_id=%s FOR UPDATE;", (telegram_id,))
-        user = cur.fetchone()
-        if not user:
-            conn.rollback()
-            return {"success": False, "credited": False, "message": "TaskCoin user not found for subid."}
-
-        # The unique constraint plus ON CONFLICT makes idempotency safe even when
-        # CPAlead retries the same postback concurrently.
-        cur.execute("""
-            INSERT INTO cpalead_conversions
-                (lead_id, telegram_id, campaign_id, payout, ip_address, credited_reward, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'credited')
-            ON CONFLICT (lead_id) DO NOTHING
-            RETURNING id, lead_id, telegram_id, credited_reward, status, created_at;
-        """, (lead_id, telegram_id, str(campaign_id or '')[:250], payout,
-              str(ip_address or '')[:100], reward))
-        conversion = cur.fetchone()
-        if not conversion:
-            conn.rollback()
-            return {"success": True, "credited": False, "duplicate": True,
-                    "message": "CPAlead lead already processed."}
-
-        cur.execute("""
-            UPDATE users
-            SET task_balance = COALESCE(task_balance, 0) + %s,
-                balance = COALESCE(task_balance, 0) + %s,
-                total_earned = COALESCE(total_earned, 0) + %s,
-                last_active = CURRENT_TIMESTAMP
-            WHERE telegram_id = %s
-            RETURNING telegram_id, balance, task_balance, total_earned;
-        """, (reward, reward, reward, telegram_id))
-        updated_user = cur.fetchone()
-        if not updated_user:
-            raise RuntimeError("TaskCoin user balance update failed.")
-        conn.commit()
-        return {"success": True, "credited": True, "reward": float(reward), "conversion": conversion, "user": updated_user}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
         cur.close()
         conn.close()
 
