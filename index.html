@@ -5516,27 +5516,10 @@ async function claimTask(taskId) {
     if (button) { button.disabled = true; button.textContent = "🔎 Verifying..."; }
 
     try {
-        const prep = await apiRequest("/api/monetag/task-ad/prepare", {
-            method: "POST",
-            body: { telegram_id: appState.telegramUser.id, task_id: id }
-        });
-        if (!prep?.success) throw new Error(prep?.message || "Could not prepare server-side ad verification.");
+        // Restore the previous flow: wait for Monetag SDK ad completion, then claim the task.
         const showAd = await waitForMonetag(20000);
         if (button) button.textContent = "📺 Watching Ad...";
         await showAd();
-        if (button) button.textContent = "🔎 Waiting for Monetag confirmation...";
-        let monetagVerified = false;
-        // Provider postbacks can arrive asynchronously; keep polling for up to 60 seconds.
-        const verifyDeadline = Date.now() + 60000;
-        while (Date.now() < verifyDeadline) {
-            const check = await apiRequest("/api/monetag/task-ad/verify", {
-                method: "POST",
-                body: { telegram_id: appState.telegramUser.id, task_id: id }
-            });
-            if (check?.verified) { monetagVerified = true; break; }
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        if (!monetagVerified) throw new Error("Monetag-এর সার্ভার-সাইড completion postback এখনো আসেনি। Monetag postback সেটআপ যাচাই করুন, তারপর আবার চেষ্টা করুন।");
         if (button) button.textContent = "⏳ Claiming Reward...";
         await proceedWithTaskClaim(id, task, button);
     } catch (error) {
@@ -5554,8 +5537,7 @@ async function proceedWithTaskClaim(id, task, button) {
         method: "POST",
         body: {
             telegram_id: appState.telegramUser.id,
-            task_id: id,
-            monetag_ad_completed: true
+            task_id: id
         }
     });
 
