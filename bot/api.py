@@ -2115,6 +2115,7 @@ def adsterra_verify():
 # ============================================================
 
 @app.route("/cpalead-callback", methods=["GET", "POST"])
+@app.route("/api/cpalead-callback", methods=["GET", "POST"])
 def cpalead_callback():
     """CPAlead server-to-server conversion callback; balance is credited once per lead_id."""
     data = request.args.to_dict(flat=True)
@@ -2272,7 +2273,7 @@ def monetag_postback():
         }), 403
 
     ymid = request.args.get("ymid")
-    telegram_id = request.args.get("telegram_id")
+    telegram_id = request.args.get("telegram_id") or request.args.get("request_var")
     zone_id = request.args.get("zone_id")
     sub_zone_id = request.args.get("sub_zone_id")
     event_type = request.args.get("event_type")
