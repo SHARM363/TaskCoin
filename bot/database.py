@@ -1167,13 +1167,13 @@ def get_active_tasks_for_user(telegram_id):
         cur.execute("""
             SELECT t.*,
                    CASE
-                       WHEN lower(trim(coalesce(t.platform,''))) IN ('facebook','tiktok','youtube','telegram','instagram')
+                       WHEN lower(trim(coalesce(t.platform,''))) IN ('facebook','tiktok','youtube','telegram','instagram','website','web','site')
                        THEN EXISTS (
                            SELECT 1
                            FROM task_completions tc
                            WHERE tc.telegram_id=%s
                              AND tc.task_id=t.id
-                             AND tc.lifetime_once=TRUE
+                             AND (tc.lifetime_once=TRUE OR lower(trim(coalesce(t.platform,''))) IN ('website','web','site'))
                        )
                        ELSE FALSE
                    END AS completed_ever
@@ -1525,45 +1525,9 @@ def claim_task_reward(telegram_id, task_id):
                 msg = f"This task is reserved for VIP Level {int(target)}."
             conn.rollback(); return {"success":False,"message":msg}
 
-        # Adsterra Reward Club tasks require the server-side 10-second session gate.
-        # Smartlink traffic is tracked separately; it does not expose a publisher-side
-        # "10 seconds viewed" completion callback.
-        adsterra_task = _is_adsterra_task(task)
-
-        # Google Sites Reward Club tasks require 30 seconds elapsed since the server-created session.
-        if adsterra_task:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS adsterra_click_sessions (
-                    telegram_id BIGINT NOT NULL,
-                    task_id BIGINT NOT NULL,
-                    session_started_at BIGINT NOT NULL,
-                    clicked_at TIMESTAMPTZ NULL,
-                    claimed_at TIMESTAMPTZ NULL,
-                    PRIMARY KEY (telegram_id, task_id)
-                );
-            """)
-            cur.execute("""
-                SELECT session_started_at, claimed_at,
-                       EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - to_timestamp(session_started_at)))::int AS elapsed_seconds
-                FROM adsterra_click_sessions
-                WHERE telegram_id=%s AND task_id=%s
-                FOR UPDATE;
-            """, (telegram_id, task_id))
-            landing_session = cur.fetchone()
-            if not landing_session:
-                conn.rollback()
-                return {"success":False,"message":"প্রথমে Google Sites ল্যান্ডিং পেজে প্রবেশ করে টাস্ক শুরু করুন।"}
-            if int(landing_session.get('elapsed_seconds') or 0) < 30:
-                remaining = 30 - int(landing_session.get('elapsed_seconds') or 0)
-                conn.rollback()
-                return {"success":False,"message":f"ল্যান্ডিং পেজে আরও {remaining} সেকেন্ড অপেক্ষা করুন।"}
-            if landing_session.get('claimed_at'):
-                conn.rollback()
-                return {"success":False,"message":"এই টাস্কের রিওয়ার্ড ইতিমধ্যে নেওয়া হয়েছে।"}
-
         platform=str(task.get('platform') or '').strip().lower()
         is_social=platform in PREMIUM_SOCIAL_PLATFORMS
-        is_website=platform in ('website','webview','web view','web-view','site')
+        is_website=platform in ('website','web','site')
         is_webview=platform in ('webview','web view','web-view')
         if is_social:
             # Social-media tasks are lifetime-one-time: once a user claims a
@@ -1577,8 +1541,13 @@ def claim_task_reward(telegram_id, task_id):
                 conn.rollback()
                 return {"success":False,"message":"This social-media task has already been claimed. You cannot claim it again."}
         elif is_website:
-            # Website / WebView tasks have no daily completion cap.
-            # Keep the existing task-start, duration, and reward checks below unchanged.
+            # Each admin-created Website/Web task can be claimed once per user.
+            cur.execute("SELECT 1 FROM task_completions WHERE telegram_id=%s AND task_id=%s LIMIT 1;", (telegram_id, task_id))
+            if cur.fetchone():
+                conn.rollback()
+                return {"success":False,"message":"This Website task has already been claimed."}
+        elif is_webview:
+            # Preserve the existing repeatable WebView task behavior.
             pass
         else:
             cur.execute("SELECT 1 FROM task_completions WHERE telegram_id=%s AND task_id=%s AND completed_date=CURRENT_DATE LIMIT 1;",(telegram_id,task_id))
@@ -1587,7 +1556,7 @@ def claim_task_reward(telegram_id, task_id):
         cur.execute("SELECT started_at FROM task_starts WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id)); st=cur.fetchone()
         if not st: conn.rollback(); return {"success":False,"message":"Start Task first."}
         cur.execute("SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-%s)) AS seconds;",(st['started_at'],)); elapsed=float(cur.fetchone()['seconds'] or 0)
-        required=10 if adsterra_task else max(1,int(task.get('duration') or 20))
+        required=max(1,int(task.get('duration') or 20))
         # For rewarded-ad tasks the ad completion is the completion gate; do not
         # reject a valid claim merely because the configured page duration is longer
         # than the ad. Non-ad tasks keep the original duration requirement.
@@ -1638,11 +1607,6 @@ def claim_task_reward(telegram_id, task_id):
         # 10-second cooldown after a successful reward.
         cur.execute("INSERT INTO task_cooldowns(telegram_id,task_id,available_at) VALUES(%s,%s,CURRENT_TIMESTAMP+INTERVAL '10 seconds') ON CONFLICT(telegram_id,task_id) DO UPDATE SET available_at=EXCLUDED.available_at;",(telegram_id,task_id))
         cur.execute("DELETE FROM task_starts WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id))
-        if adsterra_task:
-            cur.execute("UPDATE adsterra_click_sessions SET claimed_at=CURRENT_TIMESTAMP WHERE telegram_id=%s AND task_id=%s AND claimed_at IS NULL;", (telegram_id, task_id))
-            if cur.rowcount != 1:
-                conn.rollback()
-                return {"success":False,"message":"Landing-page verification expired or was already used. Start this task again."}
         conn.commit(); return {"success":True,"message":"Task completed successfully.","reward":reward,"completion":completion,"user":updated,"cooldown_seconds":10,"webview":is_webview}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
@@ -2033,17 +1997,6 @@ def update_deposit_status(deposit_id,status):
         cur.execute("UPDATE deposits SET status=%s,processed_at=CURRENT_TIMESTAMP WHERE id=%s RETURNING *;",(status,deposit_id)); row=cur.fetchone(); conn.commit(); return {"success":True,"deposit":row}
     except Exception: conn.rollback(); raise
     finally: cur.close(); conn.close()
-
-def _is_adsterra_task(task):
-    if not task:
-        return False
-    platform = str(task.get("platform") or "").strip().lower()
-    url = str(task.get("task_url") or "").strip().lower()
-    return (
-        platform in {"adsterra", "smartlink", "adsterra_smartlink", "reward_club"}
-        or "auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631" in url
-        or url.startswith("https://sites.google.com/view/taskcoin-offer")
-    )
 
 def start_task(telegram_id,task_id):
     conn=get_connection(); cur=conn.cursor(cursor_factory=RealDictCursor)
