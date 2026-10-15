@@ -1167,16 +1167,27 @@ def get_active_tasks_for_user(telegram_id):
         cur.execute("""
             SELECT t.*,
                    CASE
-                       WHEN lower(trim(coalesce(t.platform,''))) IN ('facebook','tiktok','youtube','telegram','instagram','website','web','site')
+                       WHEN lower(trim(coalesce(t.platform,''))) IN ('facebook','tiktok','youtube','telegram','instagram')
                        THEN EXISTS (
                            SELECT 1
                            FROM task_completions tc
                            WHERE tc.telegram_id=%s
                              AND tc.task_id=t.id
-                             AND (tc.lifetime_once=TRUE OR lower(trim(coalesce(t.platform,''))) IN ('website','web','site'))
+                             AND tc.lifetime_once=TRUE
                        )
                        ELSE FALSE
-                   END AS completed_ever
+                   END AS completed_ever,
+                   CASE
+                       WHEN lower(trim(coalesce(t.platform,''))) IN ('website','web','site')
+                       THEN EXISTS (
+                           SELECT 1
+                           FROM task_completions tc
+                           WHERE tc.telegram_id=%s
+                             AND tc.task_id=t.id
+                             AND tc.completed_date=CURRENT_DATE
+                       )
+                       ELSE FALSE
+                   END AS completed_today
             FROM tasks t
             WHERE t.is_active = TRUE
               AND (
@@ -1199,7 +1210,7 @@ def get_active_tasks_for_user(telegram_id):
                     ))
               )
             ORDER BY t.id DESC;
-        """, (telegram_id, telegram_id, telegram_id))
+        """, (telegram_id, telegram_id, telegram_id, telegram_id))
         return cur.fetchall()
     finally:
         cur.close()
@@ -1541,11 +1552,11 @@ def claim_task_reward(telegram_id, task_id):
                 conn.rollback()
                 return {"success":False,"message":"This social-media task has already been claimed. You cannot claim it again."}
         elif is_website:
-            # Each admin-created Website/Web task can be claimed once per user.
-            cur.execute("SELECT 1 FROM task_completions WHERE telegram_id=%s AND task_id=%s LIMIT 1;", (telegram_id, task_id))
+            # Each admin-created Website/Web task can be claimed once per user per day.
+            cur.execute("SELECT 1 FROM task_completions WHERE telegram_id=%s AND task_id=%s AND completed_date=CURRENT_DATE LIMIT 1;", (telegram_id, task_id))
             if cur.fetchone():
                 conn.rollback()
-                return {"success":False,"message":"This Website task has already been claimed."}
+                return {"success":False,"message":"This Website task has already been claimed today."}
         elif is_webview:
             # Preserve the existing repeatable WebView task behavior.
             pass
