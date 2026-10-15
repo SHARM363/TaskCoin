@@ -4976,7 +4976,6 @@ let taskPageWasBackgrounded = false;
 let taskReturnCountdownTimer = null;
 
 function taskExternalOpenedKey(taskId) { return "taskcoin_external_opened_" + Number(taskId); }
-function taskExternalAdsterraKey(taskId) { return "taskcoin_external_adsterra_" + Number(taskId); }
 function taskReturnWaitUntilKey(taskId) { return "taskcoin_return_wait_until_" + Number(taskId); }
 function getTaskReturnWaitRemaining(taskId) {
     const until = Number(localStorage.getItem(taskReturnWaitUntilKey(taskId)) || 0);
@@ -4995,12 +4994,6 @@ function beginTaskReturnCountdowns() {
     for (const id of pending) {
         if (localStorage.getItem(taskExternalOpenedKey(id)) !== "1") continue;
         const task = appState.tasks.find(item => Number(item.id) === Number(id));
-        // Reward Club has its own server-verified 30-second landing-page gate.
-        if (localStorage.getItem(taskExternalAdsterraKey(id)) === "1" || (task && isAdsterraTask(task))) {
-            localStorage.removeItem(taskExternalOpenedKey(id));
-            localStorage.removeItem(taskExternalAdsterraKey(id));
-            continue;
-        }
         localStorage.setItem(taskReturnWaitUntilKey(id), String(Date.now() + TASK_RETURN_WAIT_MS));
         localStorage.removeItem(taskExternalOpenedKey(id));
         started = true;
@@ -5186,30 +5179,27 @@ function renderTasks() {
         const platform = String(task.platform || "").trim().toLowerCase();
         const isWebView = ["webview","web view","web-view"].includes(platform);
         const isSocial = ["facebook","tiktok","youtube","telegram","instagram"].includes(platform);
-        if (isSocial && task.completed_ever) {
+        const isWebsite = ["website", "web", "site"].includes(platform);
+        if ((isSocial || isWebsite) && task.completed_ever) {
             buttonHtml = `
                 <button type="button" class="primary-button" style="margin-top:14px;" disabled>
                     ✅ Reward Claimed — One Time Only
                 </button>`;
         } else if (pendingTasks.includes(taskId)) {
-            const returnWaitRemaining = isAdsterraTask(task) ? 0 : getTaskReturnWaitRemaining(taskId);
-            const landingWaitPassed = !isAdsterraTask(task) || localStorage.getItem("taskcoin_adsterra_verified_" + taskId) === "1";
+            const returnWaitRemaining = getTaskReturnWaitRemaining(taskId);
             if (returnWaitRemaining > 0) {
                 buttonHtml = `
                     <button type="button" class="primary-button" data-task-id="${taskId}" disabled style="margin-top:14px;opacity:.75;">
                         ⏳ ${returnWaitRemaining} সেকেন্ড অপেক্ষা করুন…
                     </button>`;
             } else {
-                buttonHtml = landingWaitPassed ? `
+                buttonHtml = `
                     <button type="button"
                             class="primary-button claim-task-btn"
                             data-task-id="${taskId}"
                             onclick="claimTask(${taskId})"
                             style="margin-top:14px;">
                         🎁 Claim Reward
-                    </button>` : `
-                    <button type="button" class="primary-button" data-task-id="${taskId}" disabled style="margin-top:14px;opacity:.75;">
-                        ⏳ ৩০ সেকেন্ড যাচাই হচ্ছে…
                     </button>`;
             }
         } else {
@@ -5293,21 +5283,6 @@ function renderHomeTasksPreview() {
 }
 
 /* =========================================================
-   ADSTERRA REWARD CLUB
-   ========================================================= */
-const ADSTERRA_LANDING_URL = "https://sites.google.com/view/taskcoin-reward1/home";
-const ADSTERRA_SMART_LINK = "https://auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631";
-
-function isAdsterraTask(task) {
-    const platform = String(task?.platform || "").trim().toLowerCase();
-    const url = String(task?.task_url || task?.url || task?.link || task?.task_link || "").trim().toLowerCase();
-    return ["adsterra", "smartlink", "adsterra_smartlink", "reward_club"].includes(platform)
-        || url.includes("auctionr.org/4/91d61efb5c4e2cdcfa525e0cca6fb631")
-        || url.startsWith("https://sites.google.com/view/taskcoin-offer")
-        || url.startsWith("https://sites.google.com/view/taskcoin-earn");
-}
-
-/* =========================================================
    START TASK
    ========================================================= */
 async function startTask(taskId) {
@@ -5349,22 +5324,13 @@ async function startTask(taskId) {
     const startResult = await apiRequest("/api/tasks/start", { method:"POST", body:{ telegram_id: appState.telegramUser?.id, task_id:id } });
     if (!startResult?.success) { showToast(startResult?.message || "Task could not be started."); renderTasks(); return; }
 
-    // Adsterra tasks open the Google landing page first.
-    if (isAdsterraTask(task)) {
-        taskUrl = API_BASE_URL + "/api/adsterra/prepare?telegram_id="
-            + encodeURIComponent(appState.telegramUser?.id)
-            + "&task_id=" + encodeURIComponent(id);
-    }
-
     // SAVE PENDING FIRST. This must happen before opening the URL.
     addTaskId(TASK_PENDING_KEY, id);
     localStorage.setItem(TASK_LAST_PENDING_KEY, String(id));
     sessionStorage.setItem(TASK_LAST_PENDING_KEY, String(id));
     localStorage.setItem(taskExternalOpenedKey(id), "1");
-    localStorage.setItem(taskExternalAdsterraKey(id), isAdsterraTask(task) ? "1" : "0");
     localStorage.removeItem(taskReturnWaitUntilKey(id));
 
-    // Reward Club remains locked until the server verifies the full 30-second wait.
     renderTasks();
 
     try {
@@ -5400,33 +5366,8 @@ async function startTask(taskId) {
 /* =========================================================
    RETURN FROM EXTERNAL TASK
    ========================================================= */
-async function verifyAdsterraPendingTask(task) {
-    if (!task || !isAdsterraTask(task) || !appState.telegramUser?.id) return null;
-    return await apiRequest("/api/adsterra/verify", {
-        method:"POST",
-        body:{ telegram_id:appState.telegramUser.id, task_id:Number(task.id) }
-    });
-}
-
 async function restoreTaskUIAfterReturn() {
     restorePendingTask();
-    renderTasks();
-    const pending = getTaskIdList(TASK_PENDING_KEY);
-    for (const id of pending) {
-        const task = appState.tasks.find(item => Number(item.id) === Number(id));
-        if (task && isAdsterraTask(task)) {
-            const result = await verifyAdsterraPendingTask(task);
-            if (result?.verified) {
-                localStorage.setItem("taskcoin_adsterra_verified_" + Number(id), "1");
-            } else {
-                localStorage.removeItem("taskcoin_adsterra_verified_" + Number(id));
-                const remaining = Math.max(0, Number(result?.remaining_seconds || 0));
-                if (remaining > 0) {
-                    setTimeout(() => { void restoreTaskUIAfterReturn(); }, Math.min(remaining, 30) * 1000 + 300);
-                }
-            }
-        }
-    }
     renderTasks();
 }
 
@@ -5493,21 +5434,11 @@ async function claimTask(taskId) {
         return;
     }
     if (!getTaskIdList(TASK_PENDING_KEY).includes(id)) { showToast("প্রথমে Start Task চাপুন।"); renderTasks(); return; }
-    const returnWaitRemaining = isAdsterraTask(task) ? 0 : getTaskReturnWaitRemaining(id);
+    const returnWaitRemaining = getTaskReturnWaitRemaining(id);
     if (returnWaitRemaining > 0) {
         showToast(`আর ${returnWaitRemaining} সেকেন্ড অপেক্ষা করুন।`);
         renderTasks();
         return;
-    }
-    // Reward Club tasks require the server-confirmed 30-second landing wait before showing Monetag.
-    if (isAdsterraTask(task) && localStorage.getItem("taskcoin_adsterra_verified_" + id) !== "1") {
-        const verification = await verifyAdsterraPendingTask(task);
-        if (!verification?.verified) {
-            showToast(verification?.message || "Google Sites ল্যান্ডিং পেজে ৩০ সেকেন্ড অপেক্ষা করে ফিরে আসুন।");
-            renderTasks();
-            return;
-        }
-        localStorage.setItem("taskcoin_adsterra_verified_" + id, "1");
     }
     if (!appState.telegramUser) await loadTelegramProfile();
     if (!appState.telegramUser?.id) { showToast("Telegram user not detected. Please reopen the Mini App."); return; }
@@ -5563,17 +5494,17 @@ async function proceedWithTaskClaim(id, task, button) {
     const platform = String(task.platform || "").trim().toLowerCase();
     const isWebView = ["webview","web view","web-view"].includes(platform);
     const isSocial = ["facebook","tiktok","youtube","telegram","instagram"].includes(platform);
+    const isWebsite = ["website", "web", "site"].includes(platform);
     if (isSocial) {
         // Keep the server-confirmed lifetime state in memory; it must not reset at midnight.
         task.completed_ever = true;
-    } else if (!isWebView) {
+    } else if (!isWebView || isWebsite) {
         addTaskId(TASK_CLAIMED_KEY, id);
+        if (isWebsite) task.completed_ever = true;
     }
     localStorage.removeItem(TASK_LAST_PENDING_KEY);
     sessionStorage.removeItem(TASK_LAST_PENDING_KEY);
-    localStorage.removeItem("taskcoin_adsterra_verified_" + id);
     localStorage.removeItem(taskExternalOpenedKey(id));
-    localStorage.removeItem(taskExternalAdsterraKey(id));
     localStorage.removeItem(taskReturnWaitUntilKey(id));
 
     if (typeof updateBalanceUI === "function") {
