@@ -1567,12 +1567,9 @@ def claim_task_reward(telegram_id, task_id):
         cur.execute("SELECT started_at FROM task_starts WHERE telegram_id=%s AND task_id=%s;",(telegram_id,task_id)); st=cur.fetchone()
         if not st: conn.rollback(); return {"success":False,"message":"Start Task first."}
         cur.execute("SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-%s)) AS seconds;",(st['started_at'],)); elapsed=float(cur.fetchone()['seconds'] or 0)
-        required=max(1,int(task.get('duration') or 20))
-        # For rewarded-ad tasks the ad completion is the completion gate; do not
-        # reject a valid claim merely because the configured page duration is longer
-        # than the ad. Non-ad tasks keep the original duration requirement.
-        if not is_webview and elapsed < required:
-            conn.rollback(); return {"success":False,"message":f"Please complete the task for at least {required} seconds.","remaining":max(0,required-int(elapsed))}
+        # The client shows the Monetag rewarded ad before submitting a claim.
+        # Do not impose an additional landing-page countdown after the user returns;
+        # the valid Start Task record is still required above.
         platform=str(task.get('platform') or '').strip().lower()
         is_social=platform in PREMIUM_SOCIAL_PLATFORMS
         if is_social:
@@ -1828,11 +1825,14 @@ def create_withdrawal(telegram_id, method, account_number, amount, source='task'
     try: amount=float(amount)
     except (ValueError, TypeError): return {"success":False,"message":"Invalid withdrawal amount."}
     source=str(source or 'task').strip().lower()
+    if source == 'main':
+        source = 'task'
     if source not in ('task','deposit'): return {"success":False,"message":"Invalid withdrawal source."}
-    # Task/main balance: minimum 1000 TaskCoins. Deposit balance: minimum 1500 BDT.
-    minimum = 1000 if source == 'task' else 1500
-    if amount < minimum: return {"success":False,"message":f"Minimum withdrawal is {minimum} {'TaskCoins' if source=='task' else 'BDT'}."}
-    if amount > 30000: return {"success":False,"message":"Maximum withdrawal is 30000."}
+    # Keep the main/task balance rules consistent with the withdrawal page.
+    minimum = 500 if source == 'task' else 1500
+    maximum = 25000 if source == 'task' else 30000
+    if amount < minimum: return {"success":False,"message":f"Minimum withdrawal is {minimum} {'BDT' if source=='task' else 'BDT'}."}
+    if amount > maximum: return {"success":False,"message":f"Maximum withdrawal is {maximum} BDT."}
     method_norm=str(method or '').strip()
     allowed={"bkash":"bKash","nagad":"Nagad","usdt":"USDT"}
     method_key=method_norm.lower()
